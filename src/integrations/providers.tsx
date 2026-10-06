@@ -38,6 +38,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       appearance={CLERK_APPEARANCE}
       signInUrl="/login"
       afterSignOutUrl="/login"
+      allowedRedirectOrigins={
+        typeof window === 'undefined' ? [] : [window.location.origin]
+      }
     >
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         {children}

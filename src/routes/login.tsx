@@ -2,14 +2,12 @@ import { SignIn, useAuth } from '@clerk/tanstack-react-start'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { CenteredMessage } from '#/components/centered-message'
+import { safeRedirect } from '#/lib/safe-redirect'
 import { m } from '#/paraglide/messages.js'
 
 export const Route = createFileRoute('/login')({
   validateSearch: (search: Record<string, unknown>) => ({
-    redirect:
-      typeof search.redirect === 'string' && search.redirect.startsWith('/')
-        ? search.redirect
-        : '/',
+    redirect: safeRedirect(search.redirect),
   }),
   component: LoginPage,
 })
