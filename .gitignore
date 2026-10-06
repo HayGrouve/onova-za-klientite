@@ -1,0 +1,24 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.env*
+.nitro
+.tanstack
+.output
+.vinxi
+
+# Vercel
+.vercel
+
+# Playwright
+test-results/
+playwright-report/
+
+# Windows alternate data streams
+*:Zone.Identifier
+
+# Local git worktrees
+.worktrees/
