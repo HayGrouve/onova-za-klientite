@@ -42,3 +42,11 @@ export function isValidWord(word: Word): boolean {
   }
   return ok(word.singular) && ok(word.plural)
 }
+
+/** A best guess at a Bulgarian noun's gender from its ending, editable in Settings. */
+export function guessGender(singular: string): Gender {
+  const word = singular.trim().toLocaleLowerCase('bg')
+  if (/[ая]$/.test(word)) return 'f'
+  if (/[оеиую]$/.test(word)) return 'n'
+  return 'm'
+}
