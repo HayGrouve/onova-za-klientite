@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) is in review. Nothing below is built yet.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestone 1 is next. Nothing below is built yet.
 
 ## Contents
 
@@ -306,7 +306,7 @@ One PR each, in this order. Each has a GitHub issue. Every milestone follows the
 - [x] One GitHub issue per milestone
 - [x] Questions for the owner (below)
 
-**Acceptance:** the owner has reviewed and answered the questions.
+**Acceptance:** the owner has reviewed and answered the questions. Merged in #13. Q19 and Q21 are answered, and the rest follow their proposals unless the owner says otherwise.
 
 ### 1. Foundation (#2)
 
@@ -318,7 +318,7 @@ One PR each, in this order. Each has a GitHub issue. Every milestone follows the
 | Spike: `@clerk/tanstack-react-start` in SPA mode, with `@clerk/react` as the fallback | Sign-in, sign-out and reload all work. The choice goes in the PR |
 | ESLint (TanStack config), Prettier, knip, Vitest (inside `vite.config.ts`) | `pnpm ci:preflight` passes locally |
 | CI on `ubuntu-latest`: format check, lint, typecheck (app + `convex/`), knip, tests, build | Green on the PR |
-| Convex project and deployments in EU (Ireland) with `--region eu`, after the owner's OK (ADR 0002) | Deployment URLs contain `.eu-west-1.`. `npx convex run system:whereAmI` returns `aws-eu-west-1` |
+| Convex project on the team's Free plan, with a disposable dev deployment, in EU (Ireland) if Free allows it (ADR 0002, Q19) | `npx convex run system:whereAmI` prints the region, and the PR records it |
 | Clerk: Google + email code only, `bgBG`, Clerk's Convex integration (ADR 0003) | Sign-in works in Bulgarian on a phone viewport |
 | Paraglide with `messages/bg.json` (ADR 0009), and a test that fails on Cyrillic text in components | The test fails on a planted hard-coded string |
 | PWA manifest (`lang: "bg"`), icons from the sibling's sharp script with a padded maskable icon, SW registration | Chrome DevTools shows it installable. `check-icons` passes |
@@ -528,9 +528,11 @@ The review screen lists what will change before applying.
 
 ### Accounts, deploys and providers
 
-Q19 and Q20 are needed before milestone 1 starts. Q21 and Q22 are needed before Vercel is linked.
+Q19 and Q21 are answered. Q20 is needed before milestone 1 adds those packages, and Q22 before Vercel is linked.
 
 **Q19. Convex region: please confirm before I create anything.** It's `aws-eu-west-1` (Ireland), for production, dev and previews, created with `--region eu` (ADR 0002). Usage there is billed at 1.3×. I'd also like you to set the team's default region to Europe (Ireland) in Convex Team settings. It's the one dashboard click with no CLI equivalent, and it stops any automatic path from creating a US deployment by mistake.
+
+> **Answer (6 Oct 2026):** stay on the team's Free plan. Development data is disposable, so dev and preview deployments use what Free allows. That means EU (Ireland) if Free offers it, and otherwise the default region. The production deployment is created fresh in EU (Ireland) when the app is ready to launch, with the owner's OK. No team default region change is needed now.
 
 **Q20. New dependencies.** These are planned, and you asked to approve unusual or large ones:
 
@@ -546,6 +548,8 @@ Q19 and Q20 are needed before milestone 1 starts. Q21 and Q22 are needed before 
 
 **Q21. Convex plan and backups.** Free has hard caps: 1M function calls, 0.5 GB database, 1 GB files, and no automatic backups. That's fine for building.
 *Proposal:* stay on Free until the first user's real data goes in. Then move to Pro ($25/month) for daily backups, or Starter (pay as you go) plus a weekly manual `npx convex export`. The choice is yours; either way it's before milestone 10.
+
+> **Answer (6 Oct 2026):** Free while developing. There is no data worth keeping, so there are no backups. Plan and backups are decided again before the production deployment is created.
 
 **Q22. Merging deploys production.** With ADR 0004, a merge to `main` runs `npx convex deploy` and the Vercel production build together. So approving a merge also approves a production deploy.
 *Proposal:* accept that once milestone 1's first production deploy has gone well. The alternative is the sibling's model: production only from GitHub Actions, which still runs on merge, so it's no safer, just more moving parts.
@@ -584,6 +588,7 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D16 | Errors | Convex throws `ConvexError({ code })`, and the client maps codes to messages | Convex never holds UI text, so translation stays in one place |
 | D17 | In-app browsers | Links opened inside Viber or Facebook show "Отворете в Chrome" or "Отворете в Safari" before install or push | In-app browsers can't install a PWA or receive push, and Viber is where links get shared |
 | D18 | Photos | Compressed in the browser before upload (long side 2000 px, JPEG) | Phone photos are 3–8 MB and uploads time out after 2 minutes on slow networks |
+| D19 | Convex while developing | The team's Free plan. Every dev and preview deployment is disposable and holds only seed data, and so does the Free project's production deployment that Vercel production uses until launch. The real production deployment is created fresh in EU (Ireland) at launch, with the owner's OK, and Vercel's production deploy key is switched to it (Q19, Q21) | Nothing needs keeping until the first user's real data, and a region can't be changed after creation |
 
 ## Spikes
 
@@ -599,6 +604,12 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
 
 ## Done, next, open
 
-- **Done:** milestone 0 drafted.
-- **Next:** the owner reviews this plan and answers the questions, Q19 and Q20 first. The design doc PR (#1) is merged.
-- **Open:** see Questions.
+- **Done:**
+  - milestone 0 (#13);
+  - the design doc picks for prototypes 1 and 2 (#1);
+  - Q19 and Q21: Free plan while developing, with production created in EU at launch.
+- **Next:** milestone 1, Foundation (#2).
+- **Open:**
+  - Q20 (new dependencies, needed when milestone 1 adds Paraglide);
+  - Q22 (merging deploys production, needed before Vercel is linked);
+  - Q23–Q26.
