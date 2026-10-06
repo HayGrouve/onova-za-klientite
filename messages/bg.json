@@ -24,7 +24,7 @@
   "today_empty_title": "Нищо за днес",
   "today_empty_body": "Тук ще виждате срещите за деня, закъснелите срокове и кой ви дължи.",
   "jobs_empty_title": "{jobs}: още няма",
-  "jobs_empty_body": "Добавете първата с бутона „+“ долу.",
+  "jobs_empty_body": "Натиснете „+“ долу, за да добавите.",
   "clients_empty_title": "{clients}: още няма",
   "clients_empty_body": "Ще се появят тук, щом ги добавите.",
   "money_title": "Пари",
