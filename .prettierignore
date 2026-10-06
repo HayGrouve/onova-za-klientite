@@ -1,0 +1,11 @@
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+src/components/ui/
+src/routeTree.gen.ts
+src/paraglide/
+convex/_generated/
+.vercel/
+.output/
+project.inlang/
+*.md
