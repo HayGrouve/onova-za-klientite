@@ -1,0 +1,125 @@
+import { v } from 'convex/values'
+import {
+  customCtx,
+  customMutation,
+  customQuery,
+} from 'convex-helpers/server/customFunctions'
+import { mutation, query } from '../_generated/server'
+import type { Doc, Id, TableNames } from '../_generated/dataModel'
+import type { MutationCtx, QueryCtx } from '../_generated/server'
+import { fail } from './errors'
+
+type Role = Doc<'memberships'>['role']
+
+export async function findCurrentUser(
+  ctx: QueryCtx,
+): Promise<Doc<'users'> | null> {
+  const identity = await ctx.auth.getUserIdentity()
+  if (!identity) return null
+  return await ctx.db
+    .query('users')
+    .withIndex('by_token', (q) =>
+      q.eq('tokenIdentifier', identity.tokenIdentifier),
+    )
+    .unique()
+}
+
+async function requireUser(ctx: QueryCtx): Promise<Doc<'users'>> {
+  const identity = await ctx.auth.getUserIdentity()
+  if (!identity) fail('auth.signedOut')
+  const user = await findCurrentUser(ctx)
+  if (!user) fail('auth.noUser')
+  return user
+}
+
+/** The caller's active membership in a business, or null. */
+export async function findMembership(
+  ctx: QueryCtx,
+  businessId: Id<'businesses'>,
+  userId: Id<'users'>,
+): Promise<Doc<'memberships'> | null> {
+  const membership = await ctx.db
+    .query('memberships')
+    .withIndex('by_business_user', (q) =>
+      q.eq('businessId', businessId).eq('userId', userId),
+    )
+    .unique()
+  if (!membership || membership.deactivatedAt !== undefined) return null
+  return membership
+}
+
+async function loadBusinessScope(ctx: QueryCtx, businessId: Id<'businesses'>) {
+  const user = await requireUser(ctx)
+  const member = await findMembership(ctx, businessId, user._id)
+  if (!member) fail('auth.notMember')
+  const business = await ctx.db.get('businesses', businessId)
+  if (!business) fail('auth.notMember')
+  return { user, member, business }
+}
+
+/** A signed-in user with a `users` row. For functions outside any business. */
+export const userQuery = customQuery(
+  query,
+  customCtx(async (ctx) => ({ user: await requireUser(ctx) })),
+)
+
+export const userMutation = customMutation(
+  mutation,
+  customCtx(async (ctx) => ({ user: await requireUser(ctx) })),
+)
+
+/**
+ * Every business-scoped public function goes through these (ADR 0006). The
+ * caller passes `businessId`; the wrapper proves an active membership and
+ * passes `ctx.business`, `ctx.member` and `ctx.user` on.
+ */
+export const businessQuery = customQuery(query, {
+  args: { businessId: v.id('businesses') },
+  input: async (ctx, { businessId }) => ({
+    ctx: await loadBusinessScope(ctx, businessId),
+    args: {},
+  }),
+})
+
+export const businessMutation = customMutation(mutation, {
+  args: { businessId: v.id('businesses') },
+  input: async (ctx, { businessId }) => ({
+    ctx: await loadBusinessScope(ctx, businessId),
+    args: {},
+  }),
+})
+
+const ROLE_RANK: Record<Role, number> = { worker: 0, manager: 1, owner: 2 }
+
+/** Throws unless the member's role is at least `role`. */
+export function requireRole(member: Doc<'memberships'>, role: Role) {
+  if (ROLE_RANK[member.role] < ROLE_RANK[role]) fail('auth.forbidden')
+}
+
+type BusinessScoped = TableNames extends infer T
+  ? T extends TableNames
+    ? Doc<T> extends { businessId: Id<'businesses'> }
+      ? T
+      : never
+    : never
+  : never
+
+/** Loads a document by id and checks it belongs to the caller's business. */
+export async function getOwned<T extends BusinessScoped>(
+  ctx: QueryCtx & { business: Doc<'businesses'> },
+  table: T,
+  id: Id<T>,
+): Promise<Doc<T>> {
+  const doc = await ctx.db.get(table, id)
+  const owner = (doc as { businessId?: Id<'businesses'> } | null)?.businessId
+  if (!doc || owner !== ctx.business._id) {
+    fail('notFound', { table })
+  }
+  return doc
+}
+
+export type BusinessMutationCtx = MutationCtx & {
+  user: Doc<'users'>
+  member: Doc<'memberships'>
+  business: Doc<'businesses'>
+}
