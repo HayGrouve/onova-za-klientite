@@ -600,5 +600,5 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
 ## Done, next, open
 
 - **Done:** milestone 0 drafted.
-- **Next:** the owner reviews this plan and answers the questions. The design doc PR (#1) is merged.
+- **Next:** the owner reviews this plan and answers the questions, Q19 and Q20 first. The design doc PR (#1) is merged.
 - **Open:** see Questions.
