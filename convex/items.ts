@@ -18,6 +18,7 @@ export const create = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const client = await getOwned(ctx, 'clients', args.clientId)
+    if (client.isNoClient) fail('client.noClient')
     const item = {
       businessId: ctx.business._id,
       clientId: client._id,

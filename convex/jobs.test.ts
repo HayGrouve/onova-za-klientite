@@ -203,3 +203,60 @@ describe('jobs', () => {
     expect((await lastActivity(t)).type).toBe('item.moved')
   })
 })
+
+describe('jobs after settings change', () => {
+  it('cancelling still works after the last Cancelled stage was deleted', async () => {
+    const { t, owner, businessId, clientId, stage } = await withClient()
+    await owner.mutation(api.stages.remove, {
+      businessId,
+      stageId: stage('cancelled'),
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Шкаф',
+    })
+    await owner.mutation(api.jobs.cancel, { businessId, jobId })
+    expect((await getDoc(t, 'jobs', jobId)).stageGroup).toBe('cancelled')
+  })
+
+  it('a moved item stays linkable to the jobs it already had', async () => {
+    const { owner, businessId, clientId } = await withClient()
+    const itemId = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Golf 4',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Масло',
+      itemIds: [itemId],
+    })
+    const buyerId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Купувач',
+    })
+    await owner.mutation(api.items.move, {
+      businessId,
+      itemId,
+      toClientId: buyerId,
+    })
+    await owner.mutation(api.jobs.setItems, {
+      businessId,
+      jobId,
+      itemIds: [itemId],
+    })
+  })
+
+  it('"No client" owns no items', async () => {
+    const { owner, businessId, noClientId } = await withClient()
+    await expect(
+      owner.mutation(api.items.create, {
+        businessId,
+        clientId: noClientId,
+        name: 'Стол',
+      }),
+    ).rejects.toThrow(/client.noClient/)
+  })
+})

@@ -124,3 +124,33 @@ describe('extra fields', () => {
     ).rejects.toThrow(/field.value/)
   })
 })
+
+describe('field edge cases', () => {
+  it('long text saved before a change to text stays saveable', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const fieldId = await owner.mutation(api.fields.add, {
+      businessId,
+      target: 'client',
+      name: 'Бележка',
+      type: 'longText',
+    })
+    const long = 'дълъг текст '.repeat(60)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Ани',
+      extra: { [fieldId]: long },
+    })
+    await owner.mutation(api.fields.update, {
+      businessId,
+      fieldId,
+      type: 'text',
+    })
+    await owner.mutation(api.clients.update, {
+      businessId,
+      clientId,
+      name: 'Ани Г.',
+      extra: { [fieldId]: long },
+    })
+  })
+})

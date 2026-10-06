@@ -152,8 +152,9 @@ export const addFromClient = businessMutation({
       for (const [jobId, total] of merged) {
         const job = await getOwned(ctx, 'jobs', jobId)
         if (job.clientId !== client._id) fail('job.otherClient', { jobId })
-        if (total > Math.max(job.balanceCents, 0))
+        if (!job.owes || total > job.balanceCents) {
           fail('payment.exceeds', { jobId })
+        }
       }
     } else {
       const jobs = await openJobs(ctx, client._id)

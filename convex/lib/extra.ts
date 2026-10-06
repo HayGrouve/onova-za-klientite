@@ -9,8 +9,10 @@ type Extra = Infer<typeof vExtra>
 type Target = Doc<'fields'>['target']
 
 /**
- * Validates extra field values for a record and merges them over the old ones.
- * Values of archived fields are kept untouched: archiving hides, never deletes.
+ * Validates a record's extra field values. `incoming` replaces the active
+ * fields' values as a whole: forms send every active field, and leaving one
+ * out clears it. Values of archived fields are always kept, because archiving
+ * hides and never deletes (D27).
  */
 export async function mergeExtra(
   ctx: QueryCtx,
@@ -33,8 +35,9 @@ export async function mergeExtra(
     const field = byId.get(fieldId)
     if (!field || field.archivedAt !== undefined)
       fail('field.value', { fieldId })
-    const unchanged = previous[fieldId] === value
-    if (!validateFieldValue(field, value, { allowArchived: unchanged })) {
+    // A value saved earlier stays valid, e.g. long text after a change to text.
+    const unchanged = fieldId in previous && previous[fieldId] === value
+    if (!unchanged && !validateFieldValue(field, value)) {
       fail('field.value', { fieldId })
     }
     result[fieldId] = value
