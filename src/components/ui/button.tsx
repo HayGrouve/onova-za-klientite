@@ -30,6 +30,9 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
+        // Phone tap targets (local addition, ADR 0005).
+        xl: "h-12 gap-2 rounded-xl px-4 text-base has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg:not([class*='size-'])]:size-5",
+        "icon-xl": "size-12 rounded-xl [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {

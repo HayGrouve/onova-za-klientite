@@ -1,4 +1,9 @@
-import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from '@tanstack/react-router'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
@@ -63,7 +68,17 @@ function EnsureUser() {
 
 function WithViewer() {
   const viewer = useQuery(api.users.viewer)
-  if (viewer === undefined) return <Loading />
+  const navigate = useNavigate()
+  const pathname = useLocation({ select: (location) => location.pathname })
+  const needsSetup =
+    viewer?.business?.setupDone === false && pathname !== '/setup'
+
+  // First run: sign in → Setup → Today.
+  useEffect(() => {
+    if (needsSetup) void navigate({ to: '/setup', replace: true })
+  }, [needsSetup, navigate])
+
+  if (viewer === undefined || needsSetup) return <Loading />
   if (!viewer?.business)
     return <CenteredMessage>{m.error_profile()}</CenteredMessage>
   return (

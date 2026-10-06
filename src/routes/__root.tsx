@@ -12,6 +12,8 @@ import { ServiceWorkerRegister } from '#/components/service-worker-register'
 import { Button } from '#/components/ui/button'
 import { Toaster } from '#/components/ui/sonner'
 import { errorMessage } from '#/lib/errors'
+import { applyTimingFlag } from '#/lib/timing'
+import { useEffect } from 'react'
 import { m } from '#/paraglide/messages.js'
 import appCss from '../styles.css?url'
 
@@ -43,6 +45,9 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
+  useEffect(() => {
+    applyTimingFlag(window.location.search)
+  }, [])
   return (
     <AppProviders>
       <Outlet />

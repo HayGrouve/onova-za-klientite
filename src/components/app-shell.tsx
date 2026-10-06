@@ -3,13 +3,14 @@ import {
   CaretDownIcon,
   ClipboardTextIcon,
   PlusIcon,
+  GearSixIcon,
   SignOutIcon,
   SunIcon,
   UsersIcon,
   WalletIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { cn } from 'cn'
@@ -34,6 +35,10 @@ import { m } from '#/paraglide/messages.js'
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { business } = useViewer()
   const { words } = business
+  const pathname = useLocation({ select: (location) => location.pathname })
+
+  // Setup is a full-screen flow of its own.
+  if (pathname === '/setup') return <>{children}</>
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
@@ -181,6 +186,13 @@ function AppHeader() {
             </DropdownMenuLabel>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="min-h-11"
+            onClick={() => void navigate({ to: '/settings' })}
+          >
+            <GearSixIcon />
+            {m.account_settings()}
+          </DropdownMenuItem>
           <DropdownMenuItem className="min-h-11" onClick={() => void signOut()}>
             <SignOutIcon />
             {m.account_sign_out()}

@@ -182,6 +182,24 @@ describe('planSetup', () => {
     ])
   })
 
+  it('custom stages are left alone when the flow answer is unchanged', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      jobFlow: 'multi',
+      stages: [
+        { name: 'Оглед', group: 'new' },
+        { name: 'Изработка', group: 'in_progress' },
+        { name: 'Монтаж', group: 'in_progress' },
+        { name: 'Готово', group: 'done' },
+      ],
+    }
+    expect(
+      planSetup(current, settingsFromAnswers({ flow: 'multi' }, current))
+        .stagesToAdd,
+    ).toEqual([])
+  })
+
   it('item fields are added and existing ones kept; services are merged by name', () => {
     const current: CurrentSetup = {
       ...fresh(),

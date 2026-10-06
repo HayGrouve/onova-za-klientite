@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 (foundation) and 2 (domain core) are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 (foundation), 2 (domain core) and 3 (setup wizard) are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
 
 ## Contents
 
@@ -599,6 +599,8 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D25 | Stage delete with jobs | Deleting a stage that holds jobs takes a "move jobs to" stage and moves them in the same mutation. Without one it fails with `stage.hasJobs`. A required group's last stage can't be deleted or regrouped at all | One call for the "Изтрий и премести" button, and no moment where jobs point at a missing stage |
 | D26 | Refunds | A refund from a job is limited to what the job was paid. A refund without a job pays back client credit, and can't exceed it | A refund never makes a balance or credit go below what was actually received |
 | D27 | Extra field values | A record's extra values are replaced as a whole on edit, except values of archived fields, which are always kept | The form only shows active fields, so archived values would otherwise be lost on every save |
+| D28 | Setup and stages | A first run on a business with no jobs swaps its starting stages for the chosen flow's. After that, setup only adds a flow's missing stages, and only when the flow answer changes. Custom stages are never touched | Re-running setup with unchanged answers changes nothing, and a renamed stage list stays as the owner left it |
+| D29 | Setup logo | The logo button from step 1 arrives with file uploads in milestone 5, under Settings → Business | Uploads need the server-side file checks (D14) first |
 
 ## Spikes
 
@@ -622,6 +624,7 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - Q20: dependencies approved, with `read-excel-file` + `papaparse` instead of SheetJS.
 - **Next:** merge milestone 1, then link Vercel (Q22) and the first production deploy, with the owner's OK. Milestones 2 onwards are stacked on the milestone 1 branch meanwhile.
   - milestone 2 built (#3), in review: the full schema, the pure rules in `shared/` (money, allocation, stages, fields, words, phone, dates), the money and settings mutations, the activity log, recompute with a cache check, a stranger test over every public function, and a seed with jobs, money and reminders;
+  - milestone 3 built (#4), in review: setup with the live job-form preview, applied in one mutation through the safe-change rules, "Run setup again" from Settings with a list of what will change, and the `?timing` stopwatch (Q15);
 - **Open:**
   - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26.

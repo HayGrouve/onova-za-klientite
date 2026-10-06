@@ -131,3 +131,13 @@
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+/* Flashes the part of the setup preview an answer just changed. */
+@keyframes flash {
+  from {
+    background-color: color-mix(in oklch, var(--primary) 16%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}

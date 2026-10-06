@@ -318,14 +318,18 @@ export function planSetup(
         stage.group === settings.stages[index].group,
     )
   const replaceStages = !current.setupDone && !current.hasJobs && !sameStages
+  // Custom stages stay as they are unless the answer about the job flow changed.
+  const flowChanged = settings.jobFlow !== current.jobFlow
   const stagesToAdd = replaceStages
     ? settings.stages
-    : settings.stages.filter(
-        (stage) =>
-          !current.stages.some((existing) =>
-            sameName(existing.name, stage.name),
-          ),
-      )
+    : !flowChanged
+      ? []
+      : settings.stages.filter(
+          (stage) =>
+            !current.stages.some((existing) =>
+              sameName(existing.name, stage.name),
+            ),
+        )
 
   const fieldsToAdd = (settings.item?.fields ?? []).filter(
     (field) =>
