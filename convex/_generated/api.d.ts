@@ -30,6 +30,7 @@ import type * as lib_search from "../lib/search.js";
 import type * as lib_seedAccess from "../lib/seedAccess.js";
 import type * as lib_validate from "../lib/validate.js";
 import type * as lib_views from "../lib/views.js";
+import type * as money from "../money.js";
 import type * as newJob from "../newJob.js";
 import type * as payments from "../payments.js";
 import type * as seed from "../seed.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   "lib/seedAccess": typeof lib_seedAccess;
   "lib/validate": typeof lib_validate;
   "lib/views": typeof lib_views;
+  money: typeof money;
   newJob: typeof newJob;
   payments: typeof payments;
   seed: typeof seed;

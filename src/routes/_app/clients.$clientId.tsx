@@ -2,6 +2,7 @@ import {
   ChatCircleIcon,
   PencilSimpleIcon,
   PhoneIcon,
+  PlusIcon,
 } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
@@ -12,6 +13,9 @@ import { ClientForm } from '#/components/client-form'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { JobRow } from '#/components/job-row'
+import { PaymentForm } from '#/components/money/payment-form'
+import { RefundForm } from '#/components/money/refund-form'
+import { RemovePayment } from '#/components/money/remove-payment'
 import { ListSection } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { Timeline } from '#/components/timeline'
@@ -42,7 +46,14 @@ function ClientPage() {
     businessId: business._id,
     clientId: clientId as Id<'clients'>,
   })
-  const [editing, setEditing] = useState(false)
+  const [panel, setPanel] = useState<
+    | { kind: 'edit' }
+    | { kind: 'payment' }
+    | { kind: 'refund' }
+    | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
+    | null
+  >(null)
+  const close = () => setPanel(null)
   const { words } = business
 
   if (!data) return <ListSkeleton />
@@ -61,7 +72,7 @@ function ClientPage() {
               variant="ghost"
               size="icon-xl"
               aria-label={m.client_edit()}
-              onClick={() => setEditing(true)}
+              onClick={() => setPanel({ kind: 'edit' })}
             >
               <PencilSimpleIcon />
             </Button>
@@ -205,23 +216,47 @@ function ClientPage() {
           </li>
         ) : (
           data.payments.map((payment) => (
-            <li
-              key={payment._id}
-              className="flex items-baseline justify-between gap-3 px-4 py-2"
-            >
-              <span className="flex flex-col">
-                <span>{payment.label ?? METHOD_LABEL[payment.method]()}</span>
-                <span className="text-sm text-muted-foreground">
-                  {formatDay(payment.date, today)} ·{' '}
-                  {METHOD_LABEL[payment.method]()}
+            <li key={payment._id}>
+              <button
+                type="button"
+                onClick={() =>
+                  setPanel({
+                    kind: 'removePayment',
+                    paymentId: payment._id,
+                    amountCents: payment.amountCents,
+                  })
+                }
+                className="flex w-full items-baseline justify-between gap-3 px-4 py-2 text-left hover:bg-muted/60"
+              >
+                <span className="flex flex-col">
+                  <span>{payment.label ?? METHOD_LABEL[payment.method]()}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {formatDay(payment.date, today)} ·{' '}
+                    {METHOD_LABEL[payment.method]()}
+                  </span>
                 </span>
-              </span>
-              <span className="font-medium tabular-nums">
-                {formatMoney(payment.amountCents)}
-              </span>
+                <span className="font-medium tabular-nums">
+                  {formatMoney(payment.amountCents)}
+                </span>
+              </button>
             </li>
           ))
         )}
+        <li className="flex flex-wrap gap-2 px-4 pt-2">
+          <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
+            <PlusIcon data-icon="inline-start" />
+            {m.pay_add()}
+          </Button>
+          {client.creditCents > 0 && (
+            <Button
+              variant="outline"
+              size="xl"
+              onClick={() => setPanel({ kind: 'refund' })}
+            >
+              {m.refund_add()}
+            </Button>
+          )}
+        </li>
       </ListSection>
 
       {!client.isNoClient && (
@@ -245,21 +280,61 @@ function ClientPage() {
         </section>
       )}
 
-      <Sheet open={editing} onOpenChange={setEditing}>
+      <Sheet open={panel !== null} onOpenChange={(open) => !open && close()}>
         <SheetContent
           side="bottom"
           className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
         >
           <SheetHeader>
-            <SheetTitle>{client.name}</SheetTitle>
+            <SheetTitle>
+              {panel?.kind === 'payment'
+                ? m.pay_title()
+                : panel?.kind === 'refund'
+                  ? m.refund_title()
+                  : panel?.kind === 'removePayment'
+                    ? m.pay_remove()
+                    : client.name}
+            </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
-            <ClientForm
-              businessId={business._id}
-              client={client}
-              fields={data.fields}
-              onSaved={() => setEditing(false)}
-            />
+            {panel?.kind === 'edit' && (
+              <ClientForm
+                businessId={business._id}
+                client={client}
+                fields={data.fields}
+                onSaved={close}
+              />
+            )}
+            {panel?.kind === 'payment' && (
+              <PaymentForm
+                businessId={business._id}
+                target={{
+                  kind: 'client',
+                  clientId: client._id,
+                  openJobs: data.jobs.filter((job) => job.owes),
+                }}
+                today={today}
+                depositsOn={business.depositsOnNewJob}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'refund' && (
+              <RefundForm
+                businessId={business._id}
+                clientId={client._id}
+                creditCents={client.creditCents}
+                today={today}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'removePayment' && (
+              <RemovePayment
+                businessId={business._id}
+                paymentId={panel.paymentId}
+                amountCents={panel.amountCents}
+                onDone={close}
+              />
+            )}
           </div>
         </SheetContent>
       </Sheet>

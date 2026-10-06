@@ -9,6 +9,10 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   notFound: m.error_notFound,
   invalid: m.error_invalid,
   'payment.zero': m.error_payment_zero,
+  'payment.exceeds': m.error_payment_exceeds,
+  'payment.signMismatch': m.error_payment_signMismatch,
+  'credit.notEnough': m.error_credit_notEnough,
+  'job.otherClient': m.error_job_otherClient,
   'file.rejected': m.files_rejected,
 }
 

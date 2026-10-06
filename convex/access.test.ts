@@ -177,6 +177,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   'jobs:setLines': (ids) => ({ jobId: ids.jobId, lines: [] }),
   'jobs:update': (ids) => ({ jobId: ids.jobId, title: 'Друга' }),
   'jobs:writeOff': (ids) => ({ jobId: ids.jobId, note: 'x' }),
+  'money:summary': () => ({ month: '2026-10' }),
   'newJob:context': () => ({}),
   'newJob:save': (ids) => ({
     client: { kind: 'existing', clientId: ids.clientId },
@@ -232,6 +233,7 @@ const NO_RECORD_IDS = new Set([
   'fields:add',
   'files:generateUploadUrl',
   'files:list',
+  'money:summary',
   'newJob:context',
   'setup:apply',
   'setup:current',

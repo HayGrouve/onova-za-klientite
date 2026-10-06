@@ -14,6 +14,11 @@ import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { AppointmentForm } from '#/components/job/appointment-form'
+import { CostForm } from '#/components/money/cost-form'
+import { PaymentForm } from '#/components/money/payment-form'
+import { RefundForm } from '#/components/money/refund-form'
+import { RemovePayment } from '#/components/money/remove-payment'
+import { WriteOffForm } from '#/components/money/write-off-form'
 import { JobEditForm } from '#/components/job/job-edit-form'
 import { LinesEditor } from '#/components/job/lines-editor'
 import { formatMoment } from '#/components/job-row'
@@ -46,6 +51,11 @@ type Panel =
   | { kind: 'lines' }
   | { kind: 'appointment'; appointment?: Doc<'appointments'> }
   | { kind: 'items' }
+  | { kind: 'payment' }
+  | { kind: 'refund' }
+  | { kind: 'writeOff' }
+  | { kind: 'cost'; cost?: Doc<'costs'> }
+  | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
 
 function Section({
   title,
@@ -81,6 +91,8 @@ function JobPage() {
   })
   const services = useQuery(api.services.list, { businessId: business._id })
   const changeStage = useMutation(api.jobs.changeStage)
+  const applyCredit = useMutation(api.payments.useCredit)
+  const removeWriteOff = useMutation(api.jobs.removeWriteOff)
   const [panel, setPanel] = useState<Panel | null>(null)
   const { words, modules } = business
 
@@ -252,30 +264,104 @@ function JobPage() {
             </div>
           ))}
         </div>
-        {job.writeOff && (
+        {modules.costs && (
           <p className="px-4 text-sm text-muted-foreground">
-            {m.job_written_off()}: {formatMoney(job.writeOff.amountCents)} ·{' '}
-            {job.writeOff.note}
+            {m.job_profit()}: {formatMoney(job.paidCents - job.costCents)}
           </p>
         )}
+        {client && client.creditCents > 0 && job.owes && (
+          <div className="mx-4 flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2">
+            <span className="text-sm font-medium">
+              {m.credit_banner({ amount: formatMoney(client.creditCents) })}
+            </span>
+            <Button
+              variant="secondary"
+              className="h-10"
+              onClick={() =>
+                void applyCredit({ businessId: business._id, jobId: job._id })
+                  .then((cents) =>
+                    toast.success(
+                      m.credit_used({ amount: formatMoney(cents) }),
+                    ),
+                  )
+                  .catch((error: unknown) => toast.error(errorMessage(error)))
+              }
+            >
+              {m.credit_use()}
+            </Button>
+          </div>
+        )}
+        {job.writeOff && (
+          <div className="flex items-center justify-between gap-3 px-4 text-sm text-muted-foreground">
+            <span>
+              {m.job_written_off()}: {formatMoney(job.writeOff.amountCents)} ·{' '}
+              {job.writeOff.note}
+            </span>
+            <Button
+              variant="ghost"
+              className="h-9 shrink-0"
+              onClick={() =>
+                void removeWriteOff({
+                  businessId: business._id,
+                  jobId: job._id,
+                }).catch((error: unknown) => toast.error(errorMessage(error)))
+              }
+            >
+              {m.writeoff_undo()}
+            </Button>
+          </div>
+        )}
         {data.payments.length > 0 && (
-          <ul className="flex flex-col px-4">
+          <ul className="flex flex-col">
             {data.payments.map((payment) => (
-              <li
-                key={payment._id}
-                className="flex items-baseline justify-between gap-3 py-1.5 text-sm"
-              >
-                <span>
-                  {payment.label ?? METHOD_LABEL[payment.method]()} ·{' '}
-                  {formatDay(payment.date, today)}
-                </span>
-                <span className="tabular-nums">
-                  {formatMoney(payment.amountCents)}
-                </span>
+              <li key={payment._id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPanel({
+                      kind: 'removePayment',
+                      paymentId: payment.paymentId,
+                      amountCents: payment.paymentAmountCents,
+                    })
+                  }
+                  className="flex w-full items-baseline justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-muted/60"
+                >
+                  <span>
+                    {payment.label ?? METHOD_LABEL[payment.method]()} ·{' '}
+                    {formatDay(payment.date, today)}
+                  </span>
+                  <span className="tabular-nums">
+                    {formatMoney(payment.amountCents)}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
         )}
+        <div className="flex flex-wrap gap-2 px-4">
+          <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
+            <PlusIcon data-icon="inline-start" />
+            {m.pay_add()}
+          </Button>
+          {job.paidCents > 0 && (
+            <Button
+              variant="outline"
+              size="xl"
+              onClick={() => setPanel({ kind: 'refund' })}
+            >
+              {m.refund_add()}
+            </Button>
+          )}
+          {job.owes && job.paidCents < job.priceCents && (
+            <Button
+              variant="ghost"
+              size="xl"
+              onClick={() => setPanel({ kind: 'writeOff' })}
+            >
+              {m.writeoff_add()}
+            </Button>
+          )}
+        </div>
       </Section>
 
       <Section
@@ -317,20 +403,26 @@ function JobPage() {
         )}
       </Section>
 
-      {modules.costs && data.costs.length > 0 && (
-        <Section title={m.job_costs()}>
-          <ul className="flex flex-col px-4">
+      {modules.costs && (
+        <Section
+          title={m.job_costs()}
+          action={editButton(() => setPanel({ kind: 'cost' }), m.cost_add())}
+        >
+          <ul className="flex flex-col">
             {data.costs.map((cost) => (
-              <li
-                key={cost._id}
-                className="flex items-baseline justify-between gap-3 py-1.5 text-sm"
-              >
-                <span>
-                  {cost.label} · {formatDay(cost.date, today)}
-                </span>
-                <span className="tabular-nums">
-                  {formatMoney(cost.amountCents)}
-                </span>
+              <li key={cost._id}>
+                <button
+                  type="button"
+                  onClick={() => setPanel({ kind: 'cost', cost })}
+                  className="flex w-full items-baseline justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-muted/60"
+                >
+                  <span>
+                    {cost.label} · {formatDay(cost.date, today)}
+                  </span>
+                  <span className="tabular-nums">
+                    {formatMoney(cost.amountCents)}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -388,13 +480,23 @@ function JobPage() {
         >
           <SheetHeader>
             <SheetTitle>
-              {panel?.kind === 'lines'
-                ? m.job_lines()
-                : panel?.kind === 'appointment'
-                  ? words.appointment.singular
-                  : panel?.kind === 'items'
-                    ? words.item.plural
-                    : job.title}
+              {panel?.kind === 'payment'
+                ? m.pay_title()
+                : panel?.kind === 'refund'
+                  ? m.refund_title()
+                  : panel?.kind === 'writeOff'
+                    ? m.writeoff_title()
+                    : panel?.kind === 'cost'
+                      ? m.cost_title()
+                      : panel?.kind === 'removePayment'
+                        ? m.pay_remove()
+                        : panel?.kind === 'lines'
+                          ? m.job_lines()
+                          : panel?.kind === 'appointment'
+                            ? words.appointment.singular
+                            : panel?.kind === 'items'
+                              ? words.item.plural
+                              : job.title}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -420,6 +522,54 @@ function JobPage() {
                 jobId={job._id}
                 appointment={panel.appointment}
                 today={today}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'payment' && (
+              <PaymentForm
+                businessId={business._id}
+                target={{
+                  kind: 'job',
+                  jobId: job._id,
+                  balanceCents: job.owes ? job.balanceCents : 0,
+                }}
+                today={today}
+                depositsOn={business.depositsOnNewJob}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'refund' && client && (
+              <RefundForm
+                businessId={business._id}
+                clientId={client._id}
+                job={{ _id: job._id, paidCents: job.paidCents }}
+                creditCents={client.creditCents}
+                today={today}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'writeOff' && (
+              <WriteOffForm
+                businessId={business._id}
+                jobId={job._id}
+                balanceCents={job.balanceCents}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'cost' && (
+              <CostForm
+                businessId={business._id}
+                jobId={job._id}
+                cost={panel.cost}
+                today={today}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'removePayment' && (
+              <RemovePayment
+                businessId={business._id}
+                paymentId={panel.paymentId}
+                amountCents={panel.amountCents}
                 onDone={close}
               />
             )}
