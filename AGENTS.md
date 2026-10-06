@@ -2,7 +2,7 @@
 
 How to run, test and verify this repo. The product rules are in `docs/product-design.md` and win over everything else here.
 
-> **Status:** milestone 0 (planning). There is no app code yet, so the commands below arrive with milestone 1. Until then, this file describes the target. Update it in the same PR that changes a command.
+> **Status:** milestone 0 (the plan) is merged, and milestone 1 hasn't started. There is no app code yet, so the commands below arrive with milestone 1. Until then, this file describes the target. Update it in the same PR that changes a command.
 
 ## Before you change code
 
