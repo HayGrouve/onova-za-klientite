@@ -152,6 +152,8 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'payments:remove': (ids) => ({ paymentId: ids.paymentId }),
   'payments:useCredit': (ids) => ({ jobId: ids.jobId }),
+  'setup:apply': () => ({ answers: { businessName: 'Чужд' } }),
+  'setup:current': () => ({}),
   'stages:add': () => ({ name: 'Етап', group: 'new' }),
   'stages:remove': (ids) => ({ stageId: ids.stage('cancelled') }),
   'stages:reorder': (ids) => ({
@@ -168,7 +170,13 @@ const USER_SCOPED = [
 ]
 
 /** Functions that take no record id, so only the business check applies. */
-const NO_RECORD_IDS = new Set(['clients:create', 'fields:add', 'stages:add'])
+const NO_RECORD_IDS = new Set([
+  'clients:create',
+  'fields:add',
+  'setup:apply',
+  'setup:current',
+  'stages:add',
+])
 
 describe('business is the auth scope (ADR 0006)', () => {
   it('every public function is either user-scoped or has a stranger fixture', () => {
@@ -241,6 +249,7 @@ const EVENTS: Record<string, string | null> = {
   'payments:refund': 'payment.added',
   'payments:remove': 'payment.removed',
   'payments:useCredit': 'credit.used',
+  'setup:apply': 'setup.applied',
   'stages:add': 'stage.added',
   'stages:remove': 'stage.removed',
   'stages:reorder': 'stages.reordered',
@@ -249,7 +258,10 @@ const EVENTS: Record<string, string | null> = {
 
 describe('activity log', () => {
   it('every mutation fixture has an expected event', () => {
-    expect(Object.keys(EVENTS).sort()).toEqual(Object.keys(FIXTURES).sort())
+    const mutations = publicFunctions()
+      .filter((fn) => fn.kind === 'mutation' && fn.name in FIXTURES)
+      .map((fn) => fn.name)
+    expect(Object.keys(EVENTS).sort()).toEqual(mutations.sort())
   })
 
   it.each(Object.keys(EVENTS))(

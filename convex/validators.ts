@@ -115,6 +115,7 @@ export const ACTIVITY_TYPES = [
   'field.edited',
   'field.archived',
   'field.restored',
+  'setup.applied',
 ] as const
 
 export const vActivityType = v.union(
@@ -130,4 +131,28 @@ export const vActivityData = v.object({
   name: v.optional(v.string()),
   fromId: v.optional(v.string()),
   toId: v.optional(v.string()),
+})
+
+/** Setup wizard answers, as stored for "Run setup again" (shared/setup.ts). */
+export const vSetupAnswers = v.object({
+  businessName: v.optional(v.string()),
+  jobWord: v.optional(vWord),
+  flow: v.optional(vJobFlow),
+  hasItem: v.optional(v.boolean()),
+  item: v.optional(v.object({ word: vWord, fields: v.array(v.string()) })),
+  deposits: v.optional(v.boolean()),
+  costs: v.optional(v.boolean()),
+  repeat: v.optional(
+    v.union(v.literal('none'), v.literal('schedule'), v.literal('months')),
+  ),
+  repeatEvery: v.optional(
+    v.union(v.literal('week'), v.literal('2weeks'), v.literal('month')),
+  ),
+  reminderMonths: v.optional(v.number()),
+  services: v.optional(
+    v.array(v.object({ name: v.string(), price: v.string() })),
+  ),
+  importFrom: v.optional(
+    v.union(v.literal('phone'), v.literal('excel'), v.literal('later')),
+  ),
 })

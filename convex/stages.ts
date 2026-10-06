@@ -6,6 +6,7 @@ import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
 import { fail } from './lib/errors'
+import { insertStage } from './lib/insertStage'
 import { moveJobToStage } from './lib/moveJob'
 import { optionalText, requiredText } from './lib/validate'
 import { vStageColor, vStageGroup } from './validators'
@@ -35,23 +36,11 @@ export const add = businessMutation({
   returns: v.id('stages'),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'owner')
-    const stages = await stagesOf(ctx)
     const name = requiredText(args.name, 'name', 40)
-    // A new stage goes after the last stage of its group.
-    const inGroup = stages.filter((stage) => stage.group === args.group)
-    const after = inGroup.at(-1)?.order ?? stages.at(-1)?.order ?? -1
-    for (const stage of stages) {
-      if (stage.order > after) {
-        await ctx.db.patch('stages', stage._id, { order: stage.order + 1 })
-      }
-    }
-    const stageId = await ctx.db.insert('stages', {
-      businessId: ctx.business._id,
+    const stageId = await insertStage(ctx, {
       name,
       group: args.group,
       color: args.color ?? 'gray',
-      order: after + 1,
-      visibleToClient: false,
     })
     await logActivity(ctx, {
       type: 'stage.added',

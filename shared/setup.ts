@@ -310,7 +310,14 @@ export function planSetup(
   current: CurrentSetup,
   settings: SetupSettings,
 ): SetupPlan {
-  const replaceStages = !current.setupDone && !current.hasJobs
+  const sameStages =
+    current.stages.length === settings.stages.length &&
+    current.stages.every(
+      (stage, index) =>
+        sameName(stage.name, settings.stages[index].name) &&
+        stage.group === settings.stages[index].group,
+    )
+  const replaceStages = !current.setupDone && !current.hasJobs && !sameStages
   const stagesToAdd = replaceStages
     ? settings.stages
     : settings.stages.filter(

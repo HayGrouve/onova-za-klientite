@@ -166,6 +166,12 @@ describe('planSetup', () => {
     expect(plan.stagesToAdd.map((stage) => stage.name)).toContain('Оглед')
   })
 
+  it('a first run keeps the stages when the flow already matches', () => {
+    const plan = planSetup(fresh(), settingsFromAnswers({ flow: 'single' }))
+    expect(plan.replaceStages).toBe(false)
+    expect(plan.stagesToAdd).toEqual([])
+  })
+
   it('running setup again never deletes a stage: new ones are added, old ones kept', () => {
     const current = { ...fresh(), hasJobs: true, setupDone: true }
     const plan = planSetup(current, settingsFromAnswers({ flow: 'multi' }))
