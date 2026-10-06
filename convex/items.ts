@@ -1,11 +1,17 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
 import { logActivity } from './lib/activity'
-import { businessMutation, getOwned, requireRole } from './lib/auth'
+import {
+  businessMutation,
+  businessQuery,
+  getOwned,
+  requireRole,
+} from './lib/auth'
 import { fail } from './lib/errors'
 import { mergeExtra } from './lib/extra'
 import { itemSearchText } from './lib/search'
 import { requiredText } from './lib/validate'
+import { jobRow, newLookups, timeline } from './lib/views'
 import { vExtra } from './validators'
 
 export const create = businessMutation({
@@ -90,5 +96,56 @@ export const move = businessMutation({
       data: { fromId: item.clientId, toId: to._id },
     })
     return null
+  },
+})
+
+/** Everything the item page shows, history included. */
+export const get = businessQuery({
+  args: { itemId: v.id('items') },
+  handler: async (ctx, { itemId }) => {
+    const item = await getOwned(ctx, 'items', itemId)
+    const client = await ctx.db.get('clients', item.clientId)
+    const fields = await ctx.db
+      .query('fields')
+      .withIndex('by_business_target_order', (q) =>
+        q.eq('businessId', ctx.business._id).eq('target', 'item'),
+      )
+      .collect()
+    const links = await ctx.db
+      .query('jobItems')
+      .withIndex('by_item', (q) => q.eq('itemId', item._id))
+      .collect()
+    const lookups = newLookups()
+    const jobs = []
+    for (const link of links) {
+      const job = await ctx.db.get('jobs', link.jobId)
+      if (job) jobs.push(await jobRow(ctx, job, lookups))
+    }
+    jobs.sort((a, b) => b._creationTime - a._creationTime)
+    const events = await ctx.db
+      .query('activity')
+      .withIndex('by_item', (q) => q.eq('itemId', item._id))
+      .collect()
+    return {
+      item,
+      client: client && { _id: client._id, name: client.name },
+      fields: fields.filter((field) => field.archivedAt === undefined),
+      jobs,
+      timeline: await timeline(ctx, events),
+    }
+  },
+})
+
+/** A client's items, for linking them to a job. */
+export const byClient = businessQuery({
+  args: { clientId: v.id('clients') },
+  returns: v.array(v.object({ _id: v.id('items'), name: v.string() })),
+  handler: async (ctx, { clientId }) => {
+    const client = await getOwned(ctx, 'clients', clientId)
+    const items = await ctx.db
+      .query('items')
+      .withIndex('by_client', (q) => q.eq('clientId', client._id))
+      .collect()
+    return items.map(({ _id, name }) => ({ _id, name }))
   },
 })

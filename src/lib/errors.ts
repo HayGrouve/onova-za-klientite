@@ -9,6 +9,7 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   notFound: m.error_notFound,
   invalid: m.error_invalid,
   'payment.zero': m.error_payment_zero,
+  'file.rejected': m.files_rejected,
 }
 
 /** The error code Convex threw on purpose (D16), if any. */

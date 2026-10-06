@@ -1,11 +1,16 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
 import { internalMutation } from './_generated/server'
+import type { QueryCtx } from './_generated/server'
 import { internal } from './_generated/api'
 import { canChangeFieldType } from '../shared/fields'
 import { logActivity } from './lib/activity'
-import { businessMutation, getOwned, requireRole } from './lib/auth'
-import type { BusinessMutationCtx } from './lib/auth'
+import {
+  businessMutation,
+  businessQuery,
+  getOwned,
+  requireRole,
+} from './lib/auth'
 import { fail } from './lib/errors'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { requiredText } from './lib/validate'
@@ -18,7 +23,7 @@ function optionId() {
 }
 
 async function fieldsOf(
-  ctx: BusinessMutationCtx,
+  ctx: QueryCtx & { business: Doc<'businesses'> },
   target: Doc<'fields'>['target'],
 ) {
   return await ctx.db
@@ -258,5 +263,16 @@ export const rebuildSearch = internalMutation({
       })
     }
     return null
+  },
+})
+
+/** A target's fields in order. Archived ones only when asked for (Settings). */
+export const list = businessQuery({
+  args: { target: vFieldTarget, includeArchived: v.optional(v.boolean()) },
+  handler: async (ctx, { target, includeArchived }) => {
+    const fields = await fieldsOf(ctx, target)
+    return includeArchived
+      ? fields
+      : fields.filter((field) => field.archivedAt === undefined)
   },
 })

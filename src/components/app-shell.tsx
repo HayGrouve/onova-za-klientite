@@ -147,6 +147,7 @@ function AppHeader() {
                   <DropdownMenuRadioItem
                     key={item._id}
                     value={item._id}
+                    closeOnClick
                     className="min-h-11"
                   >
                     {item.name}

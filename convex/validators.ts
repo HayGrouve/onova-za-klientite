@@ -117,6 +117,10 @@ export const ACTIVITY_TYPES = [
   'field.restored',
   'setup.applied',
   'appointment.added',
+  'appointment.changed',
+  'appointment.cancelled',
+  'file.added',
+  'file.removed',
 ] as const
 
 export const vActivityType = v.union(

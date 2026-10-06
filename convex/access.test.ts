@@ -8,6 +8,7 @@ import {
   expectCachesFresh,
   setupBusiness,
   setupConvex,
+  storeBlob,
 } from './test.setup'
 import type { TestBusiness, TestConvex } from './test.setup'
 
@@ -89,7 +90,31 @@ async function ownerData(t: TestConvex, b: TestBusiness) {
   })
   const optionId = (await t.run((ctx) => ctx.db.get('fields', fieldId)))!
     .options![0].id
-  return { clientId, jobId, itemId, paymentId, costId, fieldId, optionId }
+  const pendingStorageId = await storeBlob(t, 10, 'image/png')
+  const savedStorageId = await storeBlob(t, 10, 'image/png')
+  const saved = await owner.mutation(api.files.save, {
+    businessId,
+    storageId: savedStorageId,
+    target: { kind: 'job', jobId },
+  })
+  if (!('fileId' in saved)) throw new Error('fixture file rejected')
+  const appointmentId = await owner.mutation(api.appointments.add, {
+    businessId,
+    jobId,
+    date: '2026-10-08',
+  })
+  return {
+    appointmentId,
+    clientId,
+    jobId,
+    itemId,
+    paymentId,
+    costId,
+    fieldId,
+    optionId,
+    pendingStorageId,
+    fileId: saved.fileId,
+  }
 }
 
 type AnyArgs = Record<string, unknown>
@@ -98,7 +123,15 @@ type Ids = Awaited<ReturnType<typeof ownerData>> & TestBusiness
 
 /** Valid arguments for each business-scoped function, aimed at the owner's data. */
 const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
+  'appointments:add': (ids) => ({ jobId: ids.jobId, date: '2026-10-09' }),
+  'appointments:cancel': (ids) => ({ appointmentId: ids.appointmentId }),
+  'appointments:update': (ids) => ({
+    appointmentId: ids.appointmentId,
+    date: '2026-10-10',
+  }),
   'clients:create': () => ({ name: 'Нов' }),
+  'clients:get': (ids) => ({ clientId: ids.clientId }),
+  'clients:list': () => ({}),
   'clients:update': (ids) => ({ clientId: ids.clientId, name: 'Друг' }),
   'costs:add': (ids) => ({
     jobId: ids.jobId,
@@ -108,6 +141,14 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'costs:remove': (ids) => ({ costId: ids.costId }),
   'costs:update': (ids) => ({ costId: ids.costId, amountCents: 200 }),
+  'files:generateUploadUrl': () => ({}),
+  'files:list': (ids) => ({ target: { kind: 'job', jobId: ids.jobId } }),
+  'files:remove': (ids) => ({ fileId: ids.fileId }),
+  'files:save': (ids) => ({
+    storageId: ids.pendingStorageId,
+    target: { kind: 'job', jobId: ids.jobId },
+  }),
+  'fields:list': () => ({ target: 'client' }),
   'fields:add': () => ({ target: 'job', name: 'Поле', type: 'text' }),
   'fields:addOption': (ids) => ({ fieldId: ids.fieldId, name: 'Черен' }),
   'fields:archive': (ids) => ({ fieldId: ids.fieldId }),
@@ -118,9 +159,13 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     optionId: ids.optionId,
     name: 'Сив',
   }),
+  'items:byClient': (ids) => ({ clientId: ids.clientId }),
+  'items:get': (ids) => ({ itemId: ids.itemId }),
   'items:create': (ids) => ({ clientId: ids.clientId, name: 'Стол' }),
   'items:move': (ids) => ({ itemId: ids.itemId, toClientId: ids.clientId }),
   'items:update': (ids) => ({ itemId: ids.itemId, name: 'Маса' }),
+  'jobs:get': (ids) => ({ jobId: ids.jobId }),
+  'jobs:list': () => ({ group: 'new' }),
   'jobs:cancel': (ids) => ({ jobId: ids.jobId }),
   'jobs:changeStage': (ids) => ({
     jobId: ids.jobId,
@@ -157,6 +202,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'payments:remove': (ids) => ({ paymentId: ids.paymentId }),
   'payments:useCredit': (ids) => ({ jobId: ids.jobId }),
+  'services:list': () => ({}),
   'setup:apply': () => ({ answers: { businessName: 'Чужд' } }),
   'setup:current': () => ({}),
   'stages:add': () => ({ name: 'Етап', group: 'new' }),
@@ -164,6 +210,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   'stages:reorder': (ids) => ({
     stageIds: ids.stages.map((stage) => stage._id),
   }),
+  'today:list': () => ({ today: '2026-10-07' }),
   'stages:update': (ids) => ({ stageId: ids.stage('new'), name: 'Оглед' }),
 }
 
@@ -176,8 +223,15 @@ const USER_SCOPED = [
 
 /** Functions that take no record id, so only the business check applies. */
 const NO_RECORD_IDS = new Set([
+  'clients:list',
+  'fields:list',
+  'jobs:list',
+  'services:list',
+  'today:list',
   'clients:create',
   'fields:add',
+  'files:generateUploadUrl',
+  'files:list',
   'newJob:context',
   'setup:apply',
   'setup:current',
@@ -228,6 +282,9 @@ describe('business is the auth scope (ADR 0006)', () => {
 
 /** The activity event each mutation logs, or null where the fixture is a no-op. */
 const EVENTS: Record<string, string | null> = {
+  'appointments:add': 'appointment.added',
+  'appointments:cancel': 'appointment.cancelled',
+  'appointments:update': 'appointment.changed',
   'clients:create': 'client.created',
   'clients:update': 'client.edited',
   'costs:add': 'cost.added',
@@ -239,6 +296,9 @@ const EVENTS: Record<string, string | null> = {
   'fields:restore': null,
   'fields:update': 'field.edited',
   'fields:updateOption': 'field.edited',
+  'files:generateUploadUrl': null,
+  'files:remove': 'file.removed',
+  'files:save': 'file.added',
   'items:create': 'item.created',
   'items:move': null,
   'items:update': 'item.edited',
