@@ -32,6 +32,8 @@ const vTarget = v.union(
   v.object({ kind: v.literal('job'), jobId: v.id('jobs') }),
   v.object({ kind: v.literal('client'), clientId: v.id('clients') }),
   v.object({ kind: v.literal('item'), itemId: v.id('items') }),
+  // The business logo (Settings → Business). Images only; replaces the old one.
+  v.object({ kind: v.literal('logo') }),
 )
 
 type Target = typeof vTarget.type
@@ -49,6 +51,7 @@ async function resolveTarget(
     const client = await getOwned(ctx, 'clients', target.clientId)
     return { clientId: client._id }
   }
+  if (target.kind === 'logo') return {}
   const item = await getOwned(ctx, 'items', target.itemId)
   return { itemId: item._id, clientId: item.clientId }
 }
@@ -78,13 +81,16 @@ export const save = businessMutation({
     v.object({ rejected: v.union(v.literal('type'), v.literal('size')) }),
   ),
   handler: async (ctx, args) => {
-    requireRole(ctx.member, 'manager')
+    requireRole(ctx.member, args.target.kind === 'logo' ? 'owner' : 'manager')
     const links = await resolveTarget(ctx, args.target)
     const meta = await ctx.db.system.get('_storage', args.storageId)
     if (!meta) fail('notFound', { table: '_storage' })
     const mimeType = (meta.contentType ?? '').toLowerCase()
     const isImage = IMAGE_TYPES.includes(mimeType)
-    if (!isImage && mimeType !== PDF_TYPE) {
+    if (
+      (!isImage && mimeType !== PDF_TYPE) ||
+      (args.target.kind === 'logo' && !isImage)
+    ) {
       await ctx.storage.delete(args.storageId)
       return { rejected: 'type' as const }
     }
@@ -106,9 +112,23 @@ export const save = businessMutation({
       visibleToClient: false,
       uploadedBy: ctx.member._id,
     })
-    await ctx.db.patch('businesses', ctx.business._id, {
-      storageBytes: ctx.business.storageBytes + meta.size,
-    })
+    let storageBytes = ctx.business.storageBytes + meta.size
+    if (args.target.kind === 'logo') {
+      const old = ctx.business.logoFileId
+        ? await ctx.db.get('files', ctx.business.logoFileId)
+        : null
+      if (old) {
+        await ctx.storage.delete(old.storageId)
+        await ctx.db.delete('files', old._id)
+        storageBytes = Math.max(0, storageBytes - old.size)
+      }
+      await ctx.db.patch('businesses', ctx.business._id, {
+        logoFileId: fileId,
+        storageBytes,
+      })
+      return { fileId }
+    }
+    await ctx.db.patch('businesses', ctx.business._id, { storageBytes })
     await logActivity(ctx, {
       type: 'file.added',
       jobId: links.jobId,
@@ -126,11 +146,15 @@ export const remove = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const file = await getOwned(ctx, 'files', args.fileId)
+    const isLogo = ctx.business.logoFileId === file._id
+    if (isLogo) requireRole(ctx.member, 'owner')
     await ctx.storage.delete(file.storageId)
     await ctx.db.delete('files', file._id)
     await ctx.db.patch('businesses', ctx.business._id, {
       storageBytes: Math.max(0, ctx.business.storageBytes - file.size),
+      ...(isLogo ? { logoFileId: undefined } : {}),
     })
+    if (isLogo) return null
     await logActivity(ctx, {
       type: 'file.removed',
       jobId: file.jobId,
@@ -172,6 +196,11 @@ export const list = businessQuery({
         .withIndex('by_client', (q) => q.eq('clientId', target.clientId))
         .order('desc')
         .collect()
+    } else if (target.kind === 'logo') {
+      const logo = ctx.business.logoFileId
+        ? await ctx.db.get('files', ctx.business.logoFileId)
+        : null
+      files = logo ? [logo] : []
     } else {
       await getOwned(ctx, 'items', target.itemId)
       files = await ctx.db

@@ -116,6 +116,7 @@ export const ACTIVITY_TYPES = [
   'field.archived',
   'field.restored',
   'setup.applied',
+  'settings.changed',
   'appointment.added',
   'appointment.changed',
   'appointment.cancelled',

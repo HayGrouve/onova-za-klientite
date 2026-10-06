@@ -32,6 +32,11 @@ const MONTH = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'UTC',
 })
 
+function monthLabel(month: string) {
+  const text = MONTH.format(new Date(`${month}-15T12:00:00Z`))
+  return text.charAt(0).toLocaleUpperCase('bg') + text.slice(1)
+}
+
 function Figure({
   label,
   cents,
@@ -90,9 +95,7 @@ function MoneyPage() {
         >
           <CaretLeftIcon />
         </Button>
-        <span className="text-base font-medium capitalize">
-          {MONTH.format(new Date(`${month}-15T12:00:00Z`))}
-        </span>
+        <span className="text-base font-medium">{monthLabel(month)}</span>
         <Button
           variant="ghost"
           size="icon-xl"
