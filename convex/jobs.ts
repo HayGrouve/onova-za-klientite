@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
 import { lineTotalCents } from '../shared/money'
-import { defaultStage } from '../shared/stages'
+import { defaultStage, stagesFor } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
@@ -25,11 +25,15 @@ async function checkItems(
   ctx: BusinessMutationCtx,
   clientId: Id<'clients'>,
   itemIds: Array<Id<'items'>>,
+  // An item already on the job stays allowed after it moves: that is history.
+  alreadyLinked: Array<Id<'items'>> = [],
 ) {
   const unique = [...new Set(itemIds)]
   for (const itemId of unique) {
     const item = await getOwned(ctx, 'items', itemId)
-    if (item.clientId !== clientId) fail('job.otherClient', { itemId })
+    if (item.clientId !== clientId && !alreadyLinked.includes(itemId)) {
+      fail('job.otherClient', { itemId })
+    }
   }
   return unique
 }
@@ -246,11 +250,22 @@ export const cancel = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    const stage = (await businessStages(ctx)).find(
-      (item) => item.group === 'cancelled',
-    )
-    if (!stage) fail('notFound', { table: 'stages' })
     if (job.stageGroup === 'cancelled') return null
+    const stages = await businessStages(ctx)
+    let stage = stages.find((item) => item.group === 'cancelled')
+    if (!stage) {
+      // Cancelled may be emptied in Settings; cancelling brings its stage back.
+      const draft = stagesFor(ctx.business.jobFlow).find(
+        (item) => item.group === 'cancelled',
+      )!
+      const stageId = await ctx.db.insert('stages', {
+        businessId: ctx.business._id,
+        ...draft,
+        order: (stages.at(-1)?.order ?? -1) + 1,
+        visibleToClient: false,
+      })
+      stage = (await ctx.db.get('stages', stageId))!
+    }
     await moveJobToStage(ctx, job, stage, args.reason)
     return null
   },
@@ -281,7 +296,12 @@ export const setItems = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    const itemIds = await checkItems(ctx, job.clientId, args.itemIds)
+    const itemIds = await checkItems(
+      ctx,
+      job.clientId,
+      args.itemIds,
+      job.itemIds,
+    )
     await ctx.db.patch('jobs', job._id, { itemIds })
     await syncJobItems(ctx, job._id, itemIds)
     await logActivity(ctx, {

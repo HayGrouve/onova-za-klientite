@@ -122,3 +122,37 @@ describe('stages', () => {
     ).rejects.toThrow(/invalid/)
   })
 })
+
+describe('stage edge cases', () => {
+  it('regrouping out of Cancelled drops the cancel reason', async () => {
+    const { t, owner, businessId, jobId } = await withJob()
+    const lost = await owner.mutation(api.stages.add, {
+      businessId,
+      name: 'Загубени',
+      group: 'cancelled',
+    })
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId,
+      stageId: lost,
+      cancelReason: 'Скъпо',
+    })
+    await owner.mutation(api.stages.update, {
+      businessId,
+      stageId: lost,
+      group: 'new',
+    })
+    expect((await getDoc(t, 'jobs', jobId)).cancelReason).toBeUndefined()
+  })
+
+  it('reordering rejects a repeated stage', async () => {
+    const { owner, businessId, stages } = await withJob()
+    const ids = stages.map((item) => item._id)
+    await expect(
+      owner.mutation(api.stages.reorder, {
+        businessId,
+        stageIds: [ids[0], ids[0], ...ids.slice(2)],
+      }),
+    ).rejects.toThrow(/invalid/)
+  })
+})

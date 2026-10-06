@@ -94,6 +94,8 @@ export const update = businessMutation({
           stageGroup: args.group,
           owes: jobOwes(job.balanceCents, args.group),
           doneAt: args.group === 'done' ? (job.doneAt ?? now) : undefined,
+          cancelReason:
+            args.group === 'cancelled' ? job.cancelReason : undefined,
         })
       }
     }
@@ -115,6 +117,7 @@ export const reorder = businessMutation({
     const stages = await stagesOf(ctx)
     const ids = new Set<string>(args.stageIds)
     if (
+      args.stageIds.length !== ids.size ||
       ids.size !== stages.length ||
       stages.some((stage) => !ids.has(stage._id))
     ) {

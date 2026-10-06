@@ -279,3 +279,20 @@ describe('payments', () => {
     )
   })
 })
+
+describe('payment edge cases', () => {
+  it('a split never pays a cancelled job', async () => {
+    const { owner, businessId, clientId, jobIds } = await withJobs([10000])
+    await owner.mutation(api.jobs.cancel, { businessId, jobId: jobIds[0] })
+    await expect(
+      owner.mutation(api.payments.addFromClient, {
+        businessId,
+        clientId,
+        amountCents: 5000,
+        date: DATE,
+        method: 'cash',
+        allocations: [{ jobId: jobIds[0], amountCents: 5000 }],
+      }),
+    ).rejects.toThrow(/payment.exceeds/)
+  })
+})
