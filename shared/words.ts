@@ -17,3 +17,28 @@ export const DEFAULT_WORDS: Words = {
   item: { singular: 'Обект', plural: 'Обекти', gender: 'm' },
   appointment: { singular: 'Среща', plural: 'Срещи', gender: 'f' },
 }
+
+/** A best guess, always shown for editing. "Урок" → "Уроци", "Сеанс" → "Сеанси". */
+export function guessPlural(singular: string): string {
+  const word = singular.trim()
+  if (!word) return ''
+  if (/ие$/i.test(word)) return word.slice(0, -1) + 'я'
+  if (/е$/i.test(word)) return word.slice(0, -1) + 'ия'
+  if (/ия$/i.test(word)) return word.slice(0, -1) + 'и'
+  if (/[ая]$/i.test(word)) return word.slice(0, -1) + 'и'
+  if (/о$/i.test(word)) return word.slice(0, -1) + 'а'
+  if (/к$/i.test(word)) return word.slice(0, -1) + 'ци'
+  if (/г$/i.test(word)) return word.slice(0, -1) + 'зи'
+  if (/х$/i.test(word)) return word.slice(0, -1) + 'си'
+  return word + 'и'
+}
+
+export const MAX_WORD_LENGTH = 40
+
+export function isValidWord(word: Word): boolean {
+  const ok = (text: string) => {
+    const trimmed = text.trim()
+    return trimmed.length > 0 && trimmed.length <= MAX_WORD_LENGTH
+  }
+  return ok(word.singular) && ok(word.plural)
+}

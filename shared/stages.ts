@@ -36,3 +36,53 @@ export function stagesFor(flow: JobFlow): StageDraft[] {
     { name: 'Отказано', group: 'cancelled', color: 'gray' },
   ]
 }
+
+/** Groups that must always keep at least one stage. Cancelled may be empty. */
+export const REQUIRED_GROUPS: readonly StageGroup[] = [
+  'new',
+  'in_progress',
+  'done',
+]
+
+type StageLike<TId> = { _id: Id; group: StageGroup; order: number }
+
+function isLastInGroup<TId>(stages: Array<StageLike<TId>>, stage: StageLike<TId>) {
+  return (
+    REQUIRED_GROUPS.includes(stage.group) &&
+    stages.filter((other) => other.group === stage.group).length === 1
+  )
+}
+
+/** Whether a stage can be deleted. A stage holding jobs must be emptied first. */
+export function canRemoveStage<TId>(
+  stages: Array<StageLike<TId>>,
+  stageId: TId,
+  jobCount: number,
+): 'ok' | 'hasJobs' | 'lastInGroup' | 'notFound' {
+  const stage = stages.find((item) => item._id === stageId)
+  if (!stage) return 'notFound'
+  if (isLastInGroup(stages, stage)) return 'lastInGroup'
+  if (jobCount > 0) return 'hasJobs'
+  return 'ok'
+}
+
+/** Whether a stage can move to another group without leaving its group empty. */
+export function canRegroupStage<TId>(
+  stages: Array<StageLike<TId>>,
+  stageId: TId,
+  group: StageGroup,
+): 'ok' | 'lastInGroup' | 'notFound' {
+  const stage = stages.find((item) => item._id === stageId)
+  if (!stage) return 'notFound'
+  if (stage.group === group) return 'ok'
+  return isLastInGroup(stages, stage) ? 'lastInGroup' : 'ok'
+}
+
+/** Where new jobs start: the first stage of the New group. */
+export function defaultStage<T extends StageLike<unknown>>(
+  stages: T[],
+): T | undefined {
+  return [...stages]
+    .sort((a, b) => a.order - b.order)
+    .find((stage) => stage.group === 'new')
+}
