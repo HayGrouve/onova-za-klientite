@@ -44,7 +44,7 @@ export const REQUIRED_GROUPS: readonly StageGroup[] = [
   'done',
 ]
 
-type StageLike<TId> = { _id: Id; group: StageGroup; order: number }
+type StageLike<TId> = { _id: TId; group: StageGroup; order: number }
 
 function isLastInGroup<TId>(stages: Array<StageLike<TId>>, stage: StageLike<TId>) {
   return (
