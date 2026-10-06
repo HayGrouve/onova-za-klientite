@@ -4,7 +4,7 @@ Simple client, job and money tracking for any small service business, from one p
 
 ## Status
 
-The product design is final, and prototypes 1 and 2 picked their variants. The v1 build plan is merged (milestone 0). Next is milestone 1, the foundation: app shell, Convex, Clerk, CI.
+The product design is final, and prototypes 1 and 2 picked their variants. The v1 build plan is merged (milestone 0). Milestone 1, the foundation (app shell, Convex, Clerk, CI), is built and in review.
 
 ## Docs
 
