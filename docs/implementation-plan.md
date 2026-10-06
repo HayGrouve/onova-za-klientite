@@ -418,7 +418,7 @@ Prototype 3 was never built, so these screens come straight from the doc. Each P
 | Task | Acceptance check |
 | --- | --- |
 | Job summary image: lines, price, deposit, balance, logo, and "Това не е фактура". Rendered with `satori` (lazy-loaded, a static Sofia Sans TTF for Cyrillic), then drawn to a canvas as PNG. The file is made when the preview opens, so the tap can share it straight away | Shared to Viber from an Android phone and an iPhone through the Web Share API. Fallbacks, in order: download, copy the image, then text through `viber://forward` |
-| Import from phone contacts (Android Chrome only, feature-detected) and from Excel or CSV, mapping unknown columns to a field or a new extra field. CSV in windows-1251 with `;` is decoded correctly | The 57-row sample file imports, as `.xlsx`, `.xls` and a Bulgarian Excel CSV. Duplicates are flagged |
+| Import from phone contacts (Android Chrome only, feature-detected) and from Excel or CSV, mapping unknown columns to a field or a new extra field. `.xlsx` is read with `read-excel-file`, and CSV with `papaparse`. CSV in windows-1251 with `;` is decoded correctly. An old `.xls` file gets a plain message asking to save it as `.xlsx` or CSV (D20) | The 57-row sample file imports as `.xlsx` and as a Bulgarian Excel CSV. An `.xls` shows the message. Duplicates are flagged |
 | Duplicate warning on a matching phone, and merging two clients | Jobs, payments, items, reminders and messages move. Credit is recomputed |
 | Export all data (JSON plus CSV per table, in a zip) | Re-reading the export finds every record |
 | Anonymize a client. Delete the account and its data (batched) | The jobs and money of an anonymized client remain. Nothing remains after deletion |
@@ -528,7 +528,7 @@ The review screen lists what will change before applying.
 
 ### Accounts, deploys and providers
 
-Q19 and Q21 are answered. Q20 is needed before milestone 1 adds those packages, and Q22 before Vercel is linked.
+Q19, Q20 and Q21 are answered. Q22 is needed before Vercel is linked.
 
 **Q19. Convex region: please confirm before I create anything.** It's `aws-eu-west-1` (Ireland), for production, dev and previews, created with `--region eu` (ADR 0002). Usage there is billed at 1.3×. I'd also like you to set the team's default region to Europe (Ireland) in Convex Team settings. It's the one dashboard click with no CLI equivalent, and it stops any automatic path from creating a US deployment by mistake.
 
@@ -543,8 +543,10 @@ Q19 and Q21 are answered. Q20 is needed before milestone 1 adds those packages, 
 | `idb-keyval` | Offline snapshot | Under 1 KB |
 | `web-push` | Sending push from Convex | Server only. Last release Jan 2024 |
 | `satori` | Job summary image | About 183 KB gz, lazy-loaded, MPL-2.0 |
-| SheetJS CE 0.20.3 (`xlsx`) | Excel import (`.xlsx`, `.xls`, `.ods`, CSV) | **Unusual:** not on npm. The npm copy is stale and has CVEs. The proposal is to vendor the official tarball into the repo (`vendor/`) so builds don't depend on its CDN. About 86–335 KB gz, lazy-loaded. Alternative: `read-excel-file` + `papaparse`, both on npm, but with no `.xls` support |
+| ~~SheetJS CE 0.20.3 (`xlsx`)~~ `read-excel-file` + `papaparse` | Excel and CSV import | Both on npm and lazy-loaded. Neither reads legacy `.xls` (D20). SheetJS was rejected because its npm copy is stale with CVEs, and the fixed version is only on its own CDN |
 | Convex components | See D12 | Official, pinned |
+
+> **Answer (6 Oct 2026):** all approved, except SheetJS. Excel import uses `read-excel-file` (`.xlsx`) and `papaparse` (CSV) instead.
 
 **Q21. Convex plan and backups.** Free has hard caps: 1M function calls, 0.5 GB database, 1 GB files, and no automatic backups. That's fine for building.
 *Proposal:* stay on Free until the first user's real data goes in. Then move to Pro ($25/month) for daily backups, or Starter (pay as you go) plus a weekly manual `npx convex export`. The choice is yours; either way it's before milestone 10.
@@ -589,6 +591,7 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D17 | In-app browsers | Links opened inside Viber or Facebook show "Отворете в Chrome" or "Отворете в Safari" before install or push | In-app browsers can't install a PWA or receive push, and Viber is where links get shared |
 | D18 | Photos | Compressed in the browser before upload (long side 2000 px, JPEG) | Phone photos are 3–8 MB and uploads time out after 2 minutes on slow networks |
 | D19 | Convex while developing | The team's Free plan. Every dev and preview deployment is disposable and holds only seed data, and so does the Free project's production deployment that Vercel production uses until launch. The real production deployment is created fresh in EU (Ireland) at launch, with the owner's OK, and Vercel's production deploy key is switched to it (Q19, Q21) | Nothing needs keeping until the first user's real data, and a region can't be changed after creation |
+| D20 | Excel import | `.xlsx` through `read-excel-file`, CSV through `papaparse`, both lazy-loaded. Legacy `.xls` isn't read: the import screen asks to save the file as `.xlsx` or CSV, which any Excel since 2007 can do (Q20) | The owner chose ordinary npm packages over a vendored SheetJS. Losing `.xls` costs one extra step for an old file |
 
 ## Spikes
 
@@ -608,8 +611,8 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - milestone 0 (#13);
   - the design doc picks for prototypes 1 and 2 (#1);
   - Q19 and Q21: Free plan while developing, with production created in EU at launch.
+  - Q20: dependencies approved, with `read-excel-file` + `papaparse` instead of SheetJS.
 - **Next:** milestone 1, Foundation (#2).
 - **Open:**
-  - Q20 (new dependencies, needed when milestone 1 adds Paraglide);
   - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26.
