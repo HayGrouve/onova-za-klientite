@@ -4,6 +4,7 @@ import {
   ClipboardTextIcon,
   PlusIcon,
   GearSixIcon,
+  MagnifyingGlassIcon,
   SignOutIcon,
   SunIcon,
   UsersIcon,
@@ -166,40 +167,52 @@ function AppHeader() {
         </span>
       )}
 
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label={m.account_menu()}
-          className={cn(
-            'flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-          )}
+      <div className="flex items-center gap-1">
+        <Link
+          to="/search"
+          aria-label={m.search_open()}
+          className="flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <Avatar>
-            {user.imageUrl && <AvatarImage src={user.imageUrl} alt="" />}
-            <AvatarFallback>
-              {initials(user.name || user.email || '?')}
-            </AvatarFallback>
-          </Avatar>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel className="truncate">
-              {user.email ?? user.name}
-            </DropdownMenuLabel>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="min-h-11"
-            onClick={() => void navigate({ to: '/settings' })}
+          <MagnifyingGlassIcon className="size-6" />
+        </Link>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label={m.account_menu()}
+            className={cn(
+              'flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+            )}
           >
-            <GearSixIcon />
-            {m.account_settings()}
-          </DropdownMenuItem>
-          <DropdownMenuItem className="min-h-11" onClick={() => void signOut()}>
-            <SignOutIcon />
-            {m.account_sign_out()}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <Avatar>
+              {user.imageUrl && <AvatarImage src={user.imageUrl} alt="" />}
+              <AvatarFallback>
+                {initials(user.name || user.email || '?')}
+              </AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="truncate">
+                {user.email ?? user.name}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="min-h-11"
+              onClick={() => void navigate({ to: '/settings' })}
+            >
+              <GearSixIcon />
+              {m.account_settings()}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11"
+              onClick={() => void signOut()}
+            >
+              <SignOutIcon />
+              {m.account_sign_out()}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   )
 }

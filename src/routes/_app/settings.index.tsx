@@ -1,6 +1,7 @@
 import {
   ArrowsClockwiseIcon,
   BellIcon,
+  BellRingingIcon,
   CaretRightIcon,
   DatabaseIcon,
   FlowArrowIcon,
@@ -96,6 +97,12 @@ function SettingsIndex() {
           icon={TagIcon}
           title={m.settings_services()}
           body={m.settings_services_body()}
+        />
+        <Row
+          to="/settings/notifications"
+          icon={BellRingingIcon}
+          title={m.push_title()}
+          body={m.push_help()}
         />
         <Row
           to="/settings/reminders"

@@ -14,6 +14,8 @@ import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { JobRow } from '#/components/job-row'
 import { PaymentForm } from '#/components/money/payment-form'
+import { ReminderForm } from '#/components/reminders/reminder-form'
+import { ReminderRow } from '#/components/reminders/reminder-row'
 import { RefundForm } from '#/components/money/refund-form'
 import { RemovePayment } from '#/components/money/remove-payment'
 import { ListSection } from '#/components/list-section'
@@ -51,9 +53,16 @@ function ClientPage() {
     | { kind: 'payment' }
     | { kind: 'refund' }
     | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
+    | { kind: 'reminder' }
     | null
   >(null)
   const close = () => setPanel(null)
+  const reminders = useQuery(
+    api.reminders.forClient,
+    business.modules.reminders
+      ? { businessId: business._id, clientId: clientId as Id<'clients'> }
+      : 'skip',
+  )
   const { words } = business
 
   if (!data) return <ListSkeleton />
@@ -197,6 +206,31 @@ function ClientPage() {
         </ListSection>
       )}
 
+      {business.modules.reminders && !client.isNoClient && (
+        <ListSection
+          title={m.reminder_list()}
+          action={
+            <Button
+              variant="ghost"
+              className="h-9"
+              onClick={() => setPanel({ kind: 'reminder' })}
+            >
+              <PlusIcon data-icon="inline-start" />
+              {m.reminder_add()}
+            </Button>
+          }
+        >
+          {(reminders ?? []).map((reminder) => (
+            <ReminderRow
+              key={reminder._id}
+              reminderId={reminder._id}
+              note={reminder.note}
+              detail={formatDay(reminder.date, today)}
+            />
+          ))}
+        </ListSection>
+      )}
+
       <ListSection title={words.job.plural}>
         {data.jobs.length === 0 ? (
           <li className="px-4 text-sm text-muted-foreground">
@@ -293,7 +327,9 @@ function ClientPage() {
                   ? m.refund_title()
                   : panel?.kind === 'removePayment'
                     ? m.pay_remove()
-                    : client.name}
+                    : panel?.kind === 'reminder'
+                      ? m.reminder_add_title()
+                      : client.name}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -324,6 +360,14 @@ function ClientPage() {
                 clientId={client._id}
                 creditCents={client.creditCents}
                 today={today}
+                onDone={close}
+              />
+            )}
+            {panel?.kind === 'reminder' && (
+              <ReminderForm
+                businessId={business._id}
+                target={{ clientId: client._id }}
+                initialDate={today}
                 onDone={close}
               />
             )}

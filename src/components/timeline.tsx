@@ -73,6 +73,16 @@ function describe(item: TimelineItem, words: Words) {
       return m.event_appointment_changed({ date: data.to ?? '' })
     case 'appointment.cancelled':
       return m.event_appointment_cancelled()
+    case 'reminder.added':
+      return m.event_reminder_added({ note: data.note ?? '' })
+    case 'reminder.closed':
+      return m.event_reminder_closed({ note: data.note ?? '' })
+    case 'job.repeatSet':
+      return m.event_job_repeatSet()
+    case 'job.repeatStopped':
+      return m.event_job_repeatStopped()
+    case 'job.repeated':
+      return m.event_job_repeated({ date: data.to ?? '' })
     case 'file.added':
       return m.event_file_added({ name: name || m.files_photo() })
     case 'file.removed':

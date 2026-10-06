@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 7 are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 8 are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
 
 ## Contents
 
@@ -611,6 +611,9 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D37 | Payment defaults | A payment from a job defaults to its balance, in cash, dated today. A split from a client defaults to oldest first and every row can be changed. The "Капаро" label is one tap when deposits are on | The common case is one tap, and every default can be changed |
 | D38 | Settings roles | Every Settings change is owner-only on the server. Managers and workers see the sections read-only, with one line saying so | Design: Manager has "no business settings" |
 | D39 | Grammar check | A unit test reads `messages/bg.json`: a business word may only follow nothing, "+", "Добави", a colon or a gender-free preposition, and `{count}` never comes before one | It turns the design doc's grammar rule into a failing test instead of a review item |
+| D40 | Search keys | Every value gives its transliteration. Values with digits (plates, models) also give the plate look-alike fold and a copy without spaces. +359 phones also give the local 0… form. A query with digits is searched twice, plain and as a compact look-alike, and the results merged. Keys are cut at 32 characters | Convex matches whole words except the last, so "СА 1234 ВР" and "CA1234BP" need both forms on each side. Plain names stay free of noise keys |
+| D41 | Repeat date | A job's date for repeating is its last non-cancelled appointment, else its due date. A job with neither can't repeat. The next job keeps the appointment's Sofia wall-clock time across daylight saving changes. The cron runs daily at 01:07 UTC | Q6 left "the job's date" open for jobs with both, and off-the-hour crons spread load |
+| D42 | Push text | The morning summary's text is built on the server in one file (`convex/lib/pushText.ts`), as "{Срещи}: 2 · Закъснели: 1 · Напомняния: 3" | Push is sent by the server, so ADR 0009's "Convex never returns UI text" has this one exception, kept in one place |
 
 ## Spikes
 
@@ -639,6 +642,7 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - milestone 5 built (#6), in review: Today, Jobs by stage group, Clients, and the client, job and item pages with appointments, job lines, timelines and files (camera in one tap, server-side checks, `storageBytes`, a daily orphan cleanup);
   - milestone 6 built (#7), in review: payments from a job and from a client with an editable split, refunds, write-offs, using credit on request, costs on a job and general, and the Money screen by month;
   - milestone 7 built (#8), in review: every Settings section (business with logo, names with gender, modules, stages, fields, services, reminders), "+ поле" on the forms, blocked actions that explain why, and a grammar test over the translation files;
+  - milestone 8 built (#9), in review: one search box (Latin/Cyrillic, plates, phones, extra fields), reminders with the rule's pre-filled offer on Done, repeating jobs with a daily idempotent cron, and Web Push (subscribe, morning summary at 07:30 Sofia, settings, iPhone guide);
 - **Open:**
   - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26.

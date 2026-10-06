@@ -2,6 +2,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   buildSearchText,
+  foldQuery,
   nameMatches,
   searchClients,
   transliterate,
@@ -32,7 +33,7 @@ describe('transliterate', () => {
 })
 
 describe('buildSearchText', () => {
-  it('keeps each folded word once', () => {
+  it('keeps each folded word once, and plain names plain', () => {
     expect(buildSearchText(['Иван Петров', 'Ivan', undefined])).toBe(
       'ivan petrov',
     )
@@ -63,5 +64,49 @@ describe('client matching', () => {
   it('needs something to match', () => {
     expect(searchClients(clients, '  ')).toEqual([])
     expect(nameMatches('', 'Иван')).toBe(false)
+  })
+})
+
+describe('search keys (milestone 8)', () => {
+  // Stored keys and a folded query match the way Convex search does: every
+  // query word but the last must equal a key, the last may be a prefix.
+  const finds = (stored: string, query: string) => {
+    const keys = buildSearchText([stored]).split(' ')
+    return foldQuery(query).some((variant) => {
+      const words = variant.split(' ').filter(Boolean)
+      return words.every((word, index) =>
+        index === words.length - 1
+          ? keys.some((key) => key.startsWith(word))
+          : keys.includes(word),
+      )
+    })
+  }
+
+  it('Ivan ↔ Иван', () => {
+    expect(finds('Иван Петров', 'Ivan')).toBe(true)
+    expect(finds('Ivan Petrov', 'Иван')).toBe(true)
+    expect(finds('Иван Петров', 'иван петр')).toBe(true)
+  })
+
+  it('CA1234BP ↔ СА 1234 ВР, either way, spaces or not', () => {
+    expect(finds('СА 1234 ВР', 'CA1234BP')).toBe(true)
+    expect(finds('СА 1234 ВР', 'ca 1234 bp')).toBe(true)
+    expect(finds('СА 1234 ВР', 'СА1234ВР')).toBe(true)
+    expect(finds('CA1234BP', 'СА 1234 ВР')).toBe(true)
+    expect(finds('CA 1234 BP', 'ca1234')).toBe(true)
+  })
+
+  it('a phone is found the local way too', () => {
+    expect(finds('+359888123456', '0888123456')).toBe(true)
+    expect(finds('+359888123456', '888123')).toBe(false)
+    expect(finds('+359888123456', '0888')).toBe(true)
+  })
+
+  it('keeps keys short enough for Convex (32 bytes)', () => {
+    const keys = buildSearchText([
+      'Металообработващ цех Петров и синове ЕООД',
+    ]).split(' ')
+    for (const key of keys)
+      expect(new TextEncoder().encode(key).length).toBeLessThanOrEqual(32)
   })
 })

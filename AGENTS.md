@@ -37,6 +37,7 @@ npx convex run system:whereAmI   # the deployment's region
 Env:
 - `.env.local` gets `CONVEX_DEPLOYMENT` and `VITE_CONVEX_URL` from `npx convex deployment select`, and the Clerk keys from `clerk env pull`. Vercel comes after milestone 1 is merged.
 - Convex env (`npx convex env list`): `CLERK_JWT_ISSUER_DOMAIN`, and `ALLOW_SEED=true` on dev and preview only. Both are also project defaults for new dev and preview deployments (`npx convex env default list --type preview`). Production never gets `ALLOW_SEED`.
+- Web Push (ADR 0011): `.env.local` also gets `VITE_VAPID_PUBLIC_KEY`, the public VAPID key (not a secret), which must match the Convex env `VAPID_PUBLIC_KEY`. Convex env also holds `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a `mailto:` address) and `APP_URL` (the app's https origin, for push links). Without them nothing is sent. Push works only in production builds (`pnpm build && pnpm preview`), where the service worker is registered.
 - Never print a secret or commit an `.env*` file.
 
 Sign-in:

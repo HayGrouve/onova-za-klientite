@@ -11,6 +11,7 @@ import { createClient } from './lib/clientWrite'
 import { fail } from './lib/errors'
 import { createJob } from './lib/jobWrite'
 import { recomputeMoney } from './lib/recompute'
+import { refreshRepeat } from './lib/repeat'
 import { calendarDate, cents, optionalText } from './lib/validate'
 import { vPaymentMethod } from './validators'
 
@@ -110,6 +111,12 @@ export const save = businessMutation({
       }),
     ),
     dueDate: v.optional(v.string()),
+    repeat: v.optional(
+      v.object({
+        every: v.number(),
+        unit: v.union(v.literal('week'), v.literal('month')),
+      }),
+    ),
   },
   returns: v.object({ jobId: v.id('jobs'), clientId: v.id('clients') }),
   handler: async (ctx, args) => {
@@ -208,6 +215,14 @@ export const save = businessMutation({
             : date,
         },
       })
+    }
+    // Repeating needs the job's date; without one the switch is ignored.
+    if (args.repeat && (args.when || args.dueDate)) {
+      const { every, unit } = args.repeat
+      if (!Number.isInteger(every) || every < 1 || every > 52)
+        fail('invalid', { field: 'every' })
+      await ctx.db.patch('jobs', jobId, { repeat: { every, unit } })
+      await refreshRepeat(ctx, jobId)
     }
     return { jobId, clientId }
   },

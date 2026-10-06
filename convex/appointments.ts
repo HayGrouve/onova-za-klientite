@@ -4,6 +4,7 @@ import { isValidDate, sofiaTimeToUtc } from '../shared/dates'
 import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
+import { refreshRepeat } from './lib/repeat'
 import { optionalText } from './lib/validate'
 
 const vSlot = {
@@ -72,6 +73,7 @@ export const add = businessMutation({
       label: optionalText(args.label, 'label', 60),
       assigneeIds: [],
     })
+    await refreshRepeat(ctx, job._id)
     await logActivity(ctx, {
       type: 'appointment.added',
       jobId: job._id,
@@ -93,6 +95,7 @@ export const update = businessMutation({
       label: optionalText(args.label, 'label', 60),
     }
     await ctx.db.patch('appointments', appointment._id, patch)
+    if (appointment.jobId) await refreshRepeat(ctx, appointment.jobId)
     await logActivity(ctx, {
       type: 'appointment.changed',
       jobId: appointment.jobId,
@@ -114,6 +117,7 @@ export const cancel = businessMutation({
     await ctx.db.patch('appointments', appointment._id, {
       cancelledAt: Date.now(),
     })
+    if (appointment.jobId) await refreshRepeat(ctx, appointment.jobId)
     await logActivity(ctx, {
       type: 'appointment.cancelled',
       jobId: appointment.jobId,

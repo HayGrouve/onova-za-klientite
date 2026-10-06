@@ -10,3 +10,8 @@ export const convexUrl = clean(
 export const clerkPublishableKey = clean(
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined,
 )
+
+/** The public VAPID key for Web Push (ADR 0011). Not a secret. */
+export const vapidPublicKey = clean(
+  import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined,
+)

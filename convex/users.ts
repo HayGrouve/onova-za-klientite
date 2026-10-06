@@ -86,6 +86,13 @@ const vViewer = v.union(
         modules: vModules,
         jobFlow: vJobFlow,
         depositsOnNewJob: v.boolean(),
+        repeatDefault: v.optional(
+          v.object({
+            every: v.number(),
+            unit: v.union(v.literal('week'), v.literal('month')),
+          }),
+        ),
+        reminderRule: v.optional(v.object({ months: v.number() })),
         setupDone: v.boolean(),
       }),
     ),
@@ -130,6 +137,8 @@ export const viewer = query({
             modules: active.modules,
             jobFlow: active.jobFlow,
             depositsOnNewJob: active.depositsOnNewJob,
+            repeatDefault: active.repeatDefault,
+            reminderRule: active.reminderRule,
             setupDone: active.setup.completedAt !== undefined,
           }
         : null,

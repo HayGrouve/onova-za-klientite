@@ -1,4 +1,5 @@
 import {
+  BellIcon,
   CalendarBlankIcon,
   PencilSimpleIcon,
   PhoneIcon,
@@ -14,6 +15,9 @@ import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { AppointmentForm } from '#/components/job/appointment-form'
+import { RepeatSection } from '#/components/job/repeat-section'
+import { ReminderForm } from '#/components/reminders/reminder-form'
+import { monthsLabel } from '#/components/setup/steps'
 import { CostForm } from '#/components/money/cost-form'
 import { PaymentForm } from '#/components/money/payment-form'
 import { RefundForm } from '#/components/money/refund-form'
@@ -38,7 +42,7 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
-import { isOverdue } from '../../../shared/dates'
+import { addMonths, isOverdue } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
 import { telHref } from '../../../shared/phone'
 
@@ -56,6 +60,7 @@ type Panel =
   | { kind: 'writeOff' }
   | { kind: 'cost'; cost?: Doc<'costs'> }
   | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
+  | { kind: 'reminder'; rule: boolean }
 
 function Section({
   title,
@@ -106,6 +111,16 @@ function JobPage() {
   const moveTo = async (stageId: Id<'stages'>) => {
     try {
       await changeStage({ businessId: business._id, jobId: job._id, stageId })
+      // Q5: reaching Done offers the reminder rule's reminder, pre-filled.
+      const target = data.stages.find((stage) => stage._id === stageId)
+      if (
+        target?.group === 'done' &&
+        job.stageGroup !== 'done' &&
+        modules.reminders &&
+        business.reminderRule
+      ) {
+        setPanel({ kind: 'reminder', rule: true })
+      }
     } catch (error) {
       toast.error(errorMessage(error))
     }
@@ -460,6 +475,21 @@ function JobPage() {
         </Section>
       )}
 
+      <RepeatSection job={job} />
+
+      {modules.reminders && client && !client.isNoClient && (
+        <div className="px-4">
+          <Button
+            variant="outline"
+            className="h-11"
+            onClick={() => setPanel({ kind: 'reminder', rule: false })}
+          >
+            <BellIcon data-icon="inline-start" />
+            {m.reminder_add()}
+          </Button>
+        </div>
+      )}
+
       <Section title={m.job_files()}>
         <FileGallery
           businessId={business._id}
@@ -490,13 +520,17 @@ function JobPage() {
                       ? m.cost_title()
                       : panel?.kind === 'removePayment'
                         ? m.pay_remove()
-                        : panel?.kind === 'lines'
-                          ? m.job_lines()
-                          : panel?.kind === 'appointment'
-                            ? words.appointment.singular
-                            : panel?.kind === 'items'
-                              ? words.item.plural
-                              : job.title}
+                        : panel?.kind === 'reminder'
+                          ? panel.rule
+                            ? m.reminder_rule_title()
+                            : m.reminder_add_title()
+                          : panel?.kind === 'lines'
+                            ? m.job_lines()
+                            : panel?.kind === 'appointment'
+                              ? words.appointment.singular
+                              : panel?.kind === 'items'
+                                ? words.item.plural
+                                : job.title}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -564,6 +598,32 @@ function JobPage() {
                 today={today}
                 onDone={close}
               />
+            )}
+            {panel?.kind === 'reminder' && (
+              <>
+                {panel.rule && business.reminderRule && (
+                  <p className="pb-4 text-sm">
+                    {m.reminder_rule_body({
+                      when: monthsLabel(
+                        business.reminderRule.months,
+                      ).toLocaleLowerCase('bg'),
+                    })}
+                  </p>
+                )}
+                <ReminderForm
+                  businessId={business._id}
+                  target={{ jobId: job._id, itemId: job.itemIds.at(0) }}
+                  initialDate={
+                    panel.rule && business.reminderRule
+                      ? addMonths(today, business.reminderRule.months)
+                      : today
+                  }
+                  initialNote={panel.rule ? job.title : ''}
+                  source={panel.rule ? 'rule' : 'manual'}
+                  onDone={close}
+                  onSkip={panel.rule ? close : undefined}
+                />
+              </>
             )}
             {panel?.kind === 'removePayment' && (
               <RemovePayment

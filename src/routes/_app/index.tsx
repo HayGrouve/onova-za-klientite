@@ -1,9 +1,10 @@
-import { BellIcon, SunIcon } from '@phosphor-icons/react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { SunIcon } from '@phosphor-icons/react'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { JobRow } from '#/components/job-row'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { ReminderRow } from '#/components/reminders/reminder-row'
 import { ListSection } from '#/components/list-section'
 import { EmptyState, PageTitle } from '#/components/page'
 import { useToday } from '#/hooks/use-today'
@@ -95,23 +96,14 @@ function TodayPage() {
           {data.reminders.length > 0 && (
             <ListSection title={m.today_reminders()}>
               {data.reminders.map((reminder) => (
-                <li key={reminder._id}>
-                  <Link
-                    to={reminder.clientId ? '/clients/$clientId' : '/'}
-                    params={{ clientId: reminder.clientId ?? '' }}
-                    className="flex items-start gap-3 rounded-2xl px-4 py-3 hover:bg-muted/60"
-                  >
-                    <BellIcon className="mt-0.5 size-5 shrink-0 text-primary" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="font-medium">{reminder.note}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {[reminder.clientName, formatDay(reminder.date, today)]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
+                <ReminderRow
+                  key={reminder._id}
+                  reminderId={reminder._id}
+                  note={reminder.note}
+                  detail={[reminder.clientName, formatDay(reminder.date, today)]
+                    .filter(Boolean)
+                    .join(' · ')}
+                />
               ))}
             </ListSection>
           )}
