@@ -20,7 +20,7 @@ Oct 6, 2026 · @Tsvetomir Tsekov
 
 ## Decisions so far
 
-Twenty-four decisions came out of the 6 Oct 2026 brainstorm, pressure test and final questions. Everything below builds on them.
+Twenty-six decisions came out of the 6 Oct 2026 brainstorm, pressure test, final questions and the first two prototypes. Everything below builds on them.
 
 | Area | Decision | Why |
 | --- | --- | --- |
@@ -48,6 +48,8 @@ Twenty-four decisions came out of the 6 Oct 2026 brainstorm, pressure test and f
 | Language | Bulgarian only, with all text in translation files | Other languages can be added later without rework |
 | Name | Онова за клиентите | Fits the founder's "онова за" label family |
 | First-user interview | Real interview skipped; the simulated answers stand as working assumptions | Throwaway prototypes test the assumptions faster than talking about them |
+| Setup wizard format | Live preview: the Job form stays on screen and changes with each answer | Founder's pick in prototype 1. Each answer shows its effect straight away |
+| New job entry | One line, typed like a notebook, read back as fields before saving | Founder's pick in prototype 2. Closest to the notebook it replaces |
 
 ## Core data model
 
@@ -128,7 +130,7 @@ These are where flexible tools such as Airtable or Salesforce become hard to use
 
 ## Setup wizard
 
-An 8-step wizard asks how people work, never what their profession is, and turns each answer into settings. One question per screen, every step skippable, and a preview at the end.
+An 8-step wizard asks how people work, never what their profession is, and turns each answer into settings. The Job form stays on screen above the questions and changes with each answer, so people see what every answer does. Questions come one at a time and every step is skippable. Prototype 1 picked this over one question per screen and a chat.
 
 | Step | Question | What it sets |
 | --- | --- | --- |
@@ -140,7 +142,7 @@ An 8-step wizard asks how people work, never what their profession is, and turns
 | 6 | "Do clients come back regularly?" Choices: on a fixed schedule (e.g. weekly), every few months, no | Fixed schedule: new jobs repeat by default. Every few months: reminders and the reminder rule |
 | 7 | "Your 3–5 most common services and prices" | Service list |
 | 8 | "Import clients from your phone or Excel" | Starting data |
-| Done | Preview: "This is how a new job will look", with "change" links | — |
+| Done | The finished Job form with "Is this how you work?" and "change" links | — |
 
 **Rules**
 
@@ -360,9 +362,18 @@ Six throwaway prototypes test the riskiest parts of the design before any real c
 - Two fake businesses set up through the same core, a furniture maker and an AC technician, so every screen is checked against two different setups.
 - Build 1 and 2 first. They cover the first minutes of use, where simple apps win or lose people.
 
+**Findings**
+
+Each prototype was built in three variants. The founder tried them all and picked one; the success times still need the first user.
+
+| # | Picked | Over | Still to check |
+| --- | --- | --- | --- |
+| 1 | Live preview: the Job form stays on screen and changes with each answer | One question per screen; a chat | Under 2 minutes with the first user, and whether the form matches how he works |
+| 2 | One line: "Иван Петров, гардероб, 950, капаро 300, до 20.10" is read back as client, title, price, deposit and date, each fixable before saving | A short form in a bottom sheet; three taps (who, what, how much) | Under 30 seconds with the first user on his own phone, and how often the read-back gets a real line wrong |
+
 ## Open questions and next steps
 
-The design is final. Only the free-tier limits and prices wait for real users; the next step is prototypes 1 and 2.
+The design is final. Only the free-tier limits and prices wait for real users. Prototypes 1 and 2 each have a picked variant; the next step is timing them with the first user.
 
 **Open questions**
 
@@ -375,7 +386,8 @@ The design is final. Only the free-tier limits and prices wait for real users; t
 - [x] Settle the five pressure-test decisions
 - [x] Decide offline, due date, job summary, СУПТО timing, pricing model, notifications, sign-in and language
 - [x] Name the product: Онова за клиентите
-- [ ] Prototypes 1 and 2: setup wizard and new job
+- [x] Prototypes 1 and 2: pick a variant (wizard: live preview; new job: one line)
+- [ ] Time prototypes 1 and 2 with the first user
 - [ ] Prototypes 3–6: lists, job money, customization, job summary
 - [ ] Get a written СУПТО answer from an accountant before public launch
 - [ ] Set free-tier limits and prices
