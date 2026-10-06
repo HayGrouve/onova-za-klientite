@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestone 1 (foundation) is built and in review. Vercel is linked after it merges.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 (foundation) and 2 (domain core) are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
 
 ## Contents
 
@@ -596,6 +596,9 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D22 | Clerk SDK | `@clerk/tanstack-react-start` works in SPA mode without `clerkMiddleware()`: sign-in, sign-out and reload all work from the static shell. `@clerk/react` isn't needed (spike 1) | Fewer moving parts; the server only serves the shell |
 | D23 | Dev seed | Seed businesses carry a `seedKey`. `seed:dev` and `seed:preview` rebuild their contents in place, so ids stay stable and a second run gives the same result. They refuse unless the deployment has `ALLOW_SEED=true`, which production never gets. On such deployments, every user joins the seed businesses at first sign-in | Previews are seeded before anyone signs in, and the Clerk test users must see both businesses |
 | D24 | Typed Convex env | Env vars are declared in `convex/convex.config.ts` and read from `env` in `_generated/server`, as the Convex ESLint plugin asks. `auth.config.ts` is the one exception, since it is read at push time | Typos in env names become type errors |
+| D25 | Stage delete with jobs | Deleting a stage that holds jobs takes a "move jobs to" stage and moves them in the same mutation. Without one it fails with `stage.hasJobs`. A required group's last stage can't be deleted or regrouped at all | One call for the "Изтрий и премести" button, and no moment where jobs point at a missing stage |
+| D26 | Refunds | A refund from a job is limited to what the job was paid. A refund without a job pays back client credit, and can't exceed it | A refund never makes a balance or credit go below what was actually received |
+| D27 | Extra field values | A record's extra values are replaced as a whole on edit, except values of archived fields, which are always kept | The form only shows active fields, so archived values would otherwise be lost on every save |
 
 ## Spikes
 
@@ -617,7 +620,8 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - the design doc picks for prototypes 1 and 2 (#1);
   - Q19 and Q21: Free plan while developing, with production created in EU at launch.
   - Q20: dependencies approved, with `read-excel-file` + `papaparse` instead of SheetJS.
-- **Next:** merge milestone 1, then link Vercel (Q22) and the first production deploy, with the owner's OK. Milestone 2, Domain core (#3), is stacked on the milestone 1 branch meanwhile.
+- **Next:** merge milestone 1, then link Vercel (Q22) and the first production deploy, with the owner's OK. Milestones 2 onwards are stacked on the milestone 1 branch meanwhile.
+  - milestone 2 built (#3), in review: the full schema, the pure rules in `shared/` (money, allocation, stages, fields, words, phone, dates), the money and settings mutations, the activity log, recompute with a cache check, a stranger test over every public function, and a seed with jobs, money and reminders;
 - **Open:**
   - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26.

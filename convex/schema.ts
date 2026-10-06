@@ -43,7 +43,9 @@ export default defineSchema({
     modules: vModules,
     jobFlow: vJobFlow,
     depositsOnNewJob: v.boolean(),
-    repeatDefault: v.optional(v.object({ every: v.number(), unit: vRepeatUnit })),
+    repeatDefault: v.optional(
+      v.object({ every: v.number(), unit: vRepeatUnit }),
+    ),
     reminderRule: v.optional(v.object({ months: v.number() })),
     setup: v.object({
       // Typed by the setup wizard in milestone 3.
@@ -149,7 +151,11 @@ export default defineSchema({
     notes: v.optional(v.string()),
     itemIds: v.array(v.id('items')),
     assigneeIds: v.array(v.id('memberships')),
-    source: v.union(v.literal('manual'), v.literal('phone'), v.literal('online')),
+    source: v.union(
+      v.literal('manual'),
+      v.literal('phone'),
+      v.literal('online'),
+    ),
     repeat: v.optional(
       v.object({
         every: v.number(),
@@ -231,7 +237,11 @@ export default defineSchema({
     jobId: v.optional(v.id('jobs')),
     itemId: v.optional(v.id('items')),
     source: v.union(v.literal('manual'), v.literal('rule')),
-    status: v.union(v.literal('open'), v.literal('done'), v.literal('dismissed')),
+    status: v.union(
+      v.literal('open'),
+      v.literal('done'),
+      v.literal('dismissed'),
+    ),
     closedAt: v.optional(v.number()),
   })
     .index('by_business_status_date', ['businessId', 'status', 'date'])
@@ -361,7 +371,11 @@ export default defineSchema({
       kind: v.union(v.literal('job'), v.literal('client')),
       id: v.string(),
     }),
-    permission: v.union(v.literal('view'), v.literal('approve'), v.literal('book')),
+    permission: v.union(
+      v.literal('view'),
+      v.literal('approve'),
+      v.literal('book'),
+    ),
     expiresAt: v.optional(v.number()),
     cancelledAt: v.optional(v.number()),
     createdBy: v.id('memberships'),

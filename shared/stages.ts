@@ -46,7 +46,10 @@ export const REQUIRED_GROUPS: readonly StageGroup[] = [
 
 type StageLike<TId> = { _id: TId; group: StageGroup; order: number }
 
-function isLastInGroup<TId>(stages: Array<StageLike<TId>>, stage: StageLike<TId>) {
+function isLastInGroup<TId>(
+  stages: Array<StageLike<TId>>,
+  stage: StageLike<TId>,
+) {
   return (
     REQUIRED_GROUPS.includes(stage.group) &&
     stages.filter((other) => other.group === stage.group).length === 1
