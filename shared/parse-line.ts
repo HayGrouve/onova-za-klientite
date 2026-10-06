@@ -140,11 +140,8 @@ function isPhone(segment: string) {
 function findService(services: ServiceRef[], title: string) {
   const wanted = foldName(title)
   if (!wanted) return null
-  return (
-    services.find((service) => foldName(service.name) === wanted) ??
-    services.find((service) => foldName(service.name).startsWith(wanted)) ??
-    null
-  )
+  // Exact only: "гардероб" must not pick up "Гардероб, на линеен метър" and its per-metre price.
+  return services.find((service) => foldName(service.name) === wanted) ?? null
 }
 
 export function parseLine(text: string, ctx: ParseContext): ParsedLine {

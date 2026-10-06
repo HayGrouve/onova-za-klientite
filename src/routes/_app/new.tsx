@@ -1,21 +1,31 @@
-import { PlusIcon } from '@phosphor-icons/react'
 import { createFileRoute } from '@tanstack/react-router'
-import { EmptyState, PageTitle } from '#/components/page'
+import { useQuery } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import { CenteredMessage } from '#/components/centered-message'
+import { NewJobForm } from '#/components/new-job/new-job-form'
+import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 
 export const Route = createFileRoute('/_app/new')({ component: NewJobPage })
 
 function NewJobPage() {
-  const { words } = useViewer().business
+  const { business } = useViewer()
+  const context = useQuery(api.newJob.context, { businessId: business._id })
+  if (!context) {
+    return (
+      <CenteredMessage>
+        <Spinner className="size-6 text-muted-foreground" />
+        <span className="sr-only">{m.loading()}</span>
+      </CenteredMessage>
+    )
+  }
   return (
-    <>
-      <PageTitle>{m.new_job({ job: words.job.singular })}</PageTitle>
-      <EmptyState
-        icon={PlusIcon}
-        title={m.new_job_title()}
-        body={m.new_job_soon()}
-      />
-    </>
+    <NewJobForm
+      key={business._id}
+      business={business}
+      clients={context.clients}
+      services={context.services}
+    />
   )
 }

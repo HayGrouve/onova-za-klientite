@@ -37,8 +37,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { words } = business
   const pathname = useLocation({ select: (location) => location.pathname })
 
-  // Setup is a full-screen flow of its own.
-  if (pathname === '/setup') return <>{children}</>
+  // Setup and "+" are full-screen flows of their own.
+  if (pathname === '/setup' || pathname === '/new') return <>{children}</>
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">

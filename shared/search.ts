@@ -87,10 +87,10 @@ export function foldName(text: string): string {
 export function nameMatches(query: string, name: string): boolean {
   const q = foldName(query)
   if (!q) return false
-  const words = foldName(name).split(' ')
+  const nameWords = foldName(name).split(' ')
   return q
     .split(' ')
-    .every((part) => words.some((word) => word.startsWith(part)))
+    .every((part) => nameWords.some((word) => word.startsWith(part)))
 }
 
 export function digitsOf(text: string): string {

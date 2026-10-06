@@ -156,6 +156,17 @@ describe('parseLine: services', () => {
     expect(parsed.priceCents).toBeNull()
   })
 
+  it('only an exact service name matches', () => {
+    const parsed = parseLine('Мария Георгиева, гардероб', {
+      ...ctx,
+      services: [
+        { id: 'm', name: 'Гардероб, на линеен метър', priceCents: 35000 },
+      ],
+    })
+    expect(parsed.service).toBeNull()
+    expect(parsed.title).toBe('гардероб')
+  })
+
   it('a typed price wins over the service price', () => {
     expect(parse('Мария Георгиева, монтаж, 60').priceCents).toBe(6000)
   })

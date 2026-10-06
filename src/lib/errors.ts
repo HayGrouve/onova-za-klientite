@@ -7,6 +7,8 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   'auth.notMember': m.error_auth_notMember,
   'auth.forbidden': m.error_auth_forbidden,
   notFound: m.error_notFound,
+  invalid: m.error_invalid,
+  'payment.zero': m.error_payment_zero,
 }
 
 /** The error code Convex threw on purpose (D16), if any. */
