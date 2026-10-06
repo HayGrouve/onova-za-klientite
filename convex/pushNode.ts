@@ -2,6 +2,7 @@
 
 import { v } from 'convex/values'
 import webpush from 'web-push'
+import { isPushEndpoint } from '../shared/push-endpoint'
 import { internal } from './_generated/api'
 import { internalAction, env } from './_generated/server'
 
@@ -48,6 +49,11 @@ export const send = internalAction({
     const gone: typeof delivered = []
     let retry: string | null = null
     for (const subscription of subscriptions) {
+      // Checked again here: rows saved before the check existed must not be sent to either.
+      if (!isPushEndpoint(subscription.endpoint)) {
+        gone.push(subscription._id)
+        continue
+      }
       try {
         await webpush.sendNotification(
           { endpoint: subscription.endpoint, keys: subscription.keys },

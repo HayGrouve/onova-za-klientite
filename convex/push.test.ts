@@ -15,7 +15,7 @@ function at(iso: string) {
 }
 
 const sub = (n: number, auth = 'auth') => ({
-  endpoint: `https://push.example.com/send/${n}`,
+  endpoint: `https://fcm.googleapis.com/fcm/send/${n}`,
   keys: { p256dh: `p256dh-${n}`, auth },
 })
 

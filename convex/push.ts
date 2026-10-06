@@ -1,5 +1,6 @@
 import { Workpool } from '@convex-dev/workpool'
 import { v } from 'convex/values'
+import { isPushEndpoint } from '../shared/push-endpoint'
 import { components, internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import { internalMutation, internalQuery } from './_generated/server'
@@ -13,8 +14,6 @@ const pool = new Workpool(components.pushPool, {
   retryActionsByDefault: true,
   defaultRetryBehavior: { maxAttempts: 4, initialBackoffMs: 30_000, base: 3 },
 })
-
-const MAX_ENDPOINT_LENGTH = 2048
 
 const vNotify = v.object({
   morningSummary: v.boolean(),
@@ -35,12 +34,7 @@ export const subscribe = userMutation({
   },
   returns: v.null(),
   handler: async (ctx, { endpoint, keys, userAgent }) => {
-    if (
-      !endpoint.startsWith('https://') ||
-      endpoint.length > MAX_ENDPOINT_LENGTH
-    ) {
-      fail('invalid', { field: 'endpoint' })
-    }
+    if (!isPushEndpoint(endpoint)) fail('invalid', { field: 'endpoint' })
     const existing = await ctx.db
       .query('pushSubscriptions')
       .withIndex('by_endpoint', (q) => q.eq('endpoint', endpoint))
