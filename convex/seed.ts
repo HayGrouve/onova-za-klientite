@@ -157,7 +157,10 @@ async function seedBusiness(
     for (const item of client.items ?? []) {
       const extra: Record<string, string> = {}
       for (const [fieldName, value] of Object.entries(item.extra)) {
-        extra[fieldIds[fieldName]] = value
+        const fieldId = fieldIds[fieldName] as Id<'fields'> | undefined
+        if (!fieldId)
+          throw new Error(`Seed item field "${fieldName}" is not defined`)
+        extra[fieldId] = value
       }
       await ctx.db.insert('items', {
         businessId,

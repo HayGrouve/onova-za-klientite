@@ -29,7 +29,6 @@ export default defineSchema({
 
   businesses: defineTable({
     name: v.string(),
-    logoFileId: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     address: v.optional(v.string()),
@@ -45,6 +44,7 @@ export default defineSchema({
     ),
     reminderRule: v.optional(v.object({ months: v.number() })),
     setup: v.object({
+      // Typed by the setup wizard in milestone 3.
       answers: v.optional(v.any()),
       completedAt: v.optional(v.number()),
     }),

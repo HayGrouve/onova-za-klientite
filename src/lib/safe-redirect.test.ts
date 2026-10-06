@@ -10,6 +10,8 @@ describe('safeRedirect', () => {
   it.each([
     '//evil.example',
     '/\\evil.example',
+    '/.//evil.example',
+    '/..//evil.example',
     'https://evil.example',
     'javascript:alert(1)',
     '',

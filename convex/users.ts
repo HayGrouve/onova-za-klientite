@@ -6,6 +6,7 @@ import { findCurrentUser, findMembership, userMutation } from './lib/auth'
 import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
 import { joinSeedBusinesses } from './lib/seedAccess'
+import { vModules, vRole, vWords } from './validators'
 
 function displayName(identity: { name?: string; email?: string }) {
   return identity.name?.trim() || identity.email?.split('@')[0] || ''
@@ -65,42 +66,69 @@ async function activeMemberships(
   )
 }
 
+const vViewer = v.union(
+  v.null(),
+  v.object({
+    user: v.object({
+      name: v.string(),
+      email: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+    }),
+    businesses: v.array(
+      v.object({ _id: v.id('businesses'), name: v.string(), role: vRole }),
+    ),
+    business: v.union(
+      v.null(),
+      v.object({
+        _id: v.id('businesses'),
+        name: v.string(),
+        words: vWords,
+        modules: vModules,
+        setupDone: v.boolean(),
+      }),
+    ),
+  }),
+)
+
 /** Everything the signed-in shell needs: who, which businesses, and the active one's words. */
 export const viewer = query({
   args: {},
+  returns: vViewer,
   handler: async (ctx) => {
     const user = await findCurrentUser(ctx)
     if (!user) return null
 
     const memberships = await activeMemberships(ctx, user._id)
-    const businesses = []
+    const loaded: Array<{
+      business: Doc<'businesses'>
+      role: Doc<'memberships'>['role']
+    }> = []
     for (const membership of memberships) {
       const business = await ctx.db.get('businesses', membership.businessId)
-      if (business) {
-        businesses.push({
-          _id: business._id,
-          name: business.name,
-          role: membership.role,
-        })
-      }
+      if (business) loaded.push({ business, role: membership.role })
     }
-    businesses.sort((a, b) => a.name.localeCompare(b.name, 'bg'))
+    loaded.sort((a, b) => a.business.name.localeCompare(b.business.name, 'bg'))
 
-    const activeId =
-      businesses.find((business) => business._id === user.activeBusinessId)
-        ?._id ?? businesses.at(0)?._id
-    const active = activeId ? await ctx.db.get('businesses', activeId) : null
+    const active =
+      loaded.find(({ business }) => business._id === user.activeBusinessId)
+        ?.business ?? loaded.at(0)?.business
 
     return {
       user: { name: user.name, email: user.email, imageUrl: user.imageUrl },
-      businesses,
-      business: active && {
-        _id: active._id,
-        name: active.name,
-        words: active.words,
-        modules: active.modules,
-        setupDone: active.setup.completedAt !== undefined,
-      },
+      businesses: loaded.map(({ business, role }) => ({
+        _id: business._id,
+        name: business.name,
+        role,
+      })),
+      business: active
+        ? {
+            _id: active._id,
+            name: active.name,
+            words: active.words,
+            modules: active.modules,
+            setupDone: active.setup.completedAt !== undefined,
+          }
+        : null,
     }
   },
 })
