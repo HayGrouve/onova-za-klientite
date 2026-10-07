@@ -1,0 +1,104 @@
+import type { FunctionReturnType } from 'convex/server'
+import type { api } from '../../convex/_generated/api'
+import { useViewer } from '#/hooks/use-viewer'
+import { m } from '#/paraglide/messages.js'
+import { formatMoney } from '../../shared/money'
+import type { Words } from '../../shared/words'
+
+type TimelineItem = FunctionReturnType<typeof api.jobs.get>['timeline'][number]
+
+const WHEN = new Intl.DateTimeFormat('bg-BG', {
+  day: 'numeric',
+  month: 'numeric',
+  year: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'Europe/Sofia',
+})
+
+function describe(item: TimelineItem, words: Words) {
+  const { data } = item
+  const amount = formatMoney(Math.abs(data.amountCents ?? 0))
+  const name = data.name ?? ''
+  switch (item.type) {
+    case 'job.created':
+      return m.event_job_created({ name })
+    case 'job.edited':
+      return m.event_job_edited()
+    case 'job.stageChanged':
+      return m.event_job_stageChanged({ to: data.to ?? '' })
+    case 'job.linesChanged':
+      return m.event_job_linesChanged()
+    case 'job.itemsChanged':
+      return m.event_job_itemsChanged()
+    case 'job.writtenOff':
+      return m.event_job_writtenOff({ amount })
+    case 'job.writeOffRemoved':
+      return m.event_job_writeOffRemoved({ amount })
+    case 'job.cancelled':
+      return data.note
+        ? `${m.event_job_cancelled()}: ${data.note}`
+        : m.event_job_cancelled()
+    case 'payment.added':
+      return (data.amountCents ?? 0) < 0
+        ? m.event_payment_refund({ amount })
+        : m.event_payment_added({ amount }) +
+            (data.note ? ` (${data.note})` : '')
+    case 'payment.removed':
+      return m.event_payment_removed({ amount })
+    case 'credit.used':
+      return m.event_credit_used({ amount })
+    case 'cost.added':
+      return m.event_cost_added({ name, amount })
+    case 'cost.edited':
+      return m.event_cost_edited({ amount })
+    case 'cost.removed':
+      return m.event_cost_removed({ name })
+    case 'client.created':
+      return m.event_client_created({ name })
+    case 'client.edited':
+      return m.event_client_edited()
+    case 'item.created':
+      return m.event_item_created({ name })
+    case 'item.edited':
+      return m.event_item_edited()
+    case 'item.moved':
+      return m.event_item_moved()
+    case 'appointment.added':
+      return m.event_appointment_added({
+        appointment: words.appointment.singular,
+        date: data.to ?? '',
+      })
+    case 'appointment.changed':
+      return m.event_appointment_changed({ date: data.to ?? '' })
+    case 'appointment.cancelled':
+      return m.event_appointment_cancelled()
+    case 'file.added':
+      return m.event_file_added({ name: name || m.files_photo() })
+    case 'file.removed':
+      return m.event_file_removed({ name: name || m.files_photo() })
+    default:
+      return m.event_other()
+  }
+}
+
+/** A record's history from the activity log, newest first. */
+export function Timeline({ items }: { items: TimelineItem[] }) {
+  const { business } = useViewer()
+  return (
+    <ol className="flex flex-col gap-3 px-4">
+      {items.map((item) => (
+        <li
+          key={item._id}
+          className="flex flex-col gap-0.5 border-l-2 border-border pl-3"
+        >
+          <span className="text-sm">{describe(item, business.words)}</span>
+          <span className="text-xs text-muted-foreground">
+            {WHEN.format(item._creationTime)}
+            {item.actorName && ` · ${item.actorName}`}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}

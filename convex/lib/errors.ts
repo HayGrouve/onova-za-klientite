@@ -23,6 +23,7 @@ export type ErrorCode =
   | 'payment.exceeds'
   | 'payment.zero'
   | 'credit.notEnough'
+  | 'file.rejected'
 
 export function fail(
   code: ErrorCode,

@@ -8,9 +8,12 @@
  * @module
  */
 
+import type * as appointments from "../appointments.js";
 import type * as clients from "../clients.js";
 import type * as costs from "../costs.js";
+import type * as crons from "../crons.js";
 import type * as fields from "../fields.js";
+import type * as files from "../files.js";
 import type * as items from "../items.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_activity from "../lib/activity.js";
@@ -26,13 +29,16 @@ import type * as lib_recompute from "../lib/recompute.js";
 import type * as lib_search from "../lib/search.js";
 import type * as lib_seedAccess from "../lib/seedAccess.js";
 import type * as lib_validate from "../lib/validate.js";
+import type * as lib_views from "../lib/views.js";
 import type * as newJob from "../newJob.js";
 import type * as payments from "../payments.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
+import type * as services from "../services.js";
 import type * as setup from "../setup.js";
 import type * as stages from "../stages.js";
 import type * as system from "../system.js";
+import type * as today from "../today.js";
 import type * as users from "../users.js";
 import type * as validators from "../validators.js";
 
@@ -43,9 +49,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  appointments: typeof appointments;
   clients: typeof clients;
   costs: typeof costs;
+  crons: typeof crons;
   fields: typeof fields;
+  files: typeof files;
   items: typeof items;
   jobs: typeof jobs;
   "lib/activity": typeof lib_activity;
@@ -61,13 +70,16 @@ declare const fullApi: ApiFromModules<{
   "lib/search": typeof lib_search;
   "lib/seedAccess": typeof lib_seedAccess;
   "lib/validate": typeof lib_validate;
+  "lib/views": typeof lib_views;
   newJob: typeof newJob;
   payments: typeof payments;
   seed: typeof seed;
   seedData: typeof seedData;
+  services: typeof services;
   setup: typeof setup;
   stages: typeof stages;
   system: typeof system;
+  today: typeof today;
   users: typeof users;
   validators: typeof validators;
 }>;

@@ -12,14 +12,19 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppClientsRouteImport } from './routes/_app/clients'
 import { Route as AppImportRouteImport } from './routes/_app/import'
-import { Route as AppJobsRouteImport } from './routes/_app/jobs'
 import { Route as AppMoneyRouteImport } from './routes/_app/money'
 import { Route as AppNewRouteImport } from './routes/_app/new'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSetupRouteImport } from './routes/_app/setup'
 import { Route as AppTimingRouteImport } from './routes/_app/timing'
+import { Route as AppClientsIndexRouteImport } from './routes/_app/clients.index'
+import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients.$clientId'
+import { Route as AppClientsNewRouteImport } from './routes/_app/clients.new'
+import { Route as AppItemsItemIdRouteImport } from './routes/_app/items.$itemId'
+import { Route as AppItemsNewRouteImport } from './routes/_app/items.new'
+import { Route as AppJobsIndexRouteImport } from './routes/_app/jobs.index'
+import { Route as AppJobsJobIdRouteImport } from './routes/_app/jobs.$jobId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -35,19 +40,9 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppClientsRoute = AppClientsRouteImport.update({
-  id: '/clients',
-  path: '/clients',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
   path: '/import',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppJobsRoute = AppJobsRouteImport.update({
-  id: '/jobs',
-  path: '/jobs',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMoneyRoute = AppMoneyRouteImport.update({
@@ -75,83 +70,148 @@ const AppTimingRoute = AppTimingRouteImport.update({
   path: '/timing',
   getParentRoute: () => AppRoute,
 } as any)
+const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsClientIdRoute = AppClientsClientIdRouteImport.update({
+  id: '/clients/$clientId',
+  path: '/clients/$clientId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsNewRoute = AppClientsNewRouteImport.update({
+  id: '/clients/new',
+  path: '/clients/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppItemsItemIdRoute = AppItemsItemIdRouteImport.update({
+  id: '/items/$itemId',
+  path: '/items/$itemId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppItemsNewRoute = AppItemsNewRouteImport.update({
+  id: '/items/new',
+  path: '/items/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppJobsIndexRoute = AppJobsIndexRouteImport.update({
+  id: '/jobs/',
+  path: '/jobs/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppJobsJobIdRoute = AppJobsJobIdRouteImport.update({
+  id: '/jobs/$jobId',
+  path: '/jobs/$jobId',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
-  '/clients': typeof AppClientsRoute
   '/import': typeof AppImportRoute
-  '/jobs': typeof AppJobsRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
   '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
   '/timing': typeof AppTimingRoute
+  '/clients/$clientId': typeof AppClientsClientIdRoute
+  '/clients/new': typeof AppClientsNewRoute
+  '/items/$itemId': typeof AppItemsItemIdRoute
+  '/items/new': typeof AppItemsNewRoute
+  '/jobs/$jobId': typeof AppJobsJobIdRoute
+  '/clients/': typeof AppClientsIndexRoute
+  '/jobs/': typeof AppJobsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
-  '/clients': typeof AppClientsRoute
   '/import': typeof AppImportRoute
-  '/jobs': typeof AppJobsRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
   '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
   '/timing': typeof AppTimingRoute
   '/': typeof AppIndexRoute
+  '/clients/$clientId': typeof AppClientsClientIdRoute
+  '/clients/new': typeof AppClientsNewRoute
+  '/items/$itemId': typeof AppItemsItemIdRoute
+  '/items/new': typeof AppItemsNewRoute
+  '/jobs/$jobId': typeof AppJobsJobIdRoute
+  '/clients': typeof AppClientsIndexRoute
+  '/jobs': typeof AppJobsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/_app/clients': typeof AppClientsRoute
   '/_app/import': typeof AppImportRoute
-  '/_app/jobs': typeof AppJobsRoute
   '/_app/money': typeof AppMoneyRoute
   '/_app/new': typeof AppNewRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/setup': typeof AppSetupRoute
   '/_app/timing': typeof AppTimingRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/clients/$clientId': typeof AppClientsClientIdRoute
+  '/_app/clients/new': typeof AppClientsNewRoute
+  '/_app/items/$itemId': typeof AppItemsItemIdRoute
+  '/_app/items/new': typeof AppItemsNewRoute
+  '/_app/jobs/$jobId': typeof AppJobsJobIdRoute
+  '/_app/clients/': typeof AppClientsIndexRoute
+  '/_app/jobs/': typeof AppJobsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
-    | '/clients'
     | '/import'
-    | '/jobs'
     | '/money'
     | '/new'
     | '/settings'
     | '/setup'
     | '/timing'
+    | '/clients/$clientId'
+    | '/clients/new'
+    | '/items/$itemId'
+    | '/items/new'
+    | '/jobs/$jobId'
+    | '/clients/'
+    | '/jobs/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
-    | '/clients'
     | '/import'
-    | '/jobs'
     | '/money'
     | '/new'
     | '/settings'
     | '/setup'
     | '/timing'
     | '/'
+    | '/clients/$clientId'
+    | '/clients/new'
+    | '/items/$itemId'
+    | '/items/new'
+    | '/jobs/$jobId'
+    | '/clients'
+    | '/jobs'
   id:
     | '__root__'
     | '/_app'
     | '/login'
-    | '/_app/clients'
     | '/_app/import'
-    | '/_app/jobs'
     | '/_app/money'
     | '/_app/new'
     | '/_app/settings'
     | '/_app/setup'
     | '/_app/timing'
     | '/_app/'
+    | '/_app/clients/$clientId'
+    | '/_app/clients/new'
+    | '/_app/items/$itemId'
+    | '/_app/items/new'
+    | '/_app/jobs/$jobId'
+    | '/_app/clients/'
+    | '/_app/jobs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -182,25 +242,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/clients': {
-      id: '/_app/clients'
-      path: '/clients'
-      fullPath: '/clients'
-      preLoaderRoute: typeof AppClientsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/import': {
       id: '/_app/import'
       path: '/import'
       fullPath: '/import'
       preLoaderRoute: typeof AppImportRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/jobs': {
-      id: '/_app/jobs'
-      path: '/jobs'
-      fullPath: '/jobs'
-      preLoaderRoute: typeof AppJobsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/money': {
@@ -238,31 +284,90 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTimingRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/clients/': {
+      id: '/_app/clients/'
+      path: '/clients'
+      fullPath: '/clients/'
+      preLoaderRoute: typeof AppClientsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/$clientId': {
+      id: '/_app/clients/$clientId'
+      path: '/clients/$clientId'
+      fullPath: '/clients/$clientId'
+      preLoaderRoute: typeof AppClientsClientIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/new': {
+      id: '/_app/clients/new'
+      path: '/clients/new'
+      fullPath: '/clients/new'
+      preLoaderRoute: typeof AppClientsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/items/$itemId': {
+      id: '/_app/items/$itemId'
+      path: '/items/$itemId'
+      fullPath: '/items/$itemId'
+      preLoaderRoute: typeof AppItemsItemIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/items/new': {
+      id: '/_app/items/new'
+      path: '/items/new'
+      fullPath: '/items/new'
+      preLoaderRoute: typeof AppItemsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/jobs/': {
+      id: '/_app/jobs/'
+      path: '/jobs'
+      fullPath: '/jobs/'
+      preLoaderRoute: typeof AppJobsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/jobs/$jobId': {
+      id: '/_app/jobs/$jobId'
+      path: '/jobs/$jobId'
+      fullPath: '/jobs/$jobId'
+      preLoaderRoute: typeof AppJobsJobIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
-  AppClientsRoute: typeof AppClientsRoute
   AppImportRoute: typeof AppImportRoute
-  AppJobsRoute: typeof AppJobsRoute
   AppMoneyRoute: typeof AppMoneyRoute
   AppNewRoute: typeof AppNewRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
   AppTimingRoute: typeof AppTimingRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppClientsClientIdRoute: typeof AppClientsClientIdRoute
+  AppClientsNewRoute: typeof AppClientsNewRoute
+  AppItemsItemIdRoute: typeof AppItemsItemIdRoute
+  AppItemsNewRoute: typeof AppItemsNewRoute
+  AppJobsJobIdRoute: typeof AppJobsJobIdRoute
+  AppClientsIndexRoute: typeof AppClientsIndexRoute
+  AppJobsIndexRoute: typeof AppJobsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppClientsRoute: AppClientsRoute,
   AppImportRoute: AppImportRoute,
-  AppJobsRoute: AppJobsRoute,
   AppMoneyRoute: AppMoneyRoute,
   AppNewRoute: AppNewRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,
   AppTimingRoute: AppTimingRoute,
   AppIndexRoute: AppIndexRoute,
+  AppClientsClientIdRoute: AppClientsClientIdRoute,
+  AppClientsNewRoute: AppClientsNewRoute,
+  AppItemsItemIdRoute: AppItemsItemIdRoute,
+  AppItemsNewRoute: AppItemsNewRoute,
+  AppJobsJobIdRoute: AppJobsJobIdRoute,
+  AppClientsIndexRoute: AppClientsIndexRoute,
+  AppJobsIndexRoute: AppJobsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

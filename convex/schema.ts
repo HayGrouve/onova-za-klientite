@@ -325,6 +325,7 @@ export default defineSchema({
     .index('by_job', ['jobId'])
     .index('by_client', ['clientId'])
     .index('by_item', ['itemId'])
+    .index('by_storage', ['storageId'])
     .index('by_business', ['businessId']),
 
   activity: defineTable({

@@ -112,3 +112,18 @@ export async function getDoc<T extends TableNames>(
 ) {
   return (await t.run((ctx) => ctx.db.get(table, id))) as Doc<T>
 }
+
+/**
+ * Stores a blob of `bytes` zero bytes. convex-test drops the content type, so
+ * it is written into the `_storage` metadata by hand, as the real backend does.
+ */
+export function storeBlob(t: TestConvex, bytes: number, contentType: string) {
+  return t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob([new Uint8Array(bytes)]))
+    const db = ctx.db as unknown as {
+      patch: (table: string, id: string, value: object) => Promise<void>
+    }
+    await db.patch('_storage', id, { contentType })
+    return id
+  })
+}
