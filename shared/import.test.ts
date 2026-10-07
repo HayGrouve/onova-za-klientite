@@ -6,15 +6,24 @@ import {
   decodeCsv,
   detectDelimiter,
   detectTargets,
+  firstChoice,
   foldName,
   mapRows,
   parseCsv,
+  previewColumns,
   rowStatuses,
   rowsFromContacts,
   tableFromRows,
+  willImport,
 } from './import'
 import { formatPhone } from './phone'
-import type { ColumnTarget, ExistingClients, Table } from './import'
+import type {
+  ColumnTarget,
+  ExistingClients,
+  ImportRow,
+  RowStatus,
+  Table,
+} from './import'
 
 const fixture = (name: string) =>
   new Uint8Array(
@@ -371,6 +380,99 @@ describe('rowStatuses', () => {
     }
     const list = rows([['+359888111111'], ['+359888111111']], ['а', 'б'])
     expect(rowStatuses(list, existing)).toEqual(['existing', 'existing'])
+  })
+})
+
+describe('firstChoice', () => {
+  const fields = [{ id: 'f1', name: 'Препоръчан от' }]
+
+  it('a column the app knows goes where it belongs', () => {
+    expect(firstChoice('Мобилен', 'phone', fields)).toBe('phone')
+    expect(firstChoice('Име', 'name', [])).toBe('name')
+  })
+
+  it('a column nobody knows is skipped: a new field is something the person opts in to', () => {
+    expect(firstChoice('Препоръчан от', 'extra', [])).toBe('skip')
+    expect(firstChoice('Коментар 2', 'extra', fields)).toBe('skip')
+  })
+
+  it('a column named like an existing field goes into that field', () => {
+    expect(firstChoice('препоръчан ОТ', 'extra', fields)).toBe('field:f1')
+  })
+})
+
+describe('willImport', () => {
+  const statuses: RowStatus[] = ['ok', 'existing', 'inFile', 'noName']
+
+  it('with duplicates skipped, only new rows go in', () => {
+    expect(statuses.map((status) => willImport(status, true))).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ])
+  })
+
+  it('with duplicates kept, they go in too, but a row with no name never does', () => {
+    expect(statuses.map((status) => willImport(status, false))).toEqual([
+      true,
+      true,
+      true,
+      false,
+    ])
+  })
+})
+
+describe('previewColumns', () => {
+  const row = (overrides: Partial<ImportRow>): ImportRow => ({
+    name: 'Иван',
+    phones: [],
+    email: '',
+    address: '',
+    note: '',
+    extra: {},
+    ...overrides,
+  })
+
+  it('always starts with the name', () => {
+    expect(previewColumns([])).toEqual([{ kind: 'name' }])
+    expect(previewColumns([row({})])).toEqual([{ kind: 'name' }])
+  })
+
+  it('adds a column for everything any row has, in a fixed order', () => {
+    const columns = previewColumns([
+      row({ address: 'София' }),
+      row({ phones: ['+359888123456'] }),
+      row({ note: 'Звъни след 18 ч.' }),
+      row({ email: 'a@b.bg' }),
+    ])
+    expect(columns.map((column) => column.kind)).toEqual([
+      'name',
+      'phone',
+      'email',
+      'address',
+      'note',
+    ])
+  })
+
+  it('adds the extra fields by header, in the order they first appear', () => {
+    const columns = previewColumns([
+      row({ extra: { 'Препоръчан от': 'Мария' } }),
+      row({ extra: { Град: 'Пловдив', 'Препоръчан от': 'Петър' } }),
+    ])
+    expect(columns).toEqual([
+      { kind: 'name' },
+      { kind: 'extra', header: 'Препоръчан от' },
+      { kind: 'extra', header: 'Град' },
+    ])
+  })
+
+  it('leaves out a column that is empty in every row', () => {
+    const columns = previewColumns([
+      row({ extra: { Град: '' } }),
+      row({ email: '' }),
+    ])
+    expect(columns).toEqual([{ kind: 'name' }])
   })
 })
 

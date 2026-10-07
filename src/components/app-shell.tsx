@@ -45,6 +45,7 @@ import { buttonVariants } from '#/components/ui/button'
 import { TooltipProvider } from '#/components/ui/tooltip'
 import { initials } from '#/lib/initials'
 import { wipeSnapshots } from '#/lib/offline-store'
+import { isShortcut, shortcutBlockedAt } from '#/lib/shortcuts'
 import { m } from '#/paraglide/messages.js'
 
 type NavEntry = { to: LinkProps['to']; icon: Icon; label: string }
@@ -94,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   })
   const offline = useOffline()
   const nav = useNavEntries()
-  useSearchShortcut()
+  useShortcuts()
 
   // Setup and "+" are full-screen flows of their own.
   if (pathname === '/setup' || pathname === '/new') return <>{children}</>
@@ -103,11 +104,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider delay={400}>
       <div className="flex min-h-dvh">
+        <SkipLink />
         <Sidebar entries={nav} />
         <div className="mx-auto flex min-h-dvh w-full max-w-lg min-w-0 flex-col lg:max-w-none">
           <AppHeader />
           {offline && <OfflineBanner />}
-          <main className="flex flex-1 flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] lg:px-4 lg:pt-6 lg:pb-12">
+          <main
+            id="main"
+            tabIndex={-1}
+            className="flex flex-1 flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] outline-none lg:px-4 lg:pt-6 lg:pb-12"
+          >
             {/* Keyed by the address, so each page fades in when it opens. */}
             <div
               key={pageKey ?? pathname}
@@ -153,29 +159,54 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-const SEARCH_SHORTCUT =
+const MAC =
   typeof navigator !== 'undefined' &&
   /Mac|iPhone|iPad/.test(navigator.userAgent)
-    ? '⌘K'
-    : 'Ctrl K'
+const SEARCH_SHORTCUT = MAC ? '⌘K' : 'Ctrl K'
+const NEW_JOB_SHORTCUT = 'N'
 
-/** Ctrl+K (⌘K on a Mac) opens search from anywhere, as in most desktop apps. */
-function useSearchShortcut() {
+/**
+ * Keys for a desktop: Ctrl+K (⌘K on a Mac) opens search from anywhere, as in
+ * most desktop apps, and a plain N starts a new job, unless someone is typing
+ * or a dialog or menu is open.
+ */
+function useShortcuts() {
   const navigate = useNavigate()
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (
-        event.key.toLowerCase() === 'k' &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey
-      ) {
+      if (isShortcut(event, 'k', true)) {
         event.preventDefault()
         void navigate({ to: '/search' })
+      } else if (
+        isShortcut(event, 'n') &&
+        !shortcutBlockedAt(event.target) &&
+        // Setup and "+" are full screens of their own.
+        !['/new', '/setup'].includes(window.location.pathname)
+      ) {
+        event.preventDefault()
+        void navigate({ to: '/new' })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [navigate])
+}
+
+/** The first Tab stop: jumps past the sidebar or the header to the page. */
+function SkipLink() {
+  return (
+    <a
+      href="#main"
+      onClick={(event) => {
+        // A plain hash link would change the address and the router's state.
+        event.preventDefault()
+        document.getElementById('main')?.focus()
+      }}
+      className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg focus:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      {m.skip_to_content()}
+    </a>
+  )
 }
 
 function NavItem({ to, icon: IconComponent, label }: NavEntry) {
@@ -216,9 +247,11 @@ function Sidebar({ entries }: { entries: NavEntry[] }) {
       <BusinessSwitcher />
       <Link
         to="/new"
+        aria-keyshortcuts={NEW_JOB_SHORTCUT}
         className={buttonVariants({
           size: 'lg',
-          className: 'group/new h-10 w-full shadow-sm shadow-primary/30',
+          className:
+            'group/new relative h-10 w-full shadow-sm shadow-primary/30',
         })}
       >
         <PlusIcon
@@ -227,6 +260,12 @@ function Sidebar({ entries }: { entries: NavEntry[] }) {
           className="transition-transform duration-300 group-hover/new:rotate-90"
         />
         {words.job.singular}
+        <kbd
+          aria-hidden
+          className="absolute right-2.5 rounded border border-primary-foreground/30 bg-primary-foreground/15 px-1.5 font-sans text-[0.6875rem] text-primary-foreground"
+        >
+          {NEW_JOB_SHORTCUT}
+        </kbd>
       </Link>
       <nav aria-label={m.nav_label()} className="flex flex-col gap-0.5">
         {entries.map((entry) => (
@@ -261,6 +300,7 @@ function SidebarLink({
   return (
     <Link
       to={to}
+      aria-keyshortcuts={shortcut === SEARCH_SHORTCUT ? 'Control+K' : undefined}
       activeOptions={{ exact: to === '/' }}
       className="group flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-foreground/80 transition-colors outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:bg-primary/10 data-[status=active]:font-medium data-[status=active]:text-primary"
     >

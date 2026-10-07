@@ -1,3 +1,5 @@
+import { monthOf } from './dates'
+import { foldName, nameMatches } from './search'
 import type { StageGroup } from './stages'
 
 /** What the board needs to order and sum a job. */
@@ -42,9 +44,68 @@ export function boardColumn<T extends BoardJob>(
   return {
     jobs: OPEN.has(group) ? sorted : sorted.slice(0, closedLimit),
     total: jobs.length,
-    owedCents: jobs.reduce(
-      (sum, item) => (item.owes ? sum + item.balanceCents : sum),
-      0,
-    ),
+    owedCents: owedCents(jobs),
   }
+}
+
+/** What the jobs still owe: the balances of those that owe. */
+export function owedCents(
+  jobs: ReadonlyArray<Pick<BoardJob, 'owes' | 'balanceCents'>>,
+) {
+  return jobs.reduce(
+    (sum, item) => (item.owes ? sum + item.balanceCents : sum),
+    0,
+  )
+}
+
+/** What the jobs filter reads from a job (a board card or a table row). */
+export type FilterableJob = {
+  title: string
+  clientName: string
+  isNoClient: boolean
+  stageName: string
+  dueDate?: string
+  owes: boolean
+  balanceCents: number
+}
+
+/**
+ * The jobs filter on a wide screen, shared by the board and the table: some
+ * words, and two yes/no chips. Everything switched on has to hold.
+ */
+export type JobFilter = {
+  /** Words that start words of the title, the client or the stage name. */
+  text?: string
+  /** Only jobs that still owe a balance. */
+  owing?: boolean
+  /** Only jobs whose due date falls in the current Sofia calendar month. */
+  dueThisMonth?: boolean
+}
+
+const hasText = (text: string | undefined): text is string =>
+  text !== undefined && foldName(text) !== ''
+
+export function isFiltering({ text, owing, dueThisMonth }: JobFilter) {
+  return hasText(text) || owing === true || dueThisMonth === true
+}
+
+/** The jobs that pass `filter`, in their order. `today` is the Sofia date. */
+export function filterJobs<T extends FilterableJob>(
+  jobs: T[],
+  filter: JobFilter,
+  today: string,
+): T[] {
+  if (!isFiltering(filter)) return jobs
+  const month = monthOf(today)
+  return jobs.filter(
+    (job) =>
+      (!hasText(filter.text) ||
+        nameMatches(
+          filter.text,
+          `${job.title} ${job.isNoClient ? '' : job.clientName} ${job.stageName}`,
+        )) &&
+      (!filter.owing || (job.owes && job.balanceCents > 0)) &&
+      (!filter.dueThisMonth ||
+        (job.dueDate !== undefined && monthOf(job.dueDate) === month)),
+  )
 }

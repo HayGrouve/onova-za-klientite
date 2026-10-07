@@ -2,7 +2,8 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { cn } from 'cn'
 import type { JobRowData } from '#/components/job-row'
 import { formatMoment } from '#/components/job-row'
-import { SortableHead, sortRows, useSort } from '#/components/sortable-head'
+import { ScrollFade } from '#/components/scroll-fade'
+import { SortableHead } from '#/components/sortable-head'
 import { StageBadge } from '#/components/stage-badge'
 import {
   Table,
@@ -17,11 +18,22 @@ import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { isOverdue } from '../../../shared/dates'
 import { formatMoney, sumCents } from '../../../shared/money'
+import { sortRows } from '../../../shared/sort'
+import type { Sort } from '../../../shared/sort'
 
-type SortKey =
-  'title' | 'client' | 'stage' | 'due' | 'next' | 'price' | 'paid' | 'balance'
+export const JOB_SORT_KEYS = [
+  'title',
+  'client',
+  'stage',
+  'due',
+  'next',
+  'price',
+  'paid',
+  'balance',
+] as const
+export type JobSortKey = (typeof JOB_SORT_KEYS)[number]
 
-const SORT: Record<SortKey, (a: JobRowData, b: JobRowData) => number> = {
+const SORT: Record<JobSortKey, (a: JobRowData, b: JobRowData) => number> = {
   title: (a, b) => a.title.localeCompare(b.title, 'bg'),
   client: (a, b) => a.clientName.localeCompare(b.clientName, 'bg'),
   stage: (a, b) => a.stageName.localeCompare(b.stageName, 'bg'),
@@ -37,44 +49,61 @@ const SORT: Record<SortKey, (a: JobRowData, b: JobRowData) => number> = {
 
 const owed = (job: JobRowData) => (job.owes ? job.balanceCents : 0)
 
+// Narrow screens drop what the books need least, so the money stays in view:
+// the client moves under the title, and the next appointment goes (xl).
+const WIDE_ONLY = 'hidden xl:table-cell'
+const CELL = 'px-3 xl:px-4'
+
 /**
- * One stage group's jobs as a table on a wide screen: every column sorts, and
- * the money columns add up at the bottom. For looking back and doing the books.
+ * Jobs as a table on a wide screen: every column sorts, and the money columns
+ * add up at the bottom. The money sits right after the title, where a narrow
+ * screen still shows it. For looking back and doing the books.
  */
 export function JobsTable({
   jobs,
   today,
+  sort,
+  onSort,
 }: {
   jobs: JobRowData[]
   today: string
+  sort: Sort<JobSortKey>
+  onSort: (key: JobSortKey, numeric: boolean) => void
 }) {
   const { words } = useViewer().business
   const navigate = useNavigate()
-  const [sort, onSort] = useSort<SortKey>()
   const rows = sortRows(jobs, sort, SORT)
-  const head = (key: SortKey, label: string, numeric = false) => (
+  const head = (
+    key: JobSortKey,
+    label: string,
+    {
+      numeric = false,
+      className,
+    }: { numeric?: boolean; className?: string } = {},
+  ) => (
     <SortableHead
       column={key}
       label={label}
       sort={sort}
       onSort={onSort}
       numeric={numeric}
+      className={className}
     />
   )
 
   return (
-    <div className="mx-4 animate-rise overflow-hidden surface">
+    <ScrollFade className="mx-4 animate-rise overflow-hidden surface">
       <Table>
         <TableHeader className="bg-foreground/3">
           <TableRow className="hover:bg-transparent">
             {head('title', words.job.singular)}
-            {head('client', words.client.singular)}
+            {head('client', words.client.singular, { className: WIDE_ONLY })}
+            {head('price', m.job_price(), { numeric: true })}
+            {head('paid', m.job_paid(), { numeric: true })}
+            {head('balance', m.job_balance(), { numeric: true })}
             {head('stage', m.job_stage())}
             {head('due', m.job_due())}
-            {head('next', m.jobs_table_next())}
-            {head('price', m.job_price(), true)}
-            {head('paid', m.job_paid(), true)}
-            {head('balance', m.job_balance(), true)}
+            {head('next', m.jobs_table_next(), { className: WIDE_ONLY })}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -82,6 +111,7 @@ export function JobsTable({
             const late =
               (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
               isOverdue(job.dueDate, today)
+            const client = job.isNoClient ? m.no_client() : job.clientName
             return (
               <TableRow
                 key={job._id}
@@ -95,7 +125,7 @@ export function JobsTable({
                   })
                 }}
               >
-                <TableCell className="max-w-72 px-4 py-3">
+                <TableCell className={cn(CELL, 'max-w-52 py-3 xl:max-w-72')}>
                   <Link
                     to="/jobs/$jobId"
                     params={{ jobId: job._id }}
@@ -103,16 +133,47 @@ export function JobsTable({
                   >
                     {job.title}
                   </Link>
+                  <span className="block truncate text-xs text-muted-foreground xl:hidden">
+                    {client}
+                  </span>
                 </TableCell>
-                <TableCell className="max-w-56 truncate px-4 text-muted-foreground">
-                  {job.isNoClient ? m.no_client() : job.clientName}
+                <TableCell
+                  className={cn(
+                    WIDE_ONLY,
+                    'max-w-56 truncate px-4 text-muted-foreground',
+                  )}
+                >
+                  {client}
                 </TableCell>
-                <TableCell className="px-4">
+                <TableCell className={cn(CELL, 'text-right tabular-nums')}>
+                  {formatMoney(job.priceCents)}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    CELL,
+                    'text-right text-muted-foreground tabular-nums',
+                  )}
+                >
+                  {formatMoney(job.paidCents)}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    CELL,
+                    'text-right tabular-nums',
+                    owed(job) > 0
+                      ? 'font-medium text-primary'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {owed(job) > 0 ? formatMoney(owed(job)) : '–'}
+                </TableCell>
+                <TableCell className={CELL}>
                   <StageBadge name={job.stageName} group={job.stageGroup} />
                 </TableCell>
                 <TableCell
                   className={cn(
-                    'px-4 first-letter:uppercase',
+                    CELL,
+                    'first-letter:uppercase',
                     late
                       ? 'font-medium text-destructive'
                       : 'text-muted-foreground',
@@ -120,7 +181,12 @@ export function JobsTable({
                 >
                   {job.dueDate ? formatDay(job.dueDate, today) : ''}
                 </TableCell>
-                <TableCell className="px-4 text-muted-foreground first-letter:uppercase">
+                <TableCell
+                  className={cn(
+                    WIDE_ONLY,
+                    'px-4 text-muted-foreground first-letter:uppercase',
+                  )}
+                >
                   {job.nextAppointment
                     ? formatMoment(
                         job.nextAppointment.start,
@@ -129,43 +195,39 @@ export function JobsTable({
                       )
                     : ''}
                 </TableCell>
-                <TableCell className="px-4 text-right tabular-nums">
-                  {formatMoney(job.priceCents)}
-                </TableCell>
-                <TableCell className="px-4 text-right text-muted-foreground tabular-nums">
-                  {formatMoney(job.paidCents)}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    'px-4 text-right tabular-nums',
-                    owed(job) > 0
-                      ? 'font-medium text-primary'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  {owed(job) > 0 ? formatMoney(owed(job)) : '–'}
-                </TableCell>
               </TableRow>
             )
           })}
         </TableBody>
         <TableFooter className="bg-foreground/3">
           <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={5} className="px-4 py-3 font-medium">
+            <TableCell className={cn(CELL, 'py-3 font-medium')}>
               {m.count({ label: words.job.plural, count: rows.length })}
             </TableCell>
-            <TableCell className="px-4 text-right font-semibold tabular-nums">
+            <TableCell className={WIDE_ONLY} />
+            <TableCell
+              className={cn(CELL, 'text-right font-semibold tabular-nums')}
+            >
               {formatMoney(sumCents(rows.map((job) => job.priceCents)))}
             </TableCell>
-            <TableCell className="px-4 text-right font-semibold tabular-nums">
+            <TableCell
+              className={cn(CELL, 'text-right font-semibold tabular-nums')}
+            >
               {formatMoney(sumCents(rows.map((job) => job.paidCents)))}
             </TableCell>
-            <TableCell className="px-4 text-right font-semibold text-primary tabular-nums">
+            <TableCell
+              className={cn(
+                CELL,
+                'text-right font-semibold text-primary tabular-nums',
+              )}
+            >
               {formatMoney(sumCents(rows.map(owed)))}
             </TableCell>
+            <TableCell colSpan={2} />
+            <TableCell className={WIDE_ONLY} />
           </TableRow>
         </TableFooter>
       </Table>
-    </div>
+    </ScrollFade>
   )
 }

@@ -1,48 +1,45 @@
-import { CheckCircleIcon } from '@phosphor-icons/react'
-import { Link } from '@tanstack/react-router'
 import { useConvex, useMutation, useQuery } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { ColumnFields } from '#/components/import/mapping-step'
-import { Badge } from '#/components/ui/badge'
-import { Button, buttonVariants } from '#/components/ui/button'
+import { PreviewTable } from '#/components/import/preview-table'
+import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { Switch } from '#/components/ui/switch'
 import { useViewer } from '#/hooks/use-viewer'
 import { errorMessage } from '#/lib/errors'
+import { saveOutcome } from '#/lib/import-outcome'
 import { m } from '#/paraglide/messages.js'
-import { IMPORT_BATCH, foldName, rowStatuses } from '../../../shared/import'
-import type { ImportRow, RowStatus } from '../../../shared/import'
-import { formatPhone } from '../../../shared/phone-format'
+import {
+  IMPORT_BATCH,
+  foldName,
+  rowStatuses,
+  willImport,
+} from '../../../shared/import'
+import type { ImportRow } from '../../../shared/import'
 
 // The first rows, then every row that repeats or has no name, up to a cap.
 const PREVIEW_FIRST = 5
 const PREVIEW_MAX = 14
 const LOOKUP_BATCH = 500
 
-const STATUS_LABEL: Record<Exclude<RowStatus, 'ok'>, () => string> = {
-  existing: m.import_row_existing,
-  inFile: m.import_row_inFile,
-  noName: m.import_row_noName,
-}
-
 type Phase =
-  | { name: 'ready' }
-  | { name: 'running'; done: number; total: number }
-  | { name: 'done'; created: number; skipped: number; failed: boolean }
+  { name: 'ready' } | { name: 'running'; done: number; total: number }
 
-/** The first rows, what repeats, then the import itself in batches, with its result. */
+/**
+ * The first rows with every mapped column, what repeats, then the import
+ * itself in batches. It ends by saving its result (`saveOutcome`), which the
+ * import page shows, so the result survives this screen being rebuilt.
+ */
 export function PreviewStep({
   rows,
   columnFields,
   onBack,
-  onAgain,
 }: {
   rows: ImportRow[]
   columnFields: ColumnFields
   onBack: () => void
-  onAgain: () => void
 }) {
   const { business } = useViewer()
   const convex = useConvex()
@@ -104,13 +101,20 @@ export function PreviewStep({
   ).length
   const noName = statuses?.filter((status) => status === 'noName').length
 
+  const finish = (created: number, failed: boolean) =>
+    saveOutcome({
+      businessId: business._id,
+      created,
+      skipped: rows.length - created,
+      failed,
+      at: Date.now(),
+    })
+
   const start = async () => {
     if (!statuses) return
-    const chosen = rows.filter((_, i) => {
-      const status = statuses[i]
-      if (status === 'ok') return true
-      return status !== 'noName' && !skipDuplicates
-    })
+    const chosen = rows.filter((_, i) =>
+      willImport(statuses[i], skipDuplicates),
+    )
     let created = 0
     setPhase({ name: 'running', done: 0, total: chosen.length })
     try {
@@ -153,58 +157,16 @@ export function PreviewStep({
           total: chosen.length,
         })
       }
-      setPhase({
-        name: 'done',
-        created,
-        skipped: rows.length - created,
-        failed: false,
-      })
+      finish(created, false)
     } catch (error) {
       toast.error(errorMessage(error))
-      setPhase({
-        name: 'done',
-        created,
-        skipped: rows.length - created,
-        failed: true,
-      })
+      finish(created, true)
     }
-  }
-
-  if (phase.name === 'done') {
-    return (
-      <div className="flex flex-col items-center gap-4 px-4 py-6 text-center">
-        <CheckCircleIcon className="size-14 text-primary" weight="fill" />
-        <h2 className="text-xl font-semibold">{m.import_done_title()}</h2>
-        <p className="text-lg" data-testid="import-result">
-          {m.import_result({
-            created: phase.created,
-            skipped: phase.skipped,
-          })}
-        </p>
-        {phase.failed && (
-          <p role="alert" className="text-sm text-destructive">
-            {m.import_failed()}
-          </p>
-        )}
-        <div className="flex w-full flex-col gap-3">
-          <Link to="/clients" className={buttonVariants({ size: 'xl' })}>
-            {m.import_see_clients({ clients: plural })}
-          </Link>
-          <Button type="button" variant="outline" size="xl" onClick={onAgain}>
-            {m.import_more()}
-          </Button>
-        </div>
-      </div>
-    )
   }
 
   const running = phase.name === 'running'
   const importing = statuses
-    ? statuses.filter(
-        (status) =>
-          status === 'ok' ||
-          (!skipDuplicates && (status === 'existing' || status === 'inFile')),
-      ).length
+    ? statuses.filter((status) => willImport(status, skipDuplicates)).length
     : 0
 
   return (
@@ -231,35 +193,14 @@ export function PreviewStep({
           </p>
         )}
       </div>
-      <ul className="flex flex-col">
-        {shown.map(({ row, index, status }) => {
-          return (
-            <li
-              key={index}
-              className="flex min-h-14 items-center justify-between gap-3 px-4 py-2"
-            >
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate font-medium">{row.name}</span>
-                {row.phones[0] && (
-                  <span className="truncate text-sm text-muted-foreground">
-                    {formatPhone(row.phones[0])}
-                  </span>
-                )}
-              </span>
-              {status && status !== 'ok' && (
-                <Badge variant="outline" className="shrink-0">
-                  {STATUS_LABEL[status]()}
-                </Badge>
-              )}
-            </li>
-          )
-        })}
+      <div className="lg:px-4">
+        <PreviewTable rows={shown} skipDuplicates={skipDuplicates} />
         {rows.length > shown.length && (
-          <li className="px-4 py-2 text-sm text-muted-foreground">
+          <p className="px-4 py-2 text-sm text-muted-foreground lg:px-0">
             {m.import_preview_more({ count: rows.length - shown.length })}
-          </li>
+          </p>
         )}
-      </ul>
+      </div>
       <div className="flex min-h-14 items-center gap-3 px-4">
         <label htmlFor="import-skip" className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{m.import_skip_duplicates()}</span>

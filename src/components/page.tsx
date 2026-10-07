@@ -6,8 +6,11 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '#/components/ui/empty'
+import { usePageTitle } from '#/hooks/use-page-title'
 
-export function PageTitle({ children }: { children: React.ReactNode }) {
+/** The page's heading, which also names the browser tab. */
+export function PageTitle({ children }: { children: string }) {
+  usePageTitle(children)
   return (
     <h1 className="px-4 pt-2 pb-3 text-3xl font-semibold tracking-tight">
       {children}

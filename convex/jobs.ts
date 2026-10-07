@@ -7,6 +7,7 @@ import {
   businessMutation,
   businessQuery,
   getOwned,
+  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
@@ -216,9 +217,12 @@ export const removeWriteOff = businessMutation({
 
 const LIST_LIMIT = 500
 
-/** Jobs of one stage group, newest first, plus the count of each group for the tabs. */
+/**
+ * Jobs of one stage group (or of every group, without one: the table's "all"
+ * tab), newest first, plus the count of each group for the tabs.
+ */
 export const list = businessQuery({
-  args: { group: vStageGroup },
+  args: { group: v.optional(vStageGroup) },
   returns: v.object({
     jobs: v.array(vJobRow),
     counts: v.object({
@@ -231,7 +235,7 @@ export const list = businessQuery({
   handler: async (ctx, { group }) => {
     const businessId = ctx.business._id
     const counts = { new: 0, in_progress: 0, done: 0, cancelled: 0 }
-    let selected: Array<Doc<'jobs'>> = []
+    const selected: Array<Doc<'jobs'>> = []
     for (const key of STAGE_GROUPS) {
       const jobs = await ctx.db
         .query('jobs')
@@ -240,7 +244,7 @@ export const list = businessQuery({
         )
         .take(LIST_LIMIT)
       counts[key] = jobs.length
-      if (key === group) selected = jobs
+      if (group === undefined || key === group) selected.push(...jobs)
     }
     const lookups = newLookups()
     const rows = []
@@ -332,9 +336,10 @@ export const board = businessQuery({
 
 /** Everything the job page shows. */
 export const get = businessQuery({
-  args: { jobId: v.id('jobs') },
+  // A string: the id comes from the address bar (see getOwnedFromUrl).
+  args: { jobId: v.string() },
   handler: async (ctx, { jobId }) => {
-    const job = await getOwned(ctx, 'jobs', jobId)
+    const job = await getOwnedFromUrl(ctx, 'jobs', jobId)
     const client = await ctx.db.get('clients', job.clientId)
     const stages = await ctx.db
       .query('stages')

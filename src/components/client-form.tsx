@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { ExtraFieldsEditor } from '#/components/extra-fields'
+import { FormFooter } from '#/components/form-footer'
 import type { ExtraValues } from '#/components/extra-fields'
 import { AddFieldLink } from '#/components/settings/add-field-link'
 import { Button } from '#/components/ui/button'
@@ -225,10 +226,17 @@ export function ClientForm({
           />
         </Field>
       </FieldGroup>
-      <Button type="submit" size="xl" disabled={saving || !name.trim()}>
-        {saving && <Spinner data-icon="inline-start" />}
-        {m.client_save()}
-      </Button>
+      <FormFooter>
+        <Button
+          type="submit"
+          size="xl"
+          className="flex-1"
+          disabled={saving || !name.trim()}
+        >
+          {saving && <Spinner data-icon="inline-start" />}
+          {m.client_save()}
+        </Button>
+      </FormFooter>
     </form>
   )
 }

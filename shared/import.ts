@@ -285,8 +285,10 @@ function targetOf(header: string): ColumnTarget {
 
 /**
  * A first guess for every column from its header, in Bulgarian or English.
- * A column nobody knows becomes an extra field. Name, last name, company,
- * e-mail, address and note take one column each (the first), phone five.
+ * A column nobody knows is `extra`: the mapping screen offers it as a field
+ * but skips it until the person opts in (`firstChoice`). Name, last name,
+ * company, e-mail, address and note take one column each (the first), phone
+ * five.
  */
 export function detectTargets(headers: readonly string[]): ColumnTarget[] {
   const used = new Map<ColumnTarget, number>()
@@ -297,6 +299,24 @@ export function detectTargets(headers: readonly string[]): ColumnTarget[] {
     used.set(target, count + 1)
     return count >= (target === 'phone' ? MAX_PHONES : 1) ? 'extra' : target
   })
+}
+
+/** What the mapping screen's choice for a column starts with when it is an existing field. */
+export const FIELD_PREFIX = 'field:'
+
+/**
+ * The mapping screen's first choice for a column: its detected meaning, or
+ * the existing field with the same name, or "skip". A column nobody knows is
+ * never turned into a new field by itself: that is the person's choice.
+ */
+export function firstChoice(
+  header: string,
+  target: ColumnTarget,
+  fields: ReadonlyArray<{ id: string; name: string }>,
+): string {
+  if (target !== 'extra') return target
+  const same = fields.find((field) => foldName(field.name) === foldName(header))
+  return same ? `${FIELD_PREFIX}${same.id}` : 'skip'
 }
 
 // --------------------------------------------------------------------- rows
@@ -467,4 +487,41 @@ export function rowStatuses(
     if (folded) seenNames.add(folded)
     return status
   })
+}
+
+/**
+ * Whether a row with this status goes in. A row with no name never does;
+ * repeats go in only when the person switched "skip duplicates" off.
+ */
+export function willImport(status: RowStatus, skipDuplicates: boolean) {
+  if (status === 'ok') return true
+  return status !== 'noName' && !skipDuplicates
+}
+
+// ------------------------------------------------------------------ preview
+
+/** One column of the preview table. */
+export type PreviewColumn =
+  | { kind: 'name' | 'phone' | 'email' | 'address' | 'note' }
+  | { kind: 'extra'; header: string }
+
+/**
+ * The columns the preview shows: the name, then each of phone, e-mail,
+ * address and note that any row has, then every extra field in the order it
+ * first appears. What no row holds would only be an empty column.
+ */
+export function previewColumns(rows: readonly ImportRow[]): PreviewColumn[] {
+  const columns: PreviewColumn[] = [{ kind: 'name' }]
+  if (rows.some((row) => row.phones.length > 0)) columns.push({ kind: 'phone' })
+  if (rows.some((row) => row.email)) columns.push({ kind: 'email' })
+  if (rows.some((row) => row.address)) columns.push({ kind: 'address' })
+  if (rows.some((row) => row.note)) columns.push({ kind: 'note' })
+  const headers = new Set<string>()
+  for (const row of rows) {
+    for (const [header, value] of Object.entries(row.extra)) {
+      if (value) headers.add(header)
+    }
+  }
+  for (const header of headers) columns.push({ kind: 'extra', header })
+  return columns
 }

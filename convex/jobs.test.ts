@@ -320,6 +320,59 @@ describe('jobs after settings change', () => {
   })
 })
 
+describe('jobs list', () => {
+  async function withJobs() {
+    const ctx = await withClient()
+    const { owner, businessId, clientId, stage } = ctx
+    const create = (title: string) =>
+      owner.mutation(api.jobs.create, {
+        businessId,
+        clientId,
+        title,
+        typedPriceCents: 10000,
+      })
+    await create('Нова')
+    const done = await create('Готова')
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId: done,
+      stageId: stage('done'),
+    })
+    return ctx
+  }
+
+  it('one group lists only its jobs, and counts every group for the tabs', async () => {
+    const { owner, businessId } = await withJobs()
+    const result = await owner.query(api.jobs.list, {
+      businessId,
+      group: 'done',
+    })
+    expect(result.jobs.map((job) => job.title)).toEqual(['Готова'])
+    expect(result.counts).toEqual({
+      new: 1,
+      in_progress: 0,
+      done: 1,
+      cancelled: 0,
+    })
+  })
+
+  it('no group lists the jobs of every group, newest first, for the "all" tab', async () => {
+    const { owner, businessId } = await withJobs()
+    const result = await owner.query(api.jobs.list, { businessId })
+    expect(result.jobs.map((job) => job.title)).toEqual(['Готова', 'Нова'])
+    expect(result.counts.new + result.counts.done).toBe(2)
+  })
+
+  it('shows another business nothing', async () => {
+    const { t, businessId } = await withJobs()
+    const stranger = t.withIdentity(STRANGER)
+    await stranger.mutation(api.users.ensureCurrent, {})
+    await expect(
+      stranger.query(api.jobs.list, { businessId }),
+    ).rejects.toThrow()
+  })
+})
+
 describe('jobs board', () => {
   it('has one column per stage group, in board order, with every stage to drop on', async () => {
     const { owner, businessId, clientId, stage, stages } = await withClient()

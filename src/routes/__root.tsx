@@ -5,15 +5,12 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 import type { ErrorComponentProps } from '@tanstack/react-router'
-import { ArrowClockwiseIcon } from '@phosphor-icons/react'
 import { AppProviders } from '#/integrations/providers'
 import { loadLastSnapshot } from '#/lib/offline-store'
 import type { SavedSnapshot } from '#/lib/offline-store'
-import { CenteredMessage } from '#/components/centered-message'
+import { ErrorView } from '#/components/error-view'
 import { ServiceWorkerRegister } from '#/components/service-worker-register'
-import { Button } from '#/components/ui/button'
 import { Toaster } from '#/components/ui/sonner'
-import { errorMessage } from '#/lib/errors'
 import { applyTimingFlag } from '#/lib/timing'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { m } from '#/paraglide/messages.js'
@@ -96,22 +93,7 @@ function RootLayout() {
 }
 
 function RootError({ error }: ErrorComponentProps) {
-  return (
-    <CenteredMessage>
-      <h1 className="text-lg font-semibold">{m.error_title()}</h1>
-      <p className="text-muted-foreground" role="alert">
-        {errorMessage(error)}
-      </p>
-      <Button
-        size="lg"
-        className="h-12 rounded-xl px-5"
-        onClick={() => window.location.reload()}
-      >
-        <ArrowClockwiseIcon aria-hidden />
-        {m.error_retry()}
-      </Button>
-    </CenteredMessage>
-  )
+  return <ErrorView error={error} />
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {

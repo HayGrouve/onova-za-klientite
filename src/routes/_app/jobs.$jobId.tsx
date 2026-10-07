@@ -46,6 +46,7 @@ import { Hint } from '#/components/hint'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { formatMoment } from '#/components/job-row'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { DetailError } from '#/components/not-found'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
@@ -57,6 +58,7 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useMoveJob } from '#/hooks/use-move-job'
 import { useViewer } from '#/hooks/use-viewer'
@@ -74,6 +76,8 @@ import type { StageGroup } from '../../../shared/stages'
 export const Route = createFileRoute('/_app/jobs/$jobId')({
   staticData: { layout: 'wide' },
   component: JobPage,
+  // A wrong address, or a record from another business, says so (D16).
+  errorComponent: ({ error }) => <DetailError error={error} kind="job" />,
 })
 
 type OpenSheet =
@@ -126,8 +130,9 @@ function JobPage() {
   const today = useToday()
   const data = useQuery(api.jobs.get, {
     businessId: business._id,
-    jobId: jobId as Id<'jobs'>,
+    jobId,
   })
+  usePageTitle(data?.job.title)
   const fields = useQuery(api.fields.list, {
     businessId: business._id,
     target: 'job',

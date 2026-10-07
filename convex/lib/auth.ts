@@ -118,6 +118,21 @@ export async function getOwned<T extends BusinessScoped>(
   return doc
 }
 
+/**
+ * `getOwned` for an id that came from the address bar, where any text can
+ * arrive: text that is no id, or the id of another table, is `notFound` too
+ * (D16), instead of an argument error the client could not tell apart.
+ */
+export async function getOwnedFromUrl<T extends BusinessScoped>(
+  ctx: QueryCtx & { business: Doc<'businesses'> },
+  table: T,
+  id: string,
+): Promise<Doc<T>> {
+  const normalized = ctx.db.normalizeId(table, id)
+  if (!normalized) fail('notFound', { table })
+  return await getOwned(ctx, table, normalized)
+}
+
 export type BusinessMutationCtx = MutationCtx & {
   user: Doc<'users'>
   member: Doc<'memberships'>

@@ -36,6 +36,7 @@ import { ReminderRow } from '#/components/reminders/reminder-row'
 import { RefundForm } from '#/components/money/refund-form'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { DetailError } from '#/components/not-found'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
@@ -46,6 +47,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
@@ -58,6 +60,8 @@ import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
 export const Route = createFileRoute('/_app/clients/$clientId')({
   staticData: { layout: 'wide' },
   component: ClientPage,
+  // A wrong address, or a record from another business, says so (D16).
+  errorComponent: ({ error }) => <DetailError error={error} kind="client" />,
 })
 
 function ClientPage() {
@@ -66,8 +70,11 @@ function ClientPage() {
   const today = useToday()
   const data = useQuery(api.clients.get, {
     businessId: business._id,
-    clientId: clientId as Id<'clients'>,
+    clientId,
   })
+  usePageTitle(
+    data && (data.client.isNoClient ? m.no_client() : data.client.name),
+  )
   const [panel, setPanel] = useState<
     | { kind: 'edit' }
     | { kind: 'payment' }

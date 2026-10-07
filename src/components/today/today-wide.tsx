@@ -163,7 +163,7 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 px-4 xl:grid-cols-4">
+      <div className="grid grid-cols-4 gap-3 px-4 xl:gap-4">
         {modules.appointments && (
           <StatTile
             to="/"
