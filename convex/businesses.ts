@@ -1,7 +1,13 @@
 import { v } from 'convex/values'
 import { isValidWord } from '../shared/words'
 import { logActivity } from './lib/activity'
-import { businessMutation, businessQuery, requireRole } from './lib/auth'
+import {
+  businessMutation,
+  businessQuery,
+  requireRole,
+  userMutation,
+} from './lib/auth'
+import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
 import { optionalText, requiredText } from './lib/validate'
 import { vModules, vWords } from './validators'
@@ -166,5 +172,16 @@ export const setNewJobOptions = businessMutation({
       data: { name: 'newJob' },
     })
     return null
+  },
+})
+
+/** Q13: a second business. It starts with defaults and opens setup. */
+export const createAnother = userMutation({
+  args: {},
+  returns: v.id('businesses'),
+  handler: async (ctx) => {
+    const businessId = await createBusiness(ctx, ctx.user._id)
+    await ctx.db.patch('users', ctx.user._id, { activeBusinessId: businessId })
+    return businessId
   },
 })

@@ -6,14 +6,4 @@ export function normalizePhone(input: string): string | null {
   return phone?.isValid() ? phone.number : null
 }
 
-export function formatPhone(e164: string): string {
-  return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164
-}
-
-export function telHref(e164: string): string {
-  return `tel:${e164}`
-}
-
-export function viberHref(e164: string): string {
-  return `viber://chat?number=${encodeURIComponent(e164)}`
-}
+export { formatPhone, telHref, viberHref } from './phone-format'

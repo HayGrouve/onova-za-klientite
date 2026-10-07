@@ -8,6 +8,7 @@ import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { AppShell } from '#/components/app-shell'
+import { SnapshotKeeper } from '#/components/offline/snapshot-keeper'
 import { CenteredMessage } from '#/components/centered-message'
 import { PushKeeper } from '#/components/push-keeper'
 import { Spinner } from '#/components/ui/spinner'
@@ -85,6 +86,7 @@ function WithViewer() {
   return (
     <ViewerProvider value={viewer}>
       <PushKeeper />
+      <SnapshotKeeper />
       <AppShell>
         <Outlet />
       </AppShell>

@@ -188,6 +188,10 @@ export function NewJobForm({
   const submit = async () => {
     setTried(true)
     if (!chosenClient || !chosenTitle.trim()) return
+    if (!navigator.onLine) {
+      toast.error(m.offline_edit_blocked())
+      return
+    }
     setSaving(true)
     try {
       await save({
@@ -258,7 +262,7 @@ export function NewJobForm({
   )
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <main className="flex min-h-dvh flex-col bg-background">
       <Stopwatch startedAt={startedAt} />
       <header className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-2">
         <h1 className="text-xl font-semibold">
@@ -602,7 +606,7 @@ export function NewJobForm({
           {m.new_save()}
         </Button>
       </div>
-    </div>
+    </main>
   )
 }
 

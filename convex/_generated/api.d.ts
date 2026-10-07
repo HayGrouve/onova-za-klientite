@@ -41,6 +41,7 @@ import type * as lib_validate from "../lib/validate.js";
 import type * as lib_views from "../lib/views.js";
 import type * as money from "../money.js";
 import type * as newJob from "../newJob.js";
+import type * as offline from "../offline.js";
 import type * as payments from "../payments.js";
 import type * as push from "../push.js";
 import type * as pushNode from "../pushNode.js";
@@ -97,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   "lib/views": typeof lib_views;
   money: typeof money;
   newJob: typeof newJob;
+  offline: typeof offline;
   payments: typeof payments;
   push: typeof push;
   pushNode: typeof pushNode;

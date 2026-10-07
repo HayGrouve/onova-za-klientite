@@ -7,6 +7,11 @@ import { m } from '#/paraglide/messages.js'
 export function useSubmit(onDone: () => void) {
   const [busy, setBusy] = useState(false)
   const run = async (action: () => Promise<unknown>, success = m.saved()) => {
+    // View offline, edit online (ADR 0010): don't queue changes without a connection.
+    if (!navigator.onLine) {
+      toast.error(m.offline_edit_blocked())
+      return
+    }
     setBusy(true)
     try {
       await action()

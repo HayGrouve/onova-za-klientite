@@ -45,7 +45,7 @@ import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import { addMonths, isOverdue } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
-import { telHref } from '../../../shared/phone'
+import { telHref } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/jobs/$jobId')({
   component: JobPage,
@@ -209,9 +209,7 @@ function JobPage() {
                 onClick={() => !current && void moveTo(stage._id)}
                 className={cn(
                   'rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                  current
-                    ? 'ring-2 ring-primary ring-offset-2'
-                    : 'opacity-70 hover:opacity-100',
+                  current && 'ring-2 ring-primary ring-offset-2',
                 )}
               >
                 <StageBadge

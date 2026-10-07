@@ -30,6 +30,9 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { useViewer } from '#/hooks/use-viewer'
+import { useOffline } from '#/hooks/use-connection'
+import { OfflineBanner } from '#/components/offline/offline-banner'
+import { wipeSnapshots } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
 
 /** The signed-in frame: header, the page, and the bottom nav with "+". */
@@ -37,6 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { business } = useViewer()
   const { words } = business
   const pathname = useLocation({ select: (location) => location.pathname })
+  const offline = useOffline()
 
   // Setup and "+" are full-screen flows of their own.
   if (pathname === '/setup' || pathname === '/new') return <>{children}</>
@@ -44,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
       <AppHeader />
+      {offline && <OfflineBanner />}
       <main className="flex flex-1 flex-col pb-[calc(6rem+env(safe-area-inset-bottom))]">
         {children}
       </main>
@@ -205,7 +210,7 @@ function AppHeader() {
             </DropdownMenuItem>
             <DropdownMenuItem
               className="min-h-11"
-              onClick={() => void signOut()}
+              onClick={() => void wipeSnapshots().then(() => signOut())}
             >
               <SignOutIcon />
               {m.account_sign_out()}

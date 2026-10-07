@@ -238,6 +238,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'push:setNotify': () => ({ overdue: false }),
   'push:settings': () => ({}),
+  'offline:snapshot': () => ({ today: '2026-10-07' }),
   'payments:addFromClient': (ids) => ({
     clientId: ids.clientId,
     amountCents: 100,
@@ -283,6 +284,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
 
 /** Functions outside any business: they act only on the caller's own user. */
 const USER_SCOPED = [
+  'businesses:createAnother',
   'account:deleteAccount',
   'push:subscribe',
   'push:unsubscribe',
@@ -293,6 +295,7 @@ const USER_SCOPED = [
 
 /** Functions that take no record id, so only the business check applies. */
 const NO_RECORD_IDS = new Set([
+  'offline:snapshot',
   'clientsAdmin:findByPhones',
   'dataExport:all',
   'search:all',

@@ -14,7 +14,7 @@ import {
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
-import { formatPhone } from '../../../shared/phone'
+import { formatPhone } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/search')({ component: SearchPage })
 
@@ -44,6 +44,7 @@ function SearchPage() {
 
   return (
     <div className="flex flex-col gap-4 pt-2">
+      <h1 className="sr-only">{m.search_open()}</h1>
       <div className="px-4">
         <InputGroup>
           <InputGroupAddon>

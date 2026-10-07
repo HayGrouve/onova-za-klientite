@@ -644,5 +644,15 @@
   "import_result": "Добавени: {created} · Пропуснати: {skipped}",
   "import_failed": "Внасянето спря. Вече добавените остават. Опитайте пак с пропускане на повтарящите се.",
   "import_see_clients": "{clients}",
-  "import_more": "Внеси още"
+  "import_more": "Внеси още",
+  "business_add": "Добави бизнес",
+  "business_add_body": "Нов бизнес със своите клиенти, записи и настройки. Започва с настройката.",
+  "offline_edit_blocked": "Без връзка. Може да разглеждате, но не и да променяте.",
+  "offline_updated": "Последно обновено: {when}",
+  "offline_no_snapshot": "Няма запазени данни. Отворете приложението веднъж с връзка, за да се запазят.",
+  "offline_retry": "Опитай пак",
+  "offline_today": "Днес",
+  "offline_open": "Отворени",
+  "offline_back": "Назад",
+  "setup_heading": "Настройка"
 }

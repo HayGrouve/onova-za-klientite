@@ -35,7 +35,7 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
-import { formatPhone, telHref, viberHref } from '../../../shared/phone'
+import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/clients/$clientId')({
   component: ClientPage,

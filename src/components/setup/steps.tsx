@@ -259,29 +259,49 @@ function ItemStep({ answers, update }: StepProps) {
             />
           </FieldSet>
           {isOther && (
-            <Field>
-              <FieldLabel htmlFor="item-singular">
-                {m.setup_own_singular()}
-              </FieldLabel>
-              <Input
-                id="item-singular"
-                autoFocus
-                maxLength={40}
-                value={item.word.singular}
-                onChange={(event) =>
-                  update({
-                    item: {
-                      ...item,
-                      word: {
-                        singular: event.target.value,
-                        plural: guessPlural(event.target.value),
-                        gender: guessGender(event.target.value),
+            <FieldGroup className="flex-row! gap-3">
+              <Field>
+                <FieldLabel htmlFor="item-singular">
+                  {m.setup_own_singular()}
+                </FieldLabel>
+                <Input
+                  id="item-singular"
+                  autoFocus
+                  maxLength={40}
+                  value={item.word.singular}
+                  onChange={(event) =>
+                    update({
+                      item: {
+                        ...item,
+                        word: {
+                          singular: event.target.value,
+                          plural: guessPlural(event.target.value),
+                          gender: guessGender(event.target.value),
+                        },
                       },
-                    },
-                  })
-                }
-              />
-            </Field>
+                    })
+                  }
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="item-plural">
+                  {m.setup_own_plural()}
+                </FieldLabel>
+                <Input
+                  id="item-plural"
+                  maxLength={40}
+                  value={item.word.plural}
+                  onChange={(event) =>
+                    update({
+                      item: {
+                        ...item,
+                        word: { ...item.word, plural: event.target.value },
+                      },
+                    })
+                  }
+                />
+              </Field>
+            </FieldGroup>
           )}
           {item && (
             <FieldSet>
