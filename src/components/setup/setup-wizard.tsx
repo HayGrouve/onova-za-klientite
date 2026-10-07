@@ -176,7 +176,7 @@ export function SetupWizard({
         </div>
       </div>
 
-      <section className="flex max-h-[58%] flex-col rounded-t-3xl border-t bg-background pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-12px] shadow-zinc-900/15 lg:max-h-[min(44rem,100%)] lg:w-md lg:shrink-0 lg:rounded-3xl lg:border lg:shadow-xl">
+      <section className="flex max-h-[70%] flex-col rounded-t-3xl border-t bg-background pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-12px] shadow-zinc-900/15 lg:max-h-[min(44rem,100%)] lg:w-md lg:shrink-0 lg:rounded-3xl lg:border lg:shadow-xl">
         {Body ? (
           <>
             <div

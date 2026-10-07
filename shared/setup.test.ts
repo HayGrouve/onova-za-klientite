@@ -4,6 +4,7 @@ import {
   ITEM_KINDS,
   JOB_WORDS,
   MAX_SERVICES,
+  OWN_ITEM_FIELDS,
   answersFromBusiness,
   defaultBusiness,
   jobFormFields,
@@ -606,5 +607,16 @@ describe('stagesAfter', () => {
       'Готово',
       'Отказано',
     ])
+  })
+})
+
+describe('the item step', () => {
+  it('an item named by the owner is offered only fields that suit anything', () => {
+    expect(OWN_ITEM_FIELDS).toEqual(['Описание', 'Бележка'])
+  })
+
+  it('an animal comes with breed and temperament', () => {
+    const animal = ITEM_KINDS.find((kind) => kind.word.singular === 'Животно')
+    expect(animal?.fields).toEqual(['Порода', 'Характер'])
   })
 })

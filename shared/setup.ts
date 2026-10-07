@@ -95,8 +95,8 @@ export const ITEM_KINDS: ItemKind[] = [
   },
 ]
 
-/** Fields suggested for an item the person names themselves. */
-export const OWN_ITEM_FIELDS = ['Модел', 'Бележка']
+/** Fields suggested for an item the person names themselves: only ones that suit a dog as well as a property. */
+export const OWN_ITEM_FIELDS = ['Описание', 'Бележка']
 
 export const REPEAT_EVERY = ['week', '2weeks', 'month'] as const
 export type RepeatEvery = (typeof REPEAT_EVERY)[number]

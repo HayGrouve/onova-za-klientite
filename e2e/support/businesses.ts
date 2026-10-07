@@ -132,12 +132,12 @@ export const BUSINESSES: Business[] = [
     stages: ['Насрочено', 'В работа', 'Готово', ...IN_STAGES],
     deposits: false,
     costs: false,
-    // "Друго" offers Модел and Бележка; Порода and Характер are added in
+    // "Друго" offers Описание and Бележка; Порода and Характер are added in
     // Settings → Полета, and the plural the wizard guessed is fixed in Имена.
     item: {
       singular: 'Куче',
       plural: 'Кучета',
-      fields: ['Модел', 'Бележка', 'Порода', 'Характер'],
+      fields: ['Описание', 'Бележка', 'Порода', 'Характер'],
     },
     itemPlural: 'Кучета',
     addItemFields: ['Порода', 'Характер'],

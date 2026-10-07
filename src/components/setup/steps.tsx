@@ -5,6 +5,7 @@ import {
   PlusIcon,
   XIcon,
 } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import {
@@ -221,12 +222,27 @@ function ItemStep({ answers, update }: StepProps) {
     (kind) => kind.word.singular === item?.word.singular,
   )
   const isOther = !!item && !preset
+  const kindKey = preset?.word.singular ?? 'other'
+  // The chips keep their places when one is switched off and on again: the
+  // fields offered for this kind first, then any the business already has.
+  const [opened] = useState({ kind: kindKey, fields: item?.fields ?? [] })
   const suggested = [
     ...new Set([
       ...(preset?.fields ?? OWN_ITEM_FIELDS),
-      ...(item?.fields ?? []),
+      ...(opened.kind === kindKey ? opened.fields : []),
     ]),
   ]
+  // The chips appear below the question that offers them; bring them into view.
+  const fieldsRef = useRef<HTMLFieldSetElement>(null)
+  const hasFields = !!answers.hasItem && !!item
+  useEffect(() => {
+    if (!hasFields) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    fieldsRef.current?.scrollIntoView({
+      block: 'nearest',
+      behavior: reduce ? 'auto' : 'smooth',
+    })
+  }, [hasFields, kindKey])
 
   return (
     <FieldSet>
@@ -313,7 +329,7 @@ function ItemStep({ answers, update }: StepProps) {
             </FieldGroup>
           )}
           {item && (
-            <FieldSet>
+            <FieldSet ref={fieldsRef}>
               <FieldLegend variant="label">{m.setup_item_fields()}</FieldLegend>
               <Choices
                 label={m.setup_item_fields()}
@@ -324,7 +340,17 @@ function ItemStep({ answers, update }: StepProps) {
                   label: field,
                 }))}
                 value={item.fields}
-                onChange={(fields) => update({ item: { ...item, fields } })}
+                onChange={(fields) =>
+                  update({
+                    item: {
+                      ...item,
+                      // In the order of the chips, whichever was pressed last.
+                      fields: suggested.filter((field) =>
+                        fields.includes(field),
+                      ),
+                    },
+                  })
+                }
               />
             </FieldSet>
           )}
