@@ -1,6 +1,6 @@
 # ADR 0004: Vercel hosting, with a Convex deployment per preview
 
-**Status:** Proposed. Vercel is linked only after milestone 1 is merged.
+**Status:** Accepted (7 Oct 2026). Linked after milestone 10 was merged, with Q22 answered.
 
 ## Context
 
@@ -17,6 +17,6 @@ The owner wants every PR to have a Vercel preview backed by its own Convex previ
 ## Consequences
 
 - **Merging to `main` deploys production**, Convex first and then the app, in one Vercel build. So the owner's merge approval is also the production deploy approval. The first production deploy happens with the owner present, right after linking.
-- Until launch, "production" is the disposable Free-plan deployment from [ADR 0002](./0002-convex-in-the-eu.md). At launch only the Production-scoped `CONVEX_DEPLOY_KEY` changes, to point at the fresh EU deployment.
+- Production is the fresh EU deployment from [ADR 0002](./0002-convex-in-the-eu.md) from the first deploy. Until launch it trusts the Clerk development instance; at launch only its Clerk env and the Production-scoped publishable key change (D50 in the implementation plan).
 - A preview deployment is reused per branch and expires after 5 days on Free/Starter. Pushing again recreates it.
 - If the owner prefers the sibling's model (production only from GitHub Actions, with Vercel Git production deploys off), only the production half changes; previews stay as above.
