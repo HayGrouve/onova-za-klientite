@@ -7,7 +7,18 @@ import {
   getDoc,
   setupBusiness,
   setupConvex,
+  STRANGER,
 } from './test.setup'
+import type { TestBusiness, TestConvex } from './test.setup'
+
+/** Turns the Items module on, as a business that keeps cars or devices would. */
+async function enableItems(t: TestConvex, b: TestBusiness) {
+  const business = await getDoc(t, 'businesses', b.businessId)
+  await b.owner.mutation(api.businesses.setModules, {
+    businessId: b.businessId,
+    modules: { ...business.modules, items: true },
+  })
+}
 
 describe('newJob.save', () => {
   it('two required fields are enough: client and title', async () => {
@@ -154,5 +165,263 @@ describe('newJob.save with repeat', () => {
     const job = await getDoc(t, 'jobs', jobId)
     expect(job.repeat).toEqual({ every: 1, unit: 'week' })
     expect(job.nextRepeatOn).toBe('2026-10-09')
+  })
+})
+
+describe('newJob.save for work already done and paid', () => {
+  const walkIn = {
+    client: { kind: 'none' as const },
+    title: 'Зареждане с фреон',
+    typedPriceCents: 4000,
+    deposit: { amountCents: 4000, date: '2026-10-07', method: 'cash' as const },
+  }
+
+  it('starts in the first New stage unless it is asked to be done', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      ...walkIn,
+    })
+    const job = await getDoc(t, 'jobs', jobId)
+    expect(job.stageGroup).toBe('new')
+    expect(job.doneAt).toBeUndefined()
+  })
+
+  it('a payment that is not a deposit, and the job saved straight as done', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      ...walkIn,
+      done: true,
+    })
+    const job = await getDoc(t, 'jobs', jobId)
+    expect(job.stageGroup).toBe('done')
+    expect(job.stageId).toBe(b.stage('done'))
+    expect(job.doneAt).toBeDefined()
+    expect(job.paidCents).toBe(4000)
+    expect(job.balanceCents).toBe(0)
+    expect(job.owes).toBe(false)
+
+    const payments = await t.run((ctx) => ctx.db.query('payments').collect())
+    expect(payments).toHaveLength(1)
+    expect(payments[0].label).toBeUndefined()
+    expect(payments[0].clientId).toBe(b.noClientId)
+    await expectCachesFresh(t)
+  })
+
+  it('goes to the first Done stage in the business’s order', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    await b.owner.mutation(api.stages.add, {
+      businessId: b.businessId,
+      name: 'Предадено',
+      group: 'done',
+    })
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      ...walkIn,
+      done: true,
+    })
+    expect((await getDoc(t, 'jobs', jobId)).stageId).toBe(b.stage('done'))
+  })
+
+  it('done without a payment is allowed: the job is done and still owed', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      client: { kind: 'none' },
+      title: 'Ключ',
+      typedPriceCents: 1000,
+      done: true,
+    })
+    const job = await getDoc(t, 'jobs', jobId)
+    expect(job.stageGroup).toBe('done')
+    expect(job.owes).toBe(true)
+    expect(job.balanceCents).toBe(1000)
+  })
+})
+
+describe('newJob.save with items', () => {
+  async function clientWithItem(t: TestConvex, b: TestBusiness) {
+    await enableItems(t, b)
+    const clientId = await b.owner.mutation(api.clients.create, {
+      businessId: b.businessId,
+      name: 'Георги Димитров',
+    })
+    const itemId = await b.owner.mutation(api.items.create, {
+      businessId: b.businessId,
+      clientId,
+      name: 'Daikin',
+    })
+    return { clientId, itemId }
+  }
+
+  it('links the chosen items to the job', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { clientId, itemId } = await clientWithItem(t, b)
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      client: { kind: 'existing', clientId },
+      title: 'Смяна на филтри',
+      typedPriceCents: 4500,
+      itemIds: [itemId],
+    })
+    expect((await getDoc(t, 'jobs', jobId)).itemIds).toEqual([itemId])
+    const links = await t.run((ctx) => ctx.db.query('jobItems').collect())
+    expect(links.map((link) => [link.jobId, link.itemId])).toEqual([
+      [jobId, itemId],
+    ])
+  })
+
+  it('refuses an item of another client, and saves nothing', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { itemId } = await clientWithItem(t, b)
+    const otherId = await b.owner.mutation(api.clients.create, {
+      businessId: b.businessId,
+      name: 'Мария',
+    })
+    await expect(
+      b.owner.mutation(api.newJob.save, {
+        businessId: b.businessId,
+        client: { kind: 'existing', clientId: otherId },
+        title: 'Смяна на филтри',
+        itemIds: [itemId],
+      }),
+    ).rejects.toThrow(/job.otherClient/)
+    expect(await t.run((ctx) => ctx.db.query('jobs').collect())).toHaveLength(0)
+  })
+
+  it('refuses an item of a new client or of a walk-in', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { itemId } = await clientWithItem(t, b)
+    await expect(
+      b.owner.mutation(api.newJob.save, {
+        businessId: b.businessId,
+        client: { kind: 'new', name: 'Петър Колев' },
+        title: 'Смяна на филтри',
+        itemIds: [itemId],
+      }),
+    ).rejects.toThrow(/job.otherClient/)
+    await expect(
+      b.owner.mutation(api.newJob.save, {
+        businessId: b.businessId,
+        client: { kind: 'none' },
+        title: 'Смяна на филтри',
+        itemIds: [itemId],
+      }),
+    ).rejects.toThrow(/job.otherClient/)
+    expect(
+      await t.run((ctx) => ctx.db.query('clients').collect()),
+    ).toHaveLength(2)
+  })
+
+  it('refuses an item of another business', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const stranger = await setupBusiness(t, STRANGER)
+    const { itemId } = await clientWithItem(t, stranger)
+    await expect(
+      b.owner.mutation(api.newJob.save, {
+        businessId: b.businessId,
+        client: { kind: 'none' },
+        title: 'Смяна на филтри',
+        itemIds: [itemId],
+      }),
+    ).rejects.toThrow(/notFound/)
+  })
+})
+
+describe('newJob.context items', () => {
+  it('lists each client’s items with the words they are searched by, when the Items module is on', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    await enableItems(t, b)
+    const modelId = await b.owner.mutation(api.fields.add, {
+      businessId: b.businessId,
+      target: 'item',
+      name: 'Модел',
+      type: 'text',
+    })
+    const clientId = await b.owner.mutation(api.clients.create, {
+      businessId: b.businessId,
+      name: 'Георги Димитров',
+    })
+    const itemId = await b.owner.mutation(api.items.create, {
+      businessId: b.businessId,
+      clientId,
+      name: 'Климатик Daikin',
+      extra: { [modelId]: 'FTXM35' },
+    })
+    const context = await b.owner.query(api.newJob.context, {
+      businessId: b.businessId,
+    })
+    expect(context.items).toHaveLength(1)
+    expect(context.items[0]).toMatchObject({
+      id: itemId,
+      clientId,
+      name: 'Климатик Daikin',
+    })
+    expect(context.items[0].keys.split(' ')).toEqual(
+      expect.arrayContaining(['klimatik', 'daikin', 'ftxm35']),
+    )
+  })
+
+  it('lists none when the Items module is off', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const clientId = await b.owner.mutation(api.clients.create, {
+      businessId: b.businessId,
+      name: 'Георги Димитров',
+    })
+    await enableItems(t, b)
+    await b.owner.mutation(api.items.create, {
+      businessId: b.businessId,
+      clientId,
+      name: 'Daikin',
+    })
+    const business = await getDoc(t, 'businesses', b.businessId)
+    await b.owner.mutation(api.businesses.setModules, {
+      businessId: b.businessId,
+      modules: { ...business.modules, items: false },
+    })
+    const context = await b.owner.query(api.newJob.context, {
+      businessId: b.businessId,
+    })
+    expect(context.items).toEqual([])
+  })
+
+  it('leaves out the items of a client who is merged away or anonymized', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    await enableItems(t, b)
+    const keep = await b.owner.mutation(api.clients.create, {
+      businessId: b.businessId,
+      name: 'Иван Петров',
+    })
+    const gone = await b.owner.mutation(api.clients.create, {
+      businessId: b.businessId,
+      name: 'Иван Петров ',
+    })
+    await b.owner.mutation(api.items.create, {
+      businessId: b.businessId,
+      clientId: keep,
+      name: 'Колело',
+    })
+    await b.owner.mutation(api.items.create, {
+      businessId: b.businessId,
+      clientId: gone,
+      name: 'Лодка',
+    })
+    await t.run((ctx) => ctx.db.patch('clients', gone, { mergedIntoId: keep }))
+    const context = await b.owner.query(api.newJob.context, {
+      businessId: b.businessId,
+    })
+    expect(context.items.map((item) => item.name)).toEqual(['Колело'])
   })
 })
