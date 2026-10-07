@@ -43,12 +43,12 @@ function JobsPage() {
         }
         className="px-4 pb-3"
       >
-        <TabsList className="h-11 w-full bg-foreground/6">
+        <TabsList className="w-full rounded-full bg-foreground/6 group-data-horizontal/tabs:h-11">
           {STAGE_GROUPS.map((key) => (
             <TabsTrigger
               key={key}
               value={key}
-              className="h-9 gap-1 px-1.5 text-sm"
+              className="h-full gap-1 rounded-full px-1 text-[0.8125rem]"
             >
               {GROUP_LABEL[key]()}
               {data && data.counts[key] > 0 && (

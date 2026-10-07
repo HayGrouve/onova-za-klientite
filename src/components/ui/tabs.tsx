@@ -36,7 +36,8 @@ const tabsListVariants = cva(
 )
 
 // Local change (ADR 0005): the default list slides a white pill to the
-// active tab instead of switching each tab's background.
+// active tab instead of switching each tab's background. The pill takes the
+// list's corner radius, so a round list gets a round pill.
 function TabsList({
   className,
   variant = "default",
@@ -52,7 +53,7 @@ function TabsList({
     >
       {children}
       {variant === "default" && (
-        <TabsPrimitive.Indicator className="absolute top-(--active-tab-top) left-(--active-tab-left) h-(--active-tab-height) w-(--active-tab-width) rounded-md bg-background shadow-sm transition-[left,width] duration-300 ease-out dark:bg-input/30" />
+        <TabsPrimitive.Indicator className="absolute top-(--active-tab-top) left-(--active-tab-left) h-(--active-tab-height) w-(--active-tab-width) rounded-[inherit] bg-background shadow-sm transition-[left,width] duration-300 ease-out dark:bg-input/30" />
       )}
     </TabsPrimitive.List>
   )
