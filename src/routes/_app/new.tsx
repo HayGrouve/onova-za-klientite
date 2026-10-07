@@ -26,6 +26,7 @@ function NewJobPage() {
       business={business}
       clients={context.clients}
       services={context.services}
+      items={context.items}
     />
   )
 }
