@@ -5,6 +5,7 @@ import {
   canRegroupStage,
   canRemoveStage,
   defaultStage,
+  groupedOrder,
   stagesFor,
 } from './stages'
 import type { StageGroup } from './stages'
@@ -81,6 +82,48 @@ describe('stage rules hold for any list', () => {
           for (const required of ['new', 'in_progress', 'done'] as const) {
             expect(rest.some((stage) => stage.group === required)).toBe(true)
           }
+        },
+      ),
+    )
+  })
+})
+
+describe('groupedOrder', () => {
+  it('keeps each group together, in group order, and the order inside it', () => {
+    const stages = list(['in_progress', 'new', 'done', 'in_progress'])
+    expect(groupedOrder(stages)).toEqual(['s1', 's0', 's3', 's2'])
+  })
+
+  it('puts a regrouped stage at the end of its new group', () => {
+    // s1 was New and is now In progress: it follows the stages already there.
+    const stages = list(['new', 'in_progress', 'in_progress', 'done'])
+    stages[0] = { ...stages[0], group: 'in_progress' }
+    expect(
+      groupedOrder([...stages, { _id: 's4', group: 'new', order: 4 }], 's0'),
+    ).toEqual(['s4', 's1', 's2', 's0', 's3'])
+  })
+
+  it('always returns every stage once, grouped', () => {
+    const group = fc.constantFrom(...STAGE_GROUPS)
+    fc.assert(
+      fc.property(
+        fc.array(group, { maxLength: 10 }),
+        fc.nat(),
+        (groups, pick) => {
+          const stages = list(groups)
+          const moved = stages.length
+            ? stages[pick % stages.length]._id
+            : undefined
+          const ids = groupedOrder(stages, moved)
+          expect([...ids].sort()).toEqual(
+            stages.map((stage) => stage._id).sort(),
+          )
+          const rank = ids.map((id) =>
+            STAGE_GROUPS.indexOf(
+              stages.find((stage) => stage._id === id)!.group,
+            ),
+          )
+          expect(rank).toEqual([...rank].sort((a, b) => a - b))
         },
       ),
     )

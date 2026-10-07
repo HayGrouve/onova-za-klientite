@@ -89,3 +89,23 @@ export function defaultStage<T extends StageLike<unknown>>(
     .sort((a, b) => a.order - b.order)
     .find((stage) => stage.group === 'new')
 }
+
+/**
+ * The stage ids in list order with each group kept together, New first:
+ * the order the job page offers them in. `moved` (a stage just regrouped)
+ * goes to the end of its group.
+ */
+export function groupedOrder<TId>(
+  stages: Array<StageLike<TId>>,
+  moved?: TId,
+): TId[] {
+  const rank = (stage: StageLike<TId>) =>
+    stage._id === moved ? Number.POSITIVE_INFINITY : stage.order
+  return [...stages]
+    .sort(
+      (a, b) =>
+        STAGE_GROUPS.indexOf(a.group) - STAGE_GROUPS.indexOf(b.group) ||
+        rank(a) - rank(b),
+    )
+    .map((stage) => stage._id)
+}
