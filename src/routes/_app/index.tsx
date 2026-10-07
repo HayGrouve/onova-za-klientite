@@ -15,7 +15,7 @@ import { ListSkeleton } from '#/components/list-skeleton'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { ListSection } from '#/components/list-section'
 import { EmptyState, PageTitle } from '#/components/page'
-import { TodayDashboard } from '#/components/today/today-dashboard'
+import { TodayWide } from '#/components/today/today-wide'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
@@ -62,7 +62,7 @@ function TodayPage() {
       {!data ? (
         <ListSkeleton />
       ) : wide ? (
-        <TodayDashboard data={data} today={today} />
+        <TodayWide data={data} today={today} />
       ) : empty ? (
         <EmptyState
           icon={SunIcon}

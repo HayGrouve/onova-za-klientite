@@ -14,7 +14,7 @@ const TONE = {
 }
 
 /**
- * One headline figure on a dashboard: an icon, a label and a value, opening
+ * One headline figure above a list, such as on Today: an icon, a label and a value, opening
  * the place that explains it. A row of these sits above the lists.
  */
 export function StatTile({

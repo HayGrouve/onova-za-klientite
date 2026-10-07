@@ -38,13 +38,7 @@ const TIME = new Intl.DateTimeFormat('bg-BG', {
  * (today hour by hour, the next days by day) beside what needs acting on.
  * Lists to act on, never charts (design doc, "Simple first").
  */
-export function TodayDashboard({
-  data,
-  today,
-}: {
-  data: TodayData
-  today: string
-}) {
+export function TodayWide({ data, today }: { data: TodayData; today: string }) {
   const { business, businesses } = useViewer()
   const { words, modules } = business
   const role = businesses.find((item) => item._id === business._id)?.role

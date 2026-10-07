@@ -61,7 +61,7 @@ pnpm generate-icons       # PNG icons and favicon from public/icon.svg and icon-
 A Convex test file starts with `// @vitest-environment edge-runtime` and uses `setupConvex()` from `convex/test.setup.ts`. Playwright (`pnpm test:e2e`, once `pnpm test:e2e:install` has fetched Chromium) drives `e2e/` in a 390×844 browser against the dev server on :3000 (started or reused) and the dev deployment in `.env.local`, which needs `ALLOW_SEED=true` and `CLERK_SECRET_KEY` in its Convex env. Each spec file creates its own `+clerk_test` user through the Clerk Backend API and deletes the account in the app (Settings → Data) at the end. In CI the `e2e` job runs only when the repo secret `E2E_VITE_CONVEX_URL` is set; it also needs `E2E_VITE_CLERK_PUBLISHABLE_KEY` and `E2E_CLERK_SECRET_KEY`, all three from that dev deployment and its Clerk dev instance.
 
 UI changes are verified in a real browser before a task counts as done:
-- Use `agent-browser` at 390×844, signed in as a Clerk test user (`+clerk_test` email) or with `clerk impersonate`.
+- Use `agent-browser` at 390×844, signed in as a Clerk test user (`+clerk_test` email) or with `clerk impersonate`. A screen with a wide layout (sidebar, board, two columns: D54) is also checked at 1440×900 and 1024×768.
 - Check every changed screen in **both** seeded businesses, and take screenshots of the key ones for the PR.
 - Report what was verified and how, what wasn't, and what failed, with the output.
 
