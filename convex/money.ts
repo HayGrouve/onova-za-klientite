@@ -1,4 +1,5 @@
 import { v } from 'convex/values'
+import type { Id } from './_generated/dataModel'
 import { monthRange } from '../shared/dates'
 import { sumCents } from '../shared/money'
 import { businessQuery, requireRole } from './lib/auth'
@@ -22,8 +23,11 @@ export const summary = businessQuery({
         name: v.string(),
         isNoClient: v.boolean(),
         owedCents: v.number(),
+        /** The part of owedCents on jobs in the Done group. */
+        doneOwedCents: v.number(),
         jobs: v.number(),
         doneJobs: v.number(),
+        phone: v.optional(v.string()),
       }),
     ),
     payments: v.array(
@@ -40,6 +44,10 @@ export const summary = businessQuery({
         label: v.optional(v.string()),
         clientId: v.id('clients'),
         clientName: v.string(),
+        /** The jobs it paid, or took money back from. */
+        jobs: v.array(v.object({ _id: v.id('jobs'), title: v.string() })),
+        /** The part that sits in client credit (or, for a refund, came out of it). */
+        creditCents: v.number(),
       }),
     ),
     costs: v.array(
@@ -82,17 +90,26 @@ export const summary = businessQuery({
       .collect()
     const byClient = new Map<
       string,
-      { owedCents: number; jobs: number; doneJobs: number }
+      {
+        owedCents: number
+        doneOwedCents: number
+        jobs: number
+        doneJobs: number
+      }
     >()
     for (const job of owing) {
       const entry = byClient.get(job.clientId) ?? {
         owedCents: 0,
+        doneOwedCents: 0,
         jobs: 0,
         doneJobs: 0,
       }
       entry.owedCents += job.balanceCents
       entry.jobs += 1
-      if (job.stageGroup === 'done') entry.doneJobs += 1
+      if (job.stageGroup === 'done') {
+        entry.doneOwedCents += job.balanceCents
+        entry.doneJobs += 1
+      }
       byClient.set(job.clientId, entry)
     }
 
@@ -112,6 +129,7 @@ export const summary = businessQuery({
           clientId: client!._id,
           name: client?.name ?? '',
           isNoClient: client?.isNoClient ?? false,
+          phone: client?.phones.at(0)?.e164,
           ...entry,
         }
       })
@@ -122,13 +140,55 @@ export const summary = businessQuery({
       )
 
     const jobTitles = new Map<string, string>()
-    for (const cost of costs) {
-      if (cost.jobId && !jobTitles.has(cost.jobId)) {
-        jobTitles.set(
-          cost.jobId,
-          (await ctx.db.get('jobs', cost.jobId))?.title ?? '',
-        )
+    const titleOf = async (jobId: Id<'jobs'>) => {
+      if (!jobTitles.has(jobId)) {
+        jobTitles.set(jobId, (await ctx.db.get('jobs', jobId))?.title ?? '')
       }
+      return jobTitles.get(jobId) ?? ''
+    }
+    for (const cost of costs) {
+      if (cost.jobId) await titleOf(cost.jobId)
+    }
+
+    // Which jobs each payment paid, and how much of it is left as credit.
+    const sortedPayments = payments.sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) || b._creationTime - a._creationTime,
+    )
+    const paymentRows = []
+    for (const payment of sortedPayments) {
+      const allocations = await ctx.db
+        .query('allocations')
+        .withIndex('by_payment', (q) => q.eq('paymentId', payment._id))
+        .collect()
+      const jobs: Array<{ _id: Id<'jobs'>; title: string }> = []
+      for (const allocation of allocations) {
+        if (!jobs.some((job) => job._id === allocation.jobId)) {
+          jobs.push({
+            _id: allocation.jobId,
+            title: await titleOf(allocation.jobId),
+          })
+        }
+      }
+      const allocated = sumCents(
+        allocations.map((allocation) => allocation.amountCents),
+      )
+      paymentRows.push({
+        _id: payment._id,
+        date: payment.date,
+        amountCents: payment.amountCents,
+        method: payment.method,
+        label: payment.label,
+        clientId: payment.clientId,
+        clientName: clientById.get(payment.clientId)?.name ?? '',
+        jobs,
+        creditCents:
+          payment.amountCents > 0
+            ? Math.max(payment.amountCents - allocated, 0)
+            : allocations.length > 0
+              ? 0
+              : -payment.amountCents,
+      })
     }
 
     const receivedCents = sumCents(
@@ -146,20 +206,7 @@ export const summary = businessQuery({
           .map((client) => client.creditCents),
       ),
       whoOwesMe,
-      payments: payments
-        .sort(
-          (a, b) =>
-            b.date.localeCompare(a.date) || b._creationTime - a._creationTime,
-        )
-        .map((payment) => ({
-          _id: payment._id,
-          date: payment.date,
-          amountCents: payment.amountCents,
-          method: payment.method,
-          label: payment.label,
-          clientId: payment.clientId,
-          clientName: clientById.get(payment.clientId)?.name ?? '',
-        })),
+      payments: paymentRows,
       costs: costs
         .sort(
           (a, b) =>

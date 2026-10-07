@@ -22,6 +22,7 @@ export type ErrorCode =
   | 'payment.signMismatch'
   | 'payment.exceeds'
   | 'payment.zero'
+  | 'payment.tooLow'
   | 'credit.notEnough'
   | 'job.noDate'
   | 'client.merged'

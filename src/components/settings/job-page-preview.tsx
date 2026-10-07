@@ -53,7 +53,7 @@ export function JobPagePreview({
         m.job_price(),
         m.job_paid(),
         m.job_balance(),
-        ...(modules.costs ? [m.job_profit()] : []),
+        ...(modules.costs ? [m.job_costs(), m.job_profit()] : []),
       ].join(' · '),
     },
     { key: 'lines', icon: ListBulletsIcon, title: m.job_lines() },

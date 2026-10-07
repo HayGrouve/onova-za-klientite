@@ -30,10 +30,10 @@ import { FileGallery } from '#/components/files/file-gallery'
 import { JobRow } from '#/components/job-row'
 import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
+import { PaymentSheet } from '#/components/money/payment-sheet'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { RefundForm } from '#/components/money/refund-form'
-import { RemovePayment } from '#/components/money/remove-payment'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
@@ -52,6 +52,7 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
+import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/clients/$clientId')({
@@ -71,10 +72,10 @@ function ClientPage() {
     | { kind: 'edit' }
     | { kind: 'payment' }
     | { kind: 'refund' }
-    | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
     | { kind: 'reminder' }
     | null
   >(null)
+  const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const close = () => setPanel(null)
   const reminders = useQuery(
     api.reminders.forClient,
@@ -87,6 +88,17 @@ function ClientPage() {
   if (!data) return <ListSkeleton />
   const { client } = data
   const phone = client.phones.at(0)?.e164
+  // A refund pays back client credit, or takes back part of what a job was paid (D26).
+  const refundSources = [
+    ...(client.creditCents > 0 ? [{ limitCents: client.creditCents }] : []),
+    ...data.jobs
+      .filter((job) => job.paidCents > 0)
+      .map((job) => ({
+        jobId: job._id,
+        title: job.title,
+        limitCents: job.paidCents,
+      })),
+  ]
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -293,7 +305,7 @@ function ClientPage() {
                       <PlusIcon data-icon="inline-start" />
                       {m.pay_add()}
                     </Button>
-                    {client.creditCents > 0 && (
+                    {refundSources.length > 0 && (
                       <Button
                         variant="outline"
                         size="xl"
@@ -309,34 +321,35 @@ function ClientPage() {
                   {data.payments.length === 0 ? (
                     <ListNote>{m.client_no_payments()}</ListNote>
                   ) : (
-                    data.payments.map((payment) => (
-                      <li key={payment._id}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPanel({
-                              kind: 'removePayment',
-                              paymentId: payment._id,
-                              amountCents: payment.amountCents,
-                            })
-                          }
-                          className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
-                        >
-                          <span className="flex flex-col">
-                            <span>
-                              {payment.label ?? METHOD_LABEL[payment.method]()}
+                    data.payments.map((payment) => {
+                      // The method is the title unless a label or a refund takes it.
+                      const refund = payment.amountCents < 0
+                      const titled =
+                        payment.label ?? (refund ? m.refund_add() : undefined)
+                      return (
+                        <li key={payment._id}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenPayment(payment._id)}
+                            className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
+                          >
+                            <span className="flex flex-col">
+                              <span>
+                                {titled ?? METHOD_LABEL[payment.method]()}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {formatDay(payment.date, today)}
+                                {titled &&
+                                  ` · ${METHOD_LABEL[payment.method]()}`}
+                              </span>
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {formatDay(payment.date, today)} ·{' '}
-                              {METHOD_LABEL[payment.method]()}
+                            <span className="font-medium tabular-nums">
+                              {formatMoney(payment.amountCents)}
                             </span>
-                          </span>
-                          <span className="font-medium tabular-nums">
-                            {formatMoney(payment.amountCents)}
-                          </span>
-                        </button>
-                      </li>
-                    ))
+                          </button>
+                        </li>
+                      )
+                    })
                   )}
                 </PanelList>
               </Panel>
@@ -454,11 +467,9 @@ function ClientPage() {
                 ? m.pay_title()
                 : panel?.kind === 'refund'
                   ? m.refund_title()
-                  : panel?.kind === 'removePayment'
-                    ? m.pay_remove()
-                    : panel?.kind === 'reminder'
-                      ? m.reminder_add_title()
-                      : client.name}
+                  : panel?.kind === 'reminder'
+                    ? m.reminder_add_title()
+                    : client.name}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -480,6 +491,7 @@ function ClientPage() {
                 }}
                 today={today}
                 depositsOn={business.depositsOnNewJob}
+                defaultMethod={defaultPaymentMethod(data.payments)}
                 onDone={close}
               />
             )}
@@ -487,7 +499,7 @@ function ClientPage() {
               <RefundForm
                 businessId={business._id}
                 clientId={client._id}
-                creditCents={client.creditCents}
+                sources={refundSources}
                 today={today}
                 onDone={close}
               />
@@ -500,17 +512,15 @@ function ClientPage() {
                 onDone={close}
               />
             )}
-            {panel?.kind === 'removePayment' && (
-              <RemovePayment
-                businessId={business._id}
-                paymentId={panel.paymentId}
-                amountCents={panel.amountCents}
-                onDone={close}
-              />
-            )}
           </div>
         </SheetContent>
       </Sheet>
+      <PaymentSheet
+        businessId={business._id}
+        paymentId={openPayment}
+        today={today}
+        onClose={() => setOpenPayment(null)}
+      />
     </div>
   )
 }

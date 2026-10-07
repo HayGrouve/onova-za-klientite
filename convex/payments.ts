@@ -1,8 +1,20 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
+import type { QueryCtx } from './_generated/server'
 import { checkAllocations, splitPayment } from '../shared/allocation'
+import {
+  paymentAmountRange,
+  paymentPrepaidCents,
+  planPaymentEdit,
+} from '../shared/payment-edit'
+import type { PaymentEditState } from '../shared/payment-edit'
 import { logActivity } from './lib/activity'
-import { businessMutation, getOwned, requireRole } from './lib/auth'
+import {
+  businessMutation,
+  businessQuery,
+  getOwned,
+  requireRole,
+} from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
 import { fail } from './lib/errors'
 import { recomputeMoney } from './lib/recompute'
@@ -326,6 +338,198 @@ export const remove = businessMutation({
       type: 'payment.removed',
       clientId: payment.clientId,
       data: { amountCents: payment.amountCents },
+    })
+    return null
+  },
+})
+
+/**
+ * Where a payment sits and what its jobs and its client hold: the facts that
+ * decide which amounts an edit may use (`shared/payment-edit.ts`).
+ */
+async function loadEditState(ctx: QueryCtx, payment: Doc<'payments'>) {
+  const rows = await ctx.db
+    .query('allocations')
+    .withIndex('by_payment', (q) => q.eq('paymentId', payment._id))
+    .collect()
+  const onJob = new Map<Id<'jobs'>, number>()
+  for (const row of rows) {
+    onJob.set(
+      row.jobId,
+      (onJob.get(row.jobId) ?? 0) + Math.abs(row.amountCents),
+    )
+  }
+  const jobs = new Map<Id<'jobs'>, Doc<'jobs'>>()
+  for (const jobId of onJob.keys()) {
+    const job = await ctx.db.get('jobs', jobId)
+    if (job) jobs.set(jobId, job)
+  }
+  const client = await ctx.db.get('clients', payment.clientId)
+  const state: PaymentEditState<Id<'jobs'>> = {
+    kind: payment.amountCents < 0 ? 'refund' : 'payment',
+    amountCents: Math.abs(payment.amountCents),
+    jobs: [...jobs.values()].map((job) => ({
+      jobId: job._id,
+      allocatedCents: onJob.get(job._id) ?? 0,
+      paidCents: job.paidCents,
+      roomCents: job.owes ? job.balanceCents : 0,
+    })),
+    clientCreditCents: client?.creditCents ?? 0,
+  }
+  return { state, rows, jobs }
+}
+
+/**
+ * One payment with how it was split across jobs, and the amounts an edit may
+ * use. A worker may look only at a payment on a job assigned to them.
+ */
+export const get = businessQuery({
+  args: { paymentId: v.id('payments') },
+  returns: v.object({
+    _id: v.id('payments'),
+    clientId: v.id('clients'),
+    amountCents: v.number(),
+    date: v.string(),
+    method: vPaymentMethod,
+    label: v.optional(v.string()),
+    note: v.optional(v.string()),
+    allocations: v.array(
+      v.object({
+        jobId: v.id('jobs'),
+        title: v.string(),
+        amountCents: v.number(),
+      }),
+    ),
+    prepaidCents: v.number(),
+    range: v.object({
+      minCents: v.number(),
+      maxCents: v.union(v.number(), v.null()),
+      why: v.union(
+        v.literal('none'),
+        v.literal('refunded'),
+        v.literal('allocated'),
+      ),
+    }),
+  }),
+  handler: async (ctx, args) => {
+    const payment = await getOwned(ctx, 'payments', args.paymentId)
+    const { state, jobs } = await loadEditState(ctx, payment)
+    if (
+      ctx.member.role === 'worker' &&
+      ![...jobs.values()].some((job) =>
+        job.assigneeIds.includes(ctx.member._id),
+      )
+    ) {
+      fail('auth.forbidden')
+    }
+    const sign = Math.sign(payment.amountCents)
+    return {
+      _id: payment._id,
+      clientId: payment.clientId,
+      amountCents: payment.amountCents,
+      date: payment.date,
+      method: payment.method,
+      label: payment.label,
+      note: payment.note,
+      allocations: state.jobs.map((job) => ({
+        jobId: job.jobId,
+        title: jobs.get(job.jobId)?.title ?? '',
+        amountCents: sign * job.allocatedCents,
+      })),
+      prepaidCents: paymentPrepaidCents(state),
+      range: paymentAmountRange(state),
+    }
+  },
+})
+
+/**
+ * Edits a payment. The date, method and label always change. The amount is
+ * reallocated in the same mutation (ADR 0008) and may not drop below what has
+ * already been refunded or used, which keeps every job's paid total and the
+ * client's credit from going negative (D26). A payment keeps its sign.
+ */
+export const update = businessMutation({
+  args: {
+    paymentId: v.id('payments'),
+    /** The amount without its sign: a refund stays a refund. */
+    amountCents: v.number(),
+    date: v.string(),
+    method: vPaymentMethod,
+    label: v.optional(v.string()),
+    note: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireRole(ctx.member, 'manager')
+    const payment = await getOwned(ctx, 'payments', args.paymentId)
+    const amountCents = cents(args.amountCents, 'amountCents')
+    if (amountCents === 0) fail('payment.zero')
+    const fields = {
+      date: calendarDate(args.date, 'date'),
+      method: args.method,
+      label: optionalText(args.label, 'label', 100),
+      note: optionalText(args.note, 'note', 1000),
+    }
+    const sign = Math.sign(payment.amountCents)
+    const amountChanged = amountCents !== Math.abs(payment.amountCents)
+    if (
+      !amountChanged &&
+      fields.date === payment.date &&
+      fields.method === payment.method &&
+      fields.label === payment.label &&
+      fields.note === payment.note
+    ) {
+      return null
+    }
+
+    const { state, rows, jobs } = await loadEditState(ctx, payment)
+    if (amountChanged) {
+      const plan = planPaymentEdit(state, amountCents)
+      if (!plan.ok) {
+        const limit = { limitCents: plan.limitCents }
+        if (plan.reason === 'tooLow') fail('payment.tooLow', limit)
+        fail(
+          state.jobs.length > 0 ? 'payment.exceeds' : 'credit.notEnough',
+          limit,
+        )
+      }
+      const same =
+        plan.allocations.length === state.jobs.length &&
+        plan.allocations.every((allocation) =>
+          state.jobs.some(
+            (job) =>
+              job.jobId === allocation.jobId &&
+              job.allocatedCents === allocation.amountCents,
+          ),
+        )
+      if (!same) {
+        for (const row of rows) await ctx.db.delete('allocations', row._id)
+        await allocate(
+          ctx,
+          payment._id,
+          payment.clientId,
+          plan.allocations.map((allocation) => ({
+            jobId: allocation.jobId,
+            amountCents: sign * allocation.amountCents,
+          })),
+        )
+      }
+    }
+    await ctx.db.patch('payments', payment._id, {
+      amountCents: sign * amountCents,
+      ...fields,
+    })
+    await recomputeMoney(ctx, {
+      paymentIds: [payment._id],
+      jobIds: [...jobs.keys()],
+      clientIds: [payment.clientId],
+    })
+    await logActivity(ctx, {
+      type: 'payment.edited',
+      clientId: payment.clientId,
+      jobId: jobs.size === 1 ? [...jobs.keys()][0] : undefined,
+      paymentId: payment._id,
+      data: { amountCents: sign * amountCents, note: fields.label },
     })
     return null
   },

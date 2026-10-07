@@ -35,8 +35,8 @@ import { monthsLabel } from '#/components/setup/steps'
 import { CostForm } from '#/components/money/cost-form'
 import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
+import { PaymentSheet } from '#/components/money/payment-sheet'
 import { RefundForm } from '#/components/money/refund-form'
-import { RemovePayment } from '#/components/money/remove-payment'
 import { WriteOffForm } from '#/components/money/write-off-form'
 import { JobEditForm } from '#/components/job/job-edit-form'
 import { JobSummaryButton } from '#/components/job-summary-sheet'
@@ -64,8 +64,10 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
+import { jobProfitCents, jobProfitIsFinal } from '../../../shared/allocation'
 import { addMonths, isOverdue } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
+import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
 import type { StageGroup } from '../../../shared/stages'
 
@@ -83,7 +85,6 @@ type OpenSheet =
   | { kind: 'refund' }
   | { kind: 'writeOff' }
   | { kind: 'cost'; cost?: Doc<'costs'> }
-  | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
   | { kind: 'reminder'; rule: boolean }
 
 type StageRef = { _id: Id<'stages'>; name: string; group: StageGroup }
@@ -144,6 +145,7 @@ function JobPage() {
   const [panel, setPanel] = useState<OpenSheet | null>(null)
   // The stage toast waits here while the reminder offer is open (see moveTo).
   const afterSheet = useRef<(() => void) | null>(null)
+  const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const { words, modules } = business
 
   // A toast's undo and payment buttons belong to this job's page.
@@ -152,6 +154,10 @@ function JobPage() {
   if (!data || !fields) return <ListSkeleton />
   const { job, client } = data
   const phone = client?.phones.at(0)?.e164
+  // New and in-progress work can still be paid or cost more: profit so far.
+  const profitLabel = jobProfitIsFinal(job.stageGroup)
+    ? m.job_profit()
+    : m.job_profit_so_far()
   const late =
     (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
     isOverdue(job.dueDate, today)
@@ -470,15 +476,30 @@ function JobPage() {
                   />
                 </div>
                 {modules.costs && (
-                  <div className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2.5 text-sm">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      {m.job_profit()}
-                      <Hint term={m.job_profit()}>{m.hint_job_profit()}</Hint>
-                    </span>
-                    <span className="font-medium tabular-nums">
-                      {formatMoney(job.paidCents - job.costCents)}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2.5 text-sm">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        {m.job_costs()}
+                        <Hint term={m.job_costs()}>{m.hint_job_costs()}</Hint>
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {formatMoney(job.costCents)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2.5 text-sm">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        {profitLabel}
+                        <Hint term={profitLabel}>
+                          {jobProfitIsFinal(job.stageGroup)
+                            ? m.hint_job_profit()
+                            : m.hint_job_profit_so_far()}
+                        </Hint>
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {formatMoney(jobProfitCents(job))}
+                      </span>
+                    </div>
+                  </>
                 )}
                 {client && client.creditCents > 0 && job.owes && (
                   <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-primary/5 py-2 pr-2 pl-4">
@@ -488,8 +509,8 @@ function JobPage() {
                       })}
                     </span>
                     <Button
-                      variant="secondary"
-                      className="h-10"
+                      variant="outline"
+                      className="h-10 border-primary bg-background text-primary hover:bg-primary/10 dark:bg-background dark:hover:bg-primary/15"
                       onClick={() =>
                         void applyCredit({
                           businessId: business._id,
@@ -533,31 +554,40 @@ function JobPage() {
                   </div>
                 )}
                 <PanelList>
-                  {data.payments.map((payment) => (
-                    <li key={payment._id}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPanel({
-                            kind: 'removePayment',
-                            paymentId: payment.paymentId,
-                            amountCents: payment.paymentAmountCents,
-                          })
-                        }
-                        className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
-                      >
-                        <span>
-                          {payment.label ?? METHOD_LABEL[payment.method]()} ·{' '}
-                          <span className="text-muted-foreground">
-                            {formatDay(payment.date, today)}
+                  {data.payments.map((payment) => {
+                    // Money paid beyond what the job owed stays with the client.
+                    const rest =
+                      payment.paymentAmountCents - payment.paymentAllocatedCents
+                    return (
+                      <li key={payment._id}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenPayment(payment.paymentId)}
+                          className="flex w-full flex-col gap-0.5 pressable px-4 py-2.5 text-left text-sm"
+                        >
+                          <span className="flex w-full items-baseline justify-between gap-3">
+                            <span>
+                              {payment.label ?? METHOD_LABEL[payment.method]()}{' '}
+                              ·{' '}
+                              <span className="text-muted-foreground">
+                                {formatDay(payment.date, today)}
+                              </span>
+                            </span>
+                            <span className="font-medium tabular-nums">
+                              {formatMoney(payment.amountCents)}
+                            </span>
                           </span>
-                        </span>
-                        <span className="font-medium tabular-nums">
-                          {formatMoney(payment.amountCents)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                          {payment.paymentAmountCents > 0 && rest > 0 && (
+                            <span className="text-muted-foreground">
+                              {m.job_payment_rest({
+                                amount: formatMoney(rest),
+                              })}
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </PanelList>
               </Panel>
             ),
@@ -753,19 +783,17 @@ function JobPage() {
                     ? m.writeoff_title()
                     : panel?.kind === 'cost'
                       ? m.cost_title()
-                      : panel?.kind === 'removePayment'
-                        ? m.pay_remove()
-                        : panel?.kind === 'reminder'
-                          ? panel.rule
-                            ? m.reminder_rule_title()
-                            : m.reminder_add_title()
-                          : panel?.kind === 'lines'
-                            ? m.job_lines()
-                            : panel?.kind === 'appointment'
-                              ? words.appointment.singular
-                              : panel?.kind === 'items'
-                                ? words.item.plural
-                                : job.title}
+                      : panel?.kind === 'reminder'
+                        ? panel.rule
+                          ? m.reminder_rule_title()
+                          : m.reminder_add_title()
+                        : panel?.kind === 'lines'
+                          ? m.job_lines()
+                          : panel?.kind === 'appointment'
+                            ? words.appointment.singular
+                            : panel?.kind === 'items'
+                              ? words.item.plural
+                              : job.title}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -804,6 +832,12 @@ function JobPage() {
                 }}
                 today={today}
                 depositsOn={business.depositsOnNewJob}
+                defaultMethod={defaultPaymentMethod(
+                  data.payments.map((payment) => ({
+                    amountCents: payment.paymentAmountCents,
+                    method: payment.method,
+                  })),
+                )}
                 onDone={close}
               />
             )}
@@ -811,8 +845,13 @@ function JobPage() {
               <RefundForm
                 businessId={business._id}
                 clientId={client._id}
-                job={{ _id: job._id, paidCents: job.paidCents }}
-                creditCents={client.creditCents}
+                sources={[
+                  {
+                    jobId: job._id,
+                    title: job.title,
+                    limitCents: job.paidCents,
+                  },
+                ]}
                 today={today}
                 onDone={close}
               />
@@ -860,14 +899,6 @@ function JobPage() {
                 />
               </>
             )}
-            {panel?.kind === 'removePayment' && (
-              <RemovePayment
-                businessId={business._id}
-                paymentId={panel.paymentId}
-                amountCents={panel.amountCents}
-                onDone={close}
-              />
-            )}
             {panel?.kind === 'items' && client && (
               <ItemsPicker
                 businessId={business._id}
@@ -879,6 +910,12 @@ function JobPage() {
           </div>
         </SheetContent>
       </Sheet>
+      <PaymentSheet
+        businessId={business._id}
+        paymentId={openPayment}
+        today={today}
+        onClose={() => setOpenPayment(null)}
+      />
     </div>
   )
 }

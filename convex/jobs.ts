@@ -362,6 +362,7 @@ export const get = businessQuery({
         paymentId: payment._id,
         amountCents: allocation.amountCents,
         paymentAmountCents: payment.amountCents,
+        paymentAllocatedCents: payment.allocatedCents,
         date: payment.date,
         method: payment.method,
         label: payment.label,
