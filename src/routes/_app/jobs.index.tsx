@@ -1,6 +1,7 @@
 import { ClipboardTextIcon } from '@phosphor-icons/react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
+import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { JobRow } from '#/components/job-row'
 import { ListCard } from '#/components/list-section'
@@ -28,6 +29,8 @@ function JobsPage() {
   const navigate = useNavigate({ from: Route.fullPath })
   const today = useToday()
   const data = useQuery(api.jobs.list, { businessId: business._id, group })
+  // The counts don't depend on the open tab, so they stay while another loads.
+  const counts = useLatest(data?.counts)
   const { words } = business
 
   return (
@@ -51,9 +54,9 @@ function JobsPage() {
               className="h-full gap-1 rounded-full px-1 text-[0.8125rem]"
             >
               {GROUP_LABEL[key]()}
-              {data && data.counts[key] > 0 && (
+              {counts && counts[key] > 0 && (
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {data.counts[key]}
+                  {counts[key]}
                 </span>
               )}
             </TabsTrigger>
@@ -82,4 +85,11 @@ function JobsPage() {
       )}
     </>
   )
+}
+
+/** The value, or the last one that wasn't undefined while it reloads. */
+function useLatest<T>(value: T | undefined) {
+  const [latest, setLatest] = useState(value)
+  if (value !== undefined && value !== latest) setLatest(value)
+  return value ?? latest
 }
