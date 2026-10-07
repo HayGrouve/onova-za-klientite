@@ -4,7 +4,7 @@ Simple client, job and money tracking for any small service business, from one p
 
 ## Status
 
-The product design is final. All v1 milestones (1–10) are built and in review as stacked pull requests, starting with #16. Next: merge, link Vercel, real-device checks, then the production launch with the owner.
+The product design is final. All v1 milestones (1–10) are merged and deployed to https://onova-za-klientite.vercel.app. Next: real-device checks, then the launch switch to the owner's domain and the Clerk production instance.
 
 ## Docs
 

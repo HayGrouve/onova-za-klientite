@@ -73,8 +73,9 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
         run: pnpm run test:e2e
 
+      # Always, so a test that only passed on retry can still be looked at.
       - name: Keep the Playwright report
-        if: ${{ failure() && env.VITE_CONVEX_URL != '' }}
+        if: ${{ always() && env.VITE_CONVEX_URL != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

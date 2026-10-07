@@ -528,7 +528,7 @@ The review screen lists what will change before applying.
 
 ### Accounts, deploys and providers
 
-Q19, Q20 and Q21 are answered. Q22 is needed before Vercel is linked.
+Q19–Q22 are answered.
 
 **Q19. Convex region: please confirm before I create anything.** It's `aws-eu-west-1` (Ireland), for production, dev and previews, created with `--region eu` (ADR 0002). Usage there is billed at 1.3×. I'd also like you to set the team's default region to Europe (Ireland) in Convex Team settings. It's the one dashboard click with no CLI equivalent, and it stops any automatic path from creating a US deployment by mistake.
 
@@ -555,6 +555,8 @@ Q19, Q20 and Q21 are answered. Q22 is needed before Vercel is linked.
 
 **Q22. Merging deploys production.** With ADR 0004, a merge to `main` runs `npx convex deploy` and the Vercel production build together. So approving a merge also approves a production deploy.
 *Proposal:* accept that once milestone 1's first production deploy has gone well. The alternative is the sibling's model: production only from GitHub Actions, which still runs on merge, so it's no safer, just more moving parts.
+
+> **Answer (7 Oct 2026):** accepted. A merge to `main` deploys production through the Vercel Git integration (ADR 0004).
 
 **Q23. File links.** Convex file URLs work for anyone who has the link (long and unguessable), until the file is deleted. They only reach signed-in members through authorized queries, but a forwarded link would still open.
 *Proposal:* accept this for v1. Before share links or client-facing features, serve files through an authorized endpoint instead.
@@ -621,6 +623,8 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D47 | Offline | A cold start without signal renders a read-only app from the last IndexedDB snapshot of the last signed-in user (today, open and done-but-unpaid jobs with details, client contacts), and reloads when the signal returns. While signed in, a mid-session drop shows the banner, and forms refuse to send. Direct taps such as a stage change are still queued by Convex and sent on reconnect | ADR 0010's view offline, edit online, without a sync engine |
 | D48 | Accessibility | `--muted-foreground` is darker than the prototype's (oklch 0.49) for AA contrast on muted cards. Full-screen flows use `<main>` and an `<h1>` (screen-reader only where the design has none) | axe-core showed no violations on every screen after these, except the Clerk dev badge |
 | D49 | Bundle | Phone display uses the small `libphonenumber-js/min` metadata (`shared/phone-format.ts`). The full metadata is only loaded with the client form. The offline app is lazy-loaded | The main chunk went from 497 KB to 297 KB |
+| D50 | Production | Production is the Convex deployment `ideal-shepherd-123` (`aws-eu-west-1`, the project's default prod) behind https://onova-za-klientite.vercel.app, Vercel functions in `dub1`. Until the owner's domain exists (Q24) it signs in through the Clerk **development** instance, with its own VAPID keys. The env switch at launch is listed under "Next" | Everything but the Clerk instance can be tested in production now. There is no user data yet, and dev-instance users don't carry over, so nothing is lost at the switch |
+| D51 | "+" line | A phone inside a segment with no commas around it ("Иван 0888123456 маса 250") splits the segment as if they were there. The phone also picks between clients with the same name | The first production check typed exactly that line, and the client was lost into the title |
 
 ## Spikes
 
@@ -636,26 +640,17 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
 
 ## Done, next, open
 
-- **Done (built, in review as stacked PRs; nothing is merged yet):**
-  - milestone 0 (#13), the design doc picks for prototypes 1 and 2 (#1), Q19–Q21;
-  - milestone 1 (#16): TanStack Start SPA with the service worker shell, shadcn `base-nova`, Paraglide, Clerk (Google and email code, Bulgarian), Convex dev deployment in `aws-eu-west-1`, the signed-in shell, the dev seed, PWA manifest and icons, CI;
-  - milestone 2 (#17): the full schema, the pure rules in `shared/`, the money and settings mutations, the activity log, recompute with a cache check, a stranger test over every public function;
-  - milestone 3 (#18): setup with the live job-form preview, applied through the safe-change rules, "Run setup again", the `?timing` stopwatch (Q15);
-  - milestone 4 (#19): the one-line "+" with a fixable read-back, saved in one mutation;
-  - milestone 5 (#20): Today, Jobs, Clients, and the client, job and item pages, with files;
-  - milestone 6 (#21): payments, splits, refunds, write-offs, credit, costs and the Money screen;
-  - milestone 7 (#22): every Settings section, "+ поле", blocked actions that explain why, the grammar test;
-  - milestone 8 (#23): search, reminders and the reminder rule, repeating jobs, Web Push;
-  - milestone 9 (#24): the job summary image, import, duplicates and merge, export, anonymize, account deletion;
-  - milestone 10 (this PR): the offline snapshot and banner, "Добави бизнес" (Q13), the accessibility pass, a smaller main bundle, Playwright journeys and the genericity check (12 tests, green locally).
+- **Done:**
+  - milestones 0–10, merged to `main` on 7 Oct 2026 (#13, #16–#25). What each one built is in its PR;
+  - Q19–Q22;
+  - Vercel project `onova-za-klientite`, linked to the GitHub repo. A merge to `main` deploys production, and every PR gets a preview with its own Convex preview deployment (ADR 0004, D50);
+  - the Convex production deployment `ideal-shepherd-123` in `aws-eu-west-1`, and the first production deploy at https://onova-za-klientite.vercel.app (D50);
+  - the CI `e2e` job's GitHub secrets, pointed at the dev deployment and the Clerk development instance.
 - **Next, with the owner:**
-  1. Review and merge #16 → #24 and the milestone 10 PR, bottom up.
-  2. Answer Q22, then link Vercel (build command and both `CONVEX_DEPLOY_KEY`s, ADR 0004) and set its env (`VITE_CLERK_PUBLISHABLE_KEY`, `VITE_VAPID_PUBLIC_KEY`).
-  3. Check the first preview: `curl -I` on `/sw.js`, `/_shell.html` and the manifest (spike 2), the preview deployment's region, Lighthouse on the preview.
-  4. The real-device spikes: push on Android and an installed iPhone app (spike 3), sharing the summary to Viber and contact import (spike 4), an airplane-mode cold start (spike 5).
-  5. Production: Clerk production instance on the owner's domain (Q24) with Google OAuth (Q25), a fresh Convex production deployment in EU (Q19, Q21), real `VAPID_SUBJECT`, `CLERK_SECRET_KEY` and `APP_URL` on it, and the production deploy, with the owner's OK.
-  6. GitHub secrets for the CI `e2e` job: `E2E_VITE_CONVEX_URL`, `E2E_VITE_CLERK_PUBLISHABLE_KEY`, `E2E_CLERK_SECRET_KEY`.
+  1. The real-device spikes: push on Android and an installed iPhone app (spike 3), sharing the summary to Viber and contact import (spike 4), an airplane-mode cold start (spike 5).
+  2. The launch switch (D50): the production domain (Q24), the Clerk production instance on it with Google OAuth (Q25), then on Vercel Production the `pk_live_` publishable key, and on the Convex production deployment the production `CLERK_JWT_ISSUER_DOMAIN`, `CLERK_SECRET_KEY` and `APP_URL`.
+  3. A real `VAPID_SUBJECT` on production (now `mailto:push@example.com`).
+  4. The Convex plan and backups before the first user's real data goes in (Q21).
 - **Open:**
-  - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26;
   - the free-tier limits and prices (design doc), and the written СУПТО answer before public launch.

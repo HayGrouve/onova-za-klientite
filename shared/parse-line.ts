@@ -137,6 +137,37 @@ function isPhone(segment: string) {
   return /^\+?[\d\s()-]+$/.test(segment) && digitsOf(segment).length >= 9
 }
 
+/** Digits a whole Bulgarian or international number has, by how it starts. */
+function phoneLengthFits(text: string) {
+  const digits = digitsOf(text).length
+  if (text.startsWith('+')) return digits >= 10 && digits <= 15
+  if (text.startsWith('00')) return digits >= 12 && digits <= 17
+  return text.startsWith('0') && digits >= 9 && digits <= 10
+}
+
+/**
+ * A phone inside a segment ("Иван 0888 123 456 маса"), split out with the
+ * words before and after it. The longest run of tokens that fits wins, so
+ * "0888 123 456" is taken whole and a price after it stays a price.
+ */
+function splitInlinePhone(segment: string) {
+  const tokens = segment.split(/\s+/)
+  for (let start = 0; start < tokens.length; start++) {
+    if (!/^(\+|0)\d/.test(tokens[start])) continue
+    for (let end = Math.min(tokens.length, start + 5); end > start; end--) {
+      const candidate = tokens.slice(start, end).join(' ')
+      if (isPhone(candidate) && phoneLengthFits(candidate)) {
+        return [
+          tokens.slice(0, start).join(' '),
+          candidate,
+          tokens.slice(end).join(' '),
+        ].filter(Boolean)
+      }
+    }
+  }
+  return null
+}
+
 function findService(services: ServiceRef[], title: string) {
   const wanted = foldName(title)
   if (!wanted) return null
@@ -158,7 +189,8 @@ export function parseLine(text: string, ctx: ParseContext): ParsedLine {
   const rest: string[] = []
   const exactMoney = new RegExp(`^${MONEY}$`, 'i')
 
-  for (const segment of segments) {
+  for (let index = 0; index < segments.length; index++) {
+    const segment = segments[index]
     const depositMatch =
       segment.match(new RegExp(`^${DEPOSIT_WORD}\\s*:?\\s*${MONEY}$`, 'i')) ??
       segment.match(new RegExp(`^${MONEY}\\s*${DEPOSIT_WORD}$`, 'i'))
@@ -168,6 +200,13 @@ export function parseLine(text: string, ctx: ParseContext): ParsedLine {
     }
     if (isPhone(segment)) {
       phone = segment
+      continue
+    }
+    // No commas around the phone: read it as if they were there.
+    const split = phone === null ? splitInlinePhone(segment) : null
+    if (split) {
+      segments.splice(index, 1, ...split)
+      index--
       continue
     }
     const parsedDate = parseDate(segment, ctx.today)
@@ -235,7 +274,12 @@ export function parseLine(text: string, ctx: ParseContext): ParsedLine {
       /^[A-ZА-Я„"]/.test(rest[0]) || rest.length > 1
         ? searchClients(ctx.clients, rest[0])
         : []
-    if (hits.length) {
+    // Two "Иван"s and a phone: the phone says which one.
+    const phoneHit = phone ? searchClients(ctx.clients, phone)[0] : undefined
+    if (phoneHit && hits.some((hit) => hit.id === phoneHit.id)) {
+      client = { kind: 'existing', id: phoneHit.id }
+      rest.shift()
+    } else if (hits.length) {
       client = { kind: 'existing', id: hits[0].id }
       candidates = hits.length > 1 ? hits : []
       rest.shift()

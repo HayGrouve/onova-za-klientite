@@ -54,6 +54,56 @@ describe('parseLine: client', () => {
     })
   })
 
+  it('a phone without commas splits the line: name, phone, title, price', () => {
+    const parsed = parse('Петър 0899 111 222 етажерка 250 лв')
+    expect(parsed.client).toEqual({
+      kind: 'new',
+      name: 'Петър',
+      phone: '0899 111 222',
+    })
+    expect(parsed.title).toBe('етажерка')
+    expect(parsed.priceCents).toBe(25000)
+  })
+
+  it('a phone without commas finds the client it belongs to', () => {
+    const parsed = parse('Иван 0888123456 маса 250')
+    expect(parsed.client).toEqual({ kind: 'existing', id: 'ivan' })
+    expect(parsed.title).toBe('маса')
+    expect(parsed.priceCents).toBe(25000)
+  })
+
+  it('the phone picks between two clients with the same name', () => {
+    const parsed = parseLine('Иван, 0888 123 456, шкаф', {
+      ...ctx,
+      clients: [
+        { id: 'ivan2', name: 'Иван Колев', phones: [] },
+        ...ctx.clients,
+      ],
+    })
+    expect(parsed.client).toEqual({ kind: 'existing', id: 'ivan' })
+    expect(parsed.candidates).toEqual([])
+  })
+
+  it('international and landline numbers split out too', () => {
+    expect(parse('Петър +359 899 111 222 шкаф').client).toEqual({
+      kind: 'new',
+      name: 'Петър',
+      phone: '+359 899 111 222',
+    })
+    expect(parse('Петър 02 987 6543 шкаф').title).toBe('шкаф')
+  })
+
+  it('a price after the phone stays a price', () => {
+    const parsed = parse('Петър 0899 111 222 300')
+    expect(parsed.priceCents).toBe(30000)
+  })
+
+  it('numbers that are not a phone stay in the title', () => {
+    const parsed = parse('Мария Георгиева, плот 120 60 3')
+    expect(parsed.title).toContain('плот')
+    expect(parsed.client).toEqual({ kind: 'existing', id: 'maria' })
+  })
+
   it('a new client keeps the phone typed with them', () => {
     expect(parse('Петър Колев, 0899 111 222, етажерка').client).toEqual({
       kind: 'new',

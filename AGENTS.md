@@ -2,7 +2,7 @@
 
 How to run, test and verify this repo. The product rules are in `docs/product-design.md` and win over everything else here.
 
-> **Status:** milestones 1–10 are built and in review as stacked PRs (#16 onwards). Nothing is in production yet. Update this file in the same PR that changes a command.
+> **Status:** milestones 1–10 are merged. A merge to `main` deploys production (https://onova-za-klientite.vercel.app, still on the Clerk development instance until launch, D50); every PR gets a Vercel preview with its own Convex preview deployment. Update this file in the same PR that changes a command.
 
 ## Before you change code
 
