@@ -10,6 +10,7 @@ import { Button } from '#/components/ui/button'
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
@@ -18,31 +19,43 @@ import { Spinner } from '#/components/ui/spinner'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, parseMoney } from '../../../shared/money'
 
-/** A refund: from what a job was paid, or from client credit (D26). Stored as a negative payment. */
+/**
+ * Where a refund can come from (D26): what a job was paid, or, with no job,
+ * the client's credit. The limit is what is there to give back.
+ */
+export type RefundSource = {
+  jobId?: Id<'jobs'>
+  title?: string
+  limitCents: number
+}
+
+/** A refund, stored as a negative payment. The client page offers every source; a job offers itself. */
 export function RefundForm({
   businessId,
   clientId,
-  job,
-  creditCents,
+  sources,
   today,
   onDone,
 }: {
   businessId: Id<'businesses'>
   clientId: Id<'clients'>
-  job?: { _id: Id<'jobs'>; paidCents: number }
-  creditCents: number
+  sources: RefundSource[]
   today: string
   onDone: () => void
 }) {
   const refund = useMutation(api.payments.refund)
   const { busy, run } = useSubmit(onDone)
+  const [sourceIndex, setSourceIndex] = useState(0)
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(today)
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [note, setNote] = useState('')
-  const limit = job ? job.paidCents : creditCents
+  const source = sources[sourceIndex]
   const amountCents = parseMoney(amount)
-  const valid = amountCents !== null && amountCents > 0 && amountCents <= limit
+  const over = amountCents !== null && amountCents > source.limitCents
+  const valid = amountCents !== null && amountCents > 0 && !over
+  const limit = formatMoney(source.limitCents)
+  const title = source.title ?? ''
 
   return (
     <form
@@ -54,7 +67,7 @@ export function RefundForm({
           refund({
             businessId,
             clientId,
-            jobId: job?._id,
+            jobId: source.jobId,
             amountCents,
             date,
             method,
@@ -64,6 +77,38 @@ export function RefundForm({
       }}
     >
       <FieldGroup>
+        {sources.length > 1 && (
+          <Field>
+            <FieldLabel>{m.refund_source()}</FieldLabel>
+            <div
+              role="radiogroup"
+              aria-label={m.refund_source()}
+              className="flex flex-col gap-2"
+            >
+              {sources.map((item, index) => (
+                <Button
+                  key={item.jobId ?? 'credit'}
+                  type="button"
+                  variant="outline"
+                  size="xl"
+                  role="radio"
+                  aria-checked={index === sourceIndex}
+                  className="justify-start text-left whitespace-normal aria-checked:border-primary aria-checked:bg-primary/8"
+                  onClick={() => setSourceIndex(index)}
+                >
+                  {item.jobId
+                    ? m.refund_source_job({
+                        title: item.title ?? '',
+                        amount: formatMoney(item.limitCents),
+                      })
+                    : m.refund_source_credit({
+                        amount: formatMoney(item.limitCents),
+                      })}
+                </Button>
+              ))}
+            </div>
+          </Field>
+        )}
         <Field>
           <FieldLabel htmlFor="refund-amount">{m.pay_amount()}</FieldLabel>
           <MoneyInput
@@ -73,11 +118,19 @@ export function RefundForm({
             onChange={setAmount}
             autoFocus
           />
-          <FieldDescription>
-            {job
-              ? m.refund_from_job({ amount: formatMoney(limit) })
-              : m.refund_from_credit({ amount: formatMoney(limit) })}
-          </FieldDescription>
+          {over ? (
+            <FieldError>
+              {source.jobId
+                ? m.refund_over_job({ title, amount: limit })
+                : m.refund_over_credit({ amount: limit })}
+            </FieldError>
+          ) : (
+            <FieldDescription>
+              {source.jobId
+                ? m.refund_from_job({ title, amount: limit })
+                : m.refund_from_credit({ amount: limit })}
+            </FieldDescription>
+          )}
         </Field>
         <Field>
           <FieldLabel>{m.pay_method()}</FieldLabel>

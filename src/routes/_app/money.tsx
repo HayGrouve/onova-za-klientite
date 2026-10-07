@@ -9,6 +9,7 @@ import {
   HandCoinsIcon,
   HourglassMediumIcon,
   MoneyIcon,
+  PhoneIcon,
   PiggyBankIcon,
   PlusIcon,
   ReceiptIcon,
@@ -21,16 +22,17 @@ import { useQuery } from 'convex/react'
 import { cn } from 'cn'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
-import type { Doc } from '../../../convex/_generated/dataModel'
+import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { ClientPaymentSheet } from '#/components/money/client-payment-sheet'
 import { CostForm } from '#/components/money/cost-form'
 import { MoneyFigure } from '#/components/money/money-figure'
 import { PageTitle } from '#/components/page'
 import { Panel, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
-import { Button } from '#/components/ui/button'
+import { Button, buttonVariants } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
 import {
   Sheet,
@@ -45,6 +47,7 @@ import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { addMonths, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
+import { telHref } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/money')({
   staticData: { layout: 'wide' },
@@ -78,6 +81,10 @@ function MoneyPage() {
       Doc<'costs'>,
       '_id' | 'label' | 'amountCents' | 'date' | 'note' | 'jobId'
     >
+  } | null>(null)
+  const [payClient, setPayClient] = useState<{
+    _id: Id<'clients'>
+    name: string
   } | null>(null)
   const data = useQuery(api.money.summary, { businessId: business._id, month })
   const costsOn = business.modules.costs
@@ -205,36 +212,84 @@ function MoneyPage() {
                   {data.whoOwesMe.length === 0 ? (
                     <ListNote>{m.money_who_owes_none()}</ListNote>
                   ) : (
-                    data.whoOwesMe.map((row) => (
-                      <li key={row.clientId}>
-                        <Link
-                          to="/clients/$clientId"
-                          params={{ clientId: row.clientId }}
-                          className="flex items-center gap-3 pressable px-4 py-3"
-                        >
-                          <InitialsAvatar
-                            name={row.isNoClient ? m.no_client() : row.name}
-                            className="size-9 text-xs"
-                          />
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="truncate font-medium">
-                              {row.isNoClient ? m.no_client() : row.name}
+                    data.whoOwesMe.map((row) => {
+                      const name = row.isNoClient ? m.no_client() : row.name
+                      // Owed money splits by stage group: finished work, and the rest.
+                      const goingCents = row.owedCents - row.doneOwedCents
+                      return (
+                        <li key={row.clientId} className="flex flex-col pb-3">
+                          <Link
+                            to="/clients/$clientId"
+                            params={{ clientId: row.clientId }}
+                            className="flex items-center gap-3 pressable px-4 pt-3 pb-2"
+                          >
+                            <InitialsAvatar
+                              name={name}
+                              className="size-9 text-xs"
+                            />
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate font-medium">
+                                {name}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {m.money_jobs_count({
+                                  jobs: business.words.job.plural,
+                                  count: row.jobs,
+                                })}
+                              </span>
+                              <span className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+                                {row.doneOwedCents > 0 && (
+                                  <span>
+                                    {m.money_owed_done({
+                                      amount: formatMoney(row.doneOwedCents),
+                                    })}
+                                  </span>
+                                )}
+                                {goingCents > 0 && (
+                                  <span>
+                                    {m.money_owed_going({
+                                      amount: formatMoney(goingCents),
+                                    })}
+                                  </span>
+                                )}
+                              </span>
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {m.money_jobs_count({
-                                jobs: business.words.job.plural,
-                                count: row.jobs,
-                              })}
-                              {row.doneJobs > 0 &&
-                                ` · ${m.money_done_marker()}`}
+                            <span className="font-semibold tabular-nums">
+                              {formatMoney(row.owedCents)}
                             </span>
-                          </span>
-                          <span className="font-semibold tabular-nums">
-                            {formatMoney(row.owedCents)}
-                          </span>
-                        </Link>
-                      </li>
-                    ))
+                          </Link>
+                          {/* Under the name, so the row stays readable on a phone. */}
+                          <div className="flex items-center gap-2 pr-4 pl-16">
+                            {row.phone && (
+                              <Tip label={m.client_call()}>
+                                <a
+                                  href={telHref(row.phone)}
+                                  aria-label={m.money_call({ name })}
+                                  className={buttonVariants({
+                                    variant: 'outline',
+                                    size: 'icon-lg',
+                                    className: 'size-10 text-primary',
+                                  })}
+                                >
+                                  <PhoneIcon weight="fill" />
+                                </a>
+                              </Tip>
+                            )}
+                            <Button
+                              variant="outline"
+                              className="h-10 px-3"
+                              aria-label={m.money_pay({ name })}
+                              onClick={() =>
+                                setPayClient({ _id: row.clientId, name })
+                              }
+                            >
+                              <PlusIcon data-icon="inline-start" />
+                              {m.pay_add()}
+                            </Button>
+                          </div>
+                        </li>
+                      )
+                    })
                   )}
                 </PanelList>
               </Panel>
@@ -258,8 +313,13 @@ function MoneyPage() {
                               {payment.clientName}
                             </span>
                             <span className="text-sm text-muted-foreground">
-                              {formatDay(payment.date, today)} ·{' '}
-                              {payment.label ?? METHOD_LABEL[payment.method]()}
+                              {[
+                                paymentTarget(payment),
+                                formatDay(payment.date, today),
+                                payment.label ?? METHOD_LABEL[payment.method](),
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </span>
                           </span>
                           <span className="tabular-nums">
@@ -324,6 +384,11 @@ function MoneyPage() {
         )}
       </div>
 
+      <ClientPaymentSheet
+        client={payClient}
+        today={today}
+        onClose={() => setPayClient(null)}
+      />
       <Sheet
         open={costPanel !== null}
         onOpenChange={(open) => !open && setCostPanel(null)}
@@ -349,6 +414,29 @@ function MoneyPage() {
       </Sheet>
     </>
   )
+}
+
+/** What a payment paid: the jobs it went to, and "prepaid" for what stayed with the client. */
+function paymentTarget(payment: {
+  amountCents: number
+  jobs: Array<{ title: string }>
+  creditCents: number
+}) {
+  const titles = payment.jobs.map((job) => job.title)
+  const jobs =
+    titles.length > 2
+      ? m.money_jobs_more({
+          titles: titles.slice(0, 2).join(', '),
+          count: titles.length - 2,
+        })
+      : titles.join(', ')
+  const credit =
+    payment.creditCents > 0
+      ? payment.amountCents < 0
+        ? m.money_from_prepaid()
+        : m.money_prepaid_short()
+      : ''
+  return [jobs, credit].filter(Boolean).join(' + ')
 }
 
 function CostLine({

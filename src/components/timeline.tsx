@@ -44,6 +44,8 @@ function describe(item: TimelineItem, words: Words) {
         ? m.event_payment_refund({ amount })
         : m.event_payment_added({ amount }) +
             (data.note ? ` (${data.note})` : '')
+    case 'payment.edited':
+      return m.event_payment_edited({ amount })
     case 'payment.removed':
       return m.event_payment_removed({ amount })
     case 'credit.used':

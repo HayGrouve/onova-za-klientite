@@ -40,12 +40,15 @@ export function PaymentForm({
   target,
   today,
   depositsOn,
+  defaultMethod = 'cash',
   onDone,
 }: {
   businessId: Id<'businesses'>
   target: Target
   today: string
   depositsOn: boolean
+  /** The method the client paid with last time; cash when they haven't paid yet (D37). */
+  defaultMethod?: PaymentMethod
   onDone: () => void
 }) {
   const fromJob = useMutation(api.payments.addFromJob)
@@ -57,7 +60,7 @@ export function PaymentForm({
       : '',
   )
   const [date, setDate] = useState(today)
-  const [method, setMethod] = useState<PaymentMethod>('cash')
+  const [method, setMethod] = useState<PaymentMethod>(defaultMethod)
   const [label, setLabel] = useState('')
   const [splitEdits, setSplitEdits] = useState<Record<string, string>>({})
 
