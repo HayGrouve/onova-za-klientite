@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { boardColumn } from './board'
-import type { BoardJob } from './board'
+import { boardColumn, filterJobs, isFiltering, owedCents } from './board'
+import type { BoardJob, FilterableJob } from './board'
 
 const job = (
   overrides: Partial<BoardJob> & { id: string },
@@ -94,5 +94,157 @@ describe('boardColumn', () => {
         },
       ),
     )
+  })
+})
+
+const filterable = (
+  overrides: Partial<FilterableJob> & { id: string },
+): FilterableJob & { id: string } => ({
+  title: 'Работа',
+  clientName: 'Иван Петров',
+  isNoClient: false,
+  stageName: 'Нова',
+  owes: false,
+  balanceCents: 0,
+  ...overrides,
+})
+
+describe('filterJobs', () => {
+  const TODAY = '2026-10-08'
+
+  it('no filter keeps every job, in order', () => {
+    const jobs = [filterable({ id: 'a' }), filterable({ id: 'b' })]
+    expect(filterJobs(jobs, {}, TODAY)).toEqual(jobs)
+    expect(filterJobs(jobs, { text: '   ' }, TODAY)).toEqual(jobs)
+    expect(isFiltering({})).toBe(false)
+    expect(isFiltering({ text: ' ' })).toBe(false)
+    expect(isFiltering({ owing: true })).toBe(true)
+    expect(isFiltering({ dueThisMonth: true })).toBe(true)
+    expect(isFiltering({ text: 'шкаф' })).toBe(true)
+  })
+
+  it('the text matches the title, the client and the stage name', () => {
+    const jobs = [
+      filterable({ id: 'title', title: 'Шкафчета за кухня' }),
+      filterable({ id: 'client', clientName: 'Мария Колева' }),
+      filterable({ id: 'stage', stageName: 'Чака материали' }),
+      filterable({ id: 'none' }),
+    ]
+    const found = (text: string) =>
+      filterJobs(jobs, { text }, TODAY).map((item) => item.id)
+    expect(found('шкаф')).toEqual(['title'])
+    expect(found('колева')).toEqual(['client'])
+    expect(found('чака')).toEqual(['stage'])
+    expect(found('mar kol')).toEqual(['client'])
+  })
+
+  it('a job with no client does not match on its placeholder name', () => {
+    const jobs = [
+      filterable({ id: 'x', isNoClient: true, clientName: 'Без клиент' }),
+    ]
+    expect(filterJobs(jobs, { text: 'клиент' }, TODAY)).toEqual([])
+  })
+
+  it('"owing" keeps the jobs that still owe a balance', () => {
+    const jobs = [
+      filterable({ id: 'owes', owes: true, balanceCents: 5000 }),
+      filterable({ id: 'paid', owes: false, balanceCents: 0 }),
+      filterable({ id: 'zero', owes: true, balanceCents: 0 }),
+    ]
+    expect(
+      filterJobs(jobs, { owing: true }, TODAY).map((item) => item.id),
+    ).toEqual(['owes'])
+  })
+
+  it('"due this month" uses the Sofia month of today, not a rolling window', () => {
+    const jobs = [
+      filterable({ id: 'first', dueDate: '2026-10-01' }),
+      filterable({ id: 'last', dueDate: '2026-10-31' }),
+      filterable({ id: 'earlier', dueDate: '2026-09-30' }),
+      filterable({ id: 'later', dueDate: '2026-11-01' }),
+      filterable({ id: 'other-year', dueDate: '2025-10-15' }),
+      filterable({ id: 'undated' }),
+    ]
+    expect(
+      filterJobs(jobs, { dueThisMonth: true }, TODAY).map((item) => item.id),
+    ).toEqual(['first', 'last'])
+    expect(
+      filterJobs(jobs, { dueThisMonth: true }, '2026-12-31').map(
+        (item) => item.id,
+      ),
+    ).toEqual([])
+  })
+
+  it('the text and both chips all have to hold', () => {
+    const jobs = [
+      filterable({
+        id: 'all',
+        title: 'Врата',
+        owes: true,
+        balanceCents: 100,
+        dueDate: '2026-10-20',
+      }),
+      filterable({ id: 'no-owe', title: 'Врата', dueDate: '2026-10-20' }),
+      filterable({
+        id: 'no-due',
+        title: 'Врата',
+        owes: true,
+        balanceCents: 100,
+      }),
+      filterable({
+        id: 'no-text',
+        owes: true,
+        balanceCents: 100,
+        dueDate: '2026-10-20',
+      }),
+    ]
+    expect(
+      filterJobs(
+        jobs,
+        { text: 'врата', owing: true, dueThisMonth: true },
+        TODAY,
+      ).map((item) => item.id),
+    ).toEqual(['all'])
+  })
+
+  it('only ever returns jobs it was given, in their order', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            owes: fc.boolean(),
+            balanceCents: fc.integer({ min: 0, max: 100_000 }),
+            dueDate: fc.option(
+              fc.constantFrom('2026-09-30', '2026-10-15', '2026-11-02'),
+              { nil: undefined },
+            ),
+          }),
+        ),
+        fc.boolean(),
+        fc.boolean(),
+        (rows, owing, dueThisMonth) => {
+          const jobs = rows.map((row, index) =>
+            filterable({ id: String(index), ...row }),
+          )
+          const kept = filterJobs(jobs, { owing, dueThisMonth }, TODAY)
+          expect(kept.every((item) => jobs.includes(item))).toBe(true)
+          const positions = kept.map((item) => jobs.indexOf(item))
+          expect(positions).toEqual([...positions].sort((a, b) => a - b))
+        },
+      ),
+    )
+  })
+})
+
+describe('owedCents', () => {
+  it('adds up the balances that are still owed, so a column total follows its visible cards', () => {
+    const cards = [
+      { owes: true, balanceCents: 5700 },
+      { owes: false, balanceCents: 900 },
+      { owes: true, balanceCents: 300 },
+    ]
+    expect(owedCents(cards)).toBe(6000)
+    expect(owedCents(cards.slice(1))).toBe(300)
+    expect(owedCents([])).toBe(0)
   })
 })

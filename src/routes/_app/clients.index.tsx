@@ -8,11 +8,11 @@ import {
   UsersIcon,
 } from '@phosphor-icons/react'
 import { cn } from 'cn'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
-import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
-import { ClientsTable } from '#/components/clients-table'
+import { CLIENT_SORT_KEYS, ClientsTable } from '#/components/clients-table'
+import type { ClientSortKey } from '#/components/clients-table'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
@@ -23,14 +23,36 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from '#/components/ui/input-group'
+import { useUrlText } from '#/hooks/use-url-text'
 import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
 import { formatPhone } from '../../../shared/phone-format'
 import { searchClients } from '../../../shared/search'
+import {
+  nextSort,
+  parseSortSearch,
+  sortFromSearch,
+  sortToSearch,
+} from '../../../shared/sort'
+import type { SortSearch } from '../../../shared/sort'
+
+/** The search words and the table's sort live in the address, so Back returns to the same list. */
+type ClientsSearch = { q?: string } & SortSearch<ClientSortKey>
 
 export const Route = createFileRoute('/_app/clients/')({
+  validateSearch: (search: Record<string, unknown>): ClientsSearch => {
+    // The address parser reads "12" as a number.
+    const q =
+      typeof search.q === 'string' || typeof search.q === 'number'
+        ? String(search.q)
+        : ''
+    return {
+      ...(q.trim() && { q }),
+      ...parseSortSearch(search, CLIENT_SORT_KEYS),
+    }
+  },
   staticData: { layout: 'wide' },
   component: ClientsPage,
 })
@@ -38,7 +60,19 @@ export const Route = createFileRoute('/_app/clients/')({
 function ClientsPage() {
   const { business } = useViewer()
   const clients = useQuery(api.clients.list, { businessId: business._id })
-  const [query, setQuery] = useState('')
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+  // In place: Back leaves the list, not the last keystroke or click.
+  const setSearch = (patch: ClientsSearch) =>
+    void navigate({
+      search: (current) => ({ ...current, ...patch }),
+      replace: true,
+    })
+  const query = search.q ?? ''
+  const searchText = useUrlText(query, (value) =>
+    setSearch({ q: value.trim() ? value : undefined }),
+  )
+  const sort = sortFromSearch(search)
   const wide = useWide()
   const { words } = business
 
@@ -94,8 +128,7 @@ function ClientsPage() {
                 type="search"
                 aria-label={m.clients_search()}
                 placeholder={m.clients_search()}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                {...searchText}
               />
             </InputGroup>
           </div>
@@ -109,7 +142,13 @@ function ClientsPage() {
               {m.clients_no_match()}
             </p>
           ) : wide ? (
-            <ClientsTable clients={shown} />
+            <ClientsTable
+              clients={shown}
+              sort={sort}
+              onSort={(key, numeric) =>
+                setSearch(sortToSearch(nextSort(sort, key, numeric)))
+              }
+            />
           ) : (
             <ListCard>
               {shown.map((client) => (

@@ -1,33 +1,7 @@
 import { CaretDownIcon, CaretUpIcon } from '@phosphor-icons/react'
 import { cn } from 'cn'
-import { useState } from 'react'
 import { TableHead } from '#/components/ui/table'
-
-export type Sort<TKey extends string> = { key: TKey; desc: boolean } | null
-
-/**
- * Which column a table is sorted by. Clicking a column sorts by it, clicking
- * again turns it round. Amounts start biggest first; words and dates A to Z.
- */
-export function useSort<TKey extends string>() {
-  const [sort, setSort] = useState<Sort<TKey>>(null)
-  const toggle = (key: TKey, numeric: boolean) =>
-    setSort(
-      sort?.key === key ? { key, desc: !sort.desc } : { key, desc: numeric },
-    )
-  return [sort, toggle] as const
-}
-
-/** Rows in the order `sort` asks for, by one comparer per column. */
-export function sortRows<T, TKey extends string>(
-  rows: T[],
-  sort: Sort<TKey>,
-  compare: Record<TKey, (a: T, b: T) => number>,
-) {
-  if (!sort) return rows
-  const by = compare[sort.key]
-  return [...rows].sort((a, b) => (sort.desc ? by(b, a) : by(a, b)))
-}
+import type { Sort } from '../../shared/sort'
 
 /** A table heading that sorts its column, with a caret for the direction. */
 export function SortableHead<TKey extends string>({
