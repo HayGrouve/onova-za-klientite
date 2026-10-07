@@ -9,22 +9,30 @@ import {
 } from './lib/auth'
 import { fail } from './lib/errors'
 import { mergeExtra } from './lib/extra'
+import { setJobItems } from './lib/jobWrite'
 import { itemSearchText } from './lib/search'
 import { requiredText } from './lib/validate'
 import { jobRow, newLookups, timeline } from './lib/views'
 import { vExtra } from './validators'
 
+/**
+ * Adds an item to a client. Started from a job's item list, it also links the
+ * new item to that job, in the same write.
+ */
 export const create = businessMutation({
   args: {
     clientId: v.id('clients'),
     name: v.string(),
     extra: v.optional(vExtra),
+    jobId: v.optional(v.id('jobs')),
   },
   returns: v.id('items'),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const client = await getOwned(ctx, 'clients', args.clientId)
     if (client.isNoClient) fail('client.noClient')
+    const job = args.jobId ? await getOwned(ctx, 'jobs', args.jobId) : null
+    if (job && job.clientId !== client._id) fail('job.otherClient')
     const item = {
       businessId: ctx.business._id,
       clientId: client._id,
@@ -41,6 +49,7 @@ export const create = businessMutation({
       clientId: client._id,
       data: { name: item.name },
     })
+    if (job) await setJobItems(ctx, job, [...job.itemIds, itemId])
     return itemId
   },
 })
