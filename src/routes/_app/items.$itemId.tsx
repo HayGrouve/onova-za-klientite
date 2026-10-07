@@ -18,6 +18,7 @@ import { JobRow } from '#/components/job-row'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { DetailError } from '#/components/not-found'
 import { Timeline } from '#/components/timeline'
 import { Button } from '#/components/ui/button'
 import { InputGroup, InputGroupInput } from '#/components/ui/input-group'
@@ -36,6 +37,8 @@ import { searchClients } from '../../../shared/search'
 export const Route = createFileRoute('/_app/items/$itemId')({
   staticData: { layout: 'wide' },
   component: ItemPage,
+  // A wrong address, or a record from another business, says so (D16).
+  errorComponent: ({ error }) => <DetailError error={error} kind="item" />,
 })
 
 function ItemPage() {
@@ -44,7 +47,7 @@ function ItemPage() {
   const today = useToday()
   const data = useQuery(api.items.get, {
     businessId: business._id,
-    itemId: itemId as Id<'items'>,
+    itemId,
   })
   const [panel, setPanel] = useState<'edit' | 'move' | null>(null)
   if (!data) return <ListSkeleton />

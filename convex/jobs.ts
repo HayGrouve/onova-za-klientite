@@ -7,6 +7,7 @@ import {
   businessMutation,
   businessQuery,
   getOwned,
+  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
@@ -346,9 +347,10 @@ export const board = businessQuery({
 
 /** Everything the job page shows. */
 export const get = businessQuery({
-  args: { jobId: v.id('jobs') },
+  // A string: the id comes from the address bar (see getOwnedFromUrl).
+  args: { jobId: v.string() },
   handler: async (ctx, { jobId }) => {
-    const job = await getOwned(ctx, 'jobs', jobId)
+    const job = await getOwnedFromUrl(ctx, 'jobs', jobId)
     const client = await ctx.db.get('clients', job.clientId)
     const stages = await ctx.db
       .query('stages')

@@ -4,8 +4,9 @@
 /**
  * Whether a key press is the shortcut for `letter`: a plain press, or with
  * Ctrl or Cmd when `withCtrl`. The key is matched by its place on the
- * keyboard too, because the Bulgarian layout types "н" where "n" is. A held
- * key and a press something else already handled don't count.
+ * keyboard too, because the Bulgarian layout types a Cyrillic letter where
+ * the Latin one is. A held key and a press something else already handled
+ * don't count.
  */
 export function isShortcut(
   event: Pick<

@@ -5,6 +5,7 @@ import {
   businessMutation,
   businessQuery,
   getOwned,
+  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
@@ -101,9 +102,10 @@ export const move = businessMutation({
 
 /** Everything the item page shows, history included. */
 export const get = businessQuery({
-  args: { itemId: v.id('items') },
+  // A string: the id comes from the address bar (see getOwnedFromUrl).
+  args: { itemId: v.string() },
   handler: async (ctx, { itemId }) => {
-    const item = await getOwned(ctx, 'items', itemId)
+    const item = await getOwnedFromUrl(ctx, 'items', itemId)
     const client = await ctx.db.get('clients', item.clientId)
     const fields = await ctx.db
       .query('fields')

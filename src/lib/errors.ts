@@ -37,3 +37,19 @@ export function errorMessage(error: unknown): string {
   const code = errorCode(error)
   return (code && MESSAGES[code]?.()) || m.error_unknown()
 }
+
+/**
+ * A record that isn't there for this person: an id from another business
+ * (the server says `notFound`, D16), or an address that holds no id at all,
+ * which the server's argument check turns away before the function runs.
+ */
+export function isNotFound(error: unknown): boolean {
+  if (errorCode(error) === 'notFound') return true
+  return (
+    error instanceof Error &&
+    !(error instanceof ConvexError) &&
+    /ArgumentValidationError|does not match (the table name in )?validator/i.test(
+      error.message,
+    )
+  )
+}

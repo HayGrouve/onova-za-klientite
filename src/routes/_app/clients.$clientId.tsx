@@ -35,6 +35,7 @@ import { RefundForm } from '#/components/money/refund-form'
 import { RemovePayment } from '#/components/money/remove-payment'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { DetailError } from '#/components/not-found'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
@@ -56,6 +57,8 @@ import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
 export const Route = createFileRoute('/_app/clients/$clientId')({
   staticData: { layout: 'wide' },
   component: ClientPage,
+  // A wrong address, or a record from another business, says so (D16).
+  errorComponent: ({ error }) => <DetailError error={error} kind="client" />,
 })
 
 function ClientPage() {
@@ -64,7 +67,7 @@ function ClientPage() {
   const today = useToday()
   const data = useQuery(api.clients.get, {
     businessId: business._id,
-    clientId: clientId as Id<'clients'>,
+    clientId,
   })
   const [panel, setPanel] = useState<
     | { kind: 'edit' }
