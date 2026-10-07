@@ -291,14 +291,14 @@ describe('jobs board', () => {
       'cancelled',
     ])
     const [open, , done] = board.columns
-    expect(open!.jobs.map((job) => job.title)).toEqual([
+    expect(open.jobs.map((job) => job.title)).toEqual([
       'Ранен срок',
       'Късен срок',
       'Без срок',
     ])
-    expect(open!.total).toBe(3)
-    expect(open!.owedCents).toBe(30000)
-    expect(done!.jobs.map((job) => job.title)).toEqual(['Готов'])
+    expect(open.total).toBe(3)
+    expect(open.owedCents).toBe(30000)
+    expect(done.jobs.map((job) => job.title)).toEqual(['Готов'])
     expect(board.stages.map((item) => item._id)).toEqual(
       stages.map((item) => item._id),
     )
@@ -308,6 +308,8 @@ describe('jobs board', () => {
     const { t, businessId } = await withClient()
     const stranger = t.withIdentity(STRANGER)
     await stranger.mutation(api.users.ensureCurrent, {})
-    await expect(stranger.query(api.jobs.board, { businessId })).rejects.toThrow()
+    await expect(
+      stranger.query(api.jobs.board, { businessId }),
+    ).rejects.toThrow()
   })
 })

@@ -37,8 +37,7 @@ export function boardColumn<T extends BoardJob>(
               : b.dueDate
                 ? 1
                 : b._creationTime - a._creationTime
-      : (a, b) =>
-          (b.doneAt ?? b._creationTime) - (a.doneAt ?? a._creationTime),
+      : (a, b) => (b.doneAt ?? b._creationTime) - (a.doneAt ?? a._creationTime),
   )
   return {
     jobs: OPEN.has(group) ? sorted : sorted.slice(0, closedLimit),

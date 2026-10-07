@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { boardColumn } from './board'
 import type { BoardJob } from './board'
 
-const job = (overrides: Partial<BoardJob> & { id: string }): BoardJob & {
+const job = (
+  overrides: Partial<BoardJob> & { id: string },
+): BoardJob & {
   id: string
 } => ({
   _creationTime: 0,
