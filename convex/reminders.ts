@@ -37,6 +37,9 @@ export const add = businessMutation({
       fail('client.noClient')
     }
     if (job && clientId && job.clientId !== clientId) fail('job.otherClient')
+    // An item's reminder stays with its own client, and with a job it is on.
+    if (item && clientId && item.clientId !== clientId) fail('item.otherClient')
+    if (item && job && !job.itemIds.includes(item._id)) fail('item.otherJob')
     const note = requiredText(args.note, 'note', 300)
     const reminderId = await ctx.db.insert('reminders', {
       businessId: ctx.business._id,

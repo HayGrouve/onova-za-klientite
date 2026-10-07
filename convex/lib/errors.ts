@@ -18,6 +18,8 @@ export type ErrorCode =
   | 'field.value'
   | 'client.noClient'
   | 'job.otherClient'
+  | 'item.otherClient'
+  | 'item.otherJob'
   | 'job.cancelled'
   | 'payment.signMismatch'
   | 'payment.exceeds'

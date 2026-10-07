@@ -14,6 +14,8 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   'payment.tooLow': m.error_payment_tooLow,
   'credit.notEnough': m.error_credit_notEnough,
   'job.otherClient': m.error_job_otherClient,
+  'item.otherClient': m.error_job_otherClient,
+  'item.otherJob': m.error_item_otherJob,
   'stage.hasJobs': m.error_stage_hasJobs,
   'job.noDate': m.error_job_noDate,
   'client.merged': m.error_client_merged,

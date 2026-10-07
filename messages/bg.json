@@ -508,6 +508,7 @@
   "error_credit_notEnough": "Няма достатъчно предплатено.",
   "error_payment_tooLow": "Сумата е под вече върнатото, приспаднатото или разпределеното.",
   "error_job_otherClient": "Това е на друг клиент.",
+  "error_item_otherJob": "Това не е към тази работа.",
   "field_type_text": "Текст",
   "field_type_longText": "Дълъг текст",
   "field_type_number": "Число",

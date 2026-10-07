@@ -151,6 +151,48 @@ describe('reminders', () => {
     })
   })
 
+  it("an item's reminder stays with the item's client and job", async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const elena = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Елена',
+    })
+    const petar = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Петър',
+    })
+    const unit = await owner.mutation(api.items.create, {
+      businessId,
+      clientId: elena,
+      name: 'Daikin, хол',
+    })
+    const otherJob = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: elena,
+      title: 'Друго',
+    })
+    // Another client's item, or a job the item isn't on, is refused.
+    await expect(
+      owner.mutation(api.reminders.add, {
+        businessId,
+        clientId: petar,
+        itemId: unit,
+        date: '2027-01-10',
+        note: 'Профилактика',
+      }),
+    ).rejects.toThrow(/item.otherClient/)
+    await expect(
+      owner.mutation(api.reminders.add, {
+        businessId,
+        jobId: otherJob,
+        itemId: unit,
+        date: '2027-01-10',
+        note: 'Профилактика',
+      }),
+    ).rejects.toThrow(/item.otherJob/)
+  })
+
   it('a job lists its own open reminders, soonest first', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)

@@ -121,7 +121,12 @@ function NamesForm({
         <fieldset disabled={!owner} className="contents">
           {KEYS.map(({ key, label, about, icon }) => (
             <Panel key={key} title={label()} icon={icon} className="mx-0">
-              <PanelBody className="flex flex-col gap-4">
+              {/* A named group, so "Едно" and "Много" say which word they are. */}
+              <PanelBody
+                role="group"
+                aria-label={label()}
+                className="flex flex-col gap-4"
+              >
                 <p className="text-sm text-muted-foreground">{about()}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <Field>

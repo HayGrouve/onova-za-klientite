@@ -136,19 +136,23 @@ export const rebuildAll = internalMutation({
     for (const doc of page.page) {
       if (table === 'clients') {
         const client = doc as Doc<'clients'>
-        await ctx.db.patch('clients', client._id, {
-          searchText: await clientSearchText(ctx, client),
-        })
+        const searchText = await clientSearchText(ctx, client)
+        // Unchanged rows aren't rewritten, so a second run wakes no query.
+        if (searchText !== client.searchText) {
+          await ctx.db.patch('clients', client._id, { searchText })
+        }
       } else if (table === 'jobs') {
         const job = doc as Doc<'jobs'>
-        await ctx.db.patch('jobs', job._id, {
-          searchText: await jobSearchText(ctx, job),
-        })
+        const searchText = await jobSearchText(ctx, job)
+        if (searchText !== job.searchText) {
+          await ctx.db.patch('jobs', job._id, { searchText })
+        }
       } else {
         const item = doc as Doc<'items'>
-        await ctx.db.patch('items', item._id, {
-          searchText: await itemSearchText(ctx, item),
-        })
+        const searchText = await itemSearchText(ctx, item)
+        if (searchText !== item.searchText) {
+          await ctx.db.patch('items', item._id, { searchText })
+        }
       }
     }
     if (!page.isDone) {
