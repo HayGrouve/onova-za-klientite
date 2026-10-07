@@ -114,7 +114,12 @@ async function ownerData(t: TestConvex, b: TestBusiness) {
     date: '2026-11-01',
     note: 'Обади се',
   })
+  const otherClientId = await owner.mutation(api.clients.create, {
+    businessId,
+    name: 'Иван 2',
+  })
   return {
+    otherClientId,
     reminderId,
     serviceId,
     appointmentId,
@@ -163,7 +168,14 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'businesses:settings': () => ({}),
   'businesses:updateProfile': () => ({ name: 'Чужд' }),
+  'clientsAdmin:anonymize': (ids) => ({ clientId: ids.clientId }),
+  'clientsAdmin:findByPhones': () => ({ phones: ['+359888123456'] }),
+  'clientsAdmin:merge': (ids) => ({
+    fromId: ids.otherClientId,
+    intoId: ids.clientId,
+  }),
   'clients:create': () => ({ name: 'Нов' }),
+  'dataExport:all': () => ({}),
   'clients:get': (ids) => ({ clientId: ids.clientId }),
   'clients:list': () => ({}),
   'clients:update': (ids) => ({ clientId: ids.clientId, name: 'Друг' }),
@@ -193,6 +205,11 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     optionId: ids.optionId,
     name: 'Сив',
   }),
+  'import:clients': () => ({
+    rows: [{ name: 'Внесен', phones: [], extra: {} }],
+    skipDuplicates: true,
+  }),
+  'import:duplicatesByPhone': () => ({ phones: ['+359888123456'] }),
   'items:byClient': (ids) => ({ clientId: ids.clientId }),
   'items:get': (ids) => ({ itemId: ids.itemId }),
   'items:create': (ids) => ({ clientId: ids.clientId, name: 'Стол' }),
@@ -266,6 +283,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
 
 /** Functions outside any business: they act only on the caller's own user. */
 const USER_SCOPED = [
+  'account:deleteAccount',
   'push:subscribe',
   'push:unsubscribe',
   'users:ensureCurrent',
@@ -275,6 +293,8 @@ const USER_SCOPED = [
 
 /** Functions that take no record id, so only the business check applies. */
 const NO_RECORD_IDS = new Set([
+  'clientsAdmin:findByPhones',
+  'dataExport:all',
   'search:all',
   'businesses:setModules',
   'businesses:setNewJobOptions',
@@ -292,6 +312,8 @@ const NO_RECORD_IDS = new Set([
   'fields:add',
   'files:generateUploadUrl',
   'files:list',
+  'import:clients',
+  'import:duplicatesByPhone',
   'money:summary',
   'push:setNotify',
   'push:settings',
@@ -353,6 +375,8 @@ const EVENTS: Record<string, string | null> = {
   'businesses:setReminderRule': 'settings.changed',
   'businesses:setWords': 'settings.changed',
   'businesses:updateProfile': 'settings.changed',
+  'clientsAdmin:anonymize': 'client.anonymized',
+  'clientsAdmin:merge': 'client.merged',
   'clients:create': 'client.created',
   'clients:update': 'client.edited',
   'costs:add': 'cost.added',
@@ -367,6 +391,7 @@ const EVENTS: Record<string, string | null> = {
   'files:generateUploadUrl': null,
   'files:remove': 'file.removed',
   'files:save': 'file.added',
+  'import:clients': 'client.created',
   'items:create': 'item.created',
   'items:move': null,
   'items:update': 'item.edited',

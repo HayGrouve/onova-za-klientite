@@ -201,7 +201,8 @@ export default defineSchema({
     itemId: v.id('items'),
   })
     .index('by_item', ['itemId'])
-    .index('by_job', ['jobId']),
+    .index('by_job', ['jobId'])
+    .index('by_business', ['businessId']),
 
   appointments: defineTable({
     businessId: v.id('businesses'),
@@ -273,7 +274,8 @@ export default defineSchema({
   })
     .index('by_payment', ['paymentId'])
     .index('by_job', ['jobId'])
-    .index('by_client', ['clientId']),
+    .index('by_client', ['clientId'])
+    .index('by_business', ['businessId']),
 
   costs: defineTable({
     businessId: v.id('businesses'),
@@ -363,7 +365,8 @@ export default defineSchema({
     by: v.optional(v.id('memberships')),
   })
     .index('by_client', ['clientId'])
-    .index('by_job', ['jobId']),
+    .index('by_job', ['jobId'])
+    .index('by_business', ['businessId']),
 
   shareLinks: defineTable({
     businessId: v.id('businesses'),
@@ -380,7 +383,9 @@ export default defineSchema({
     expiresAt: v.optional(v.number()),
     cancelledAt: v.optional(v.number()),
     createdBy: v.id('memberships'),
-  }).index('by_token_hash', ['tokenHash']),
+  })
+    .index('by_token_hash', ['tokenHash'])
+    .index('by_business', ['businessId']),
 
   pushSubscriptions: defineTable({
     userId: v.id('users'),

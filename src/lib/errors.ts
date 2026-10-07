@@ -15,6 +15,7 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   'job.otherClient': m.error_job_otherClient,
   'stage.hasJobs': m.error_stage_hasJobs,
   'job.noDate': m.error_job_noDate,
+  'client.merged': m.error_client_merged,
   'stage.lastInGroup': m.error_stage_lastInGroup,
   'file.rejected': m.files_rejected,
   'field.typeChange': m.error_field_typeChange,

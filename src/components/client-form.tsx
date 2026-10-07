@@ -1,5 +1,6 @@
 import { PlusIcon, XIcon } from '@phosphor-icons/react'
-import { useMutation } from 'convex/react'
+import { Link } from '@tanstack/react-router'
+import { useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
@@ -15,7 +16,7 @@ import { Textarea } from '#/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
-import { formatPhone } from '../../shared/phone'
+import { formatPhone, normalizePhone } from '../../shared/phone'
 
 type ClientDoc = Doc<'clients'>
 
@@ -57,6 +58,15 @@ export function ClientForm({
   const [note, setNote] = useState(client?.note ?? '')
   const [extra, setExtra] = useState<ExtraValues>(client?.extra ?? {})
   const [saving, setSaving] = useState(false)
+  const typedPhones = phones
+    .map((phone) => normalizePhone(phone))
+    .filter((phone): phone is string => phone !== null)
+  const duplicates = useQuery(
+    api.clientsAdmin.findByPhones,
+    typedPhones.length
+      ? { businessId, phones: typedPhones, exceptClientId: client?._id }
+      : 'skip',
+  )
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -159,6 +169,21 @@ export function ClientForm({
                   </Button>
                 )}
               </div>
+            ))}
+            {duplicates?.map((duplicate) => (
+              <p
+                key={duplicate._id}
+                className="flex flex-wrap items-center gap-2 text-sm text-amber-700 dark:text-amber-400"
+              >
+                {m.duplicate_warning({ name: duplicate.name })}
+                <Link
+                  to="/clients/$clientId"
+                  params={{ clientId: duplicate._id }}
+                  className="font-medium underline underline-offset-4"
+                >
+                  {m.duplicate_open()}
+                </Link>
+              </p>
             ))}
             {phones.length < 5 && (
               <Button

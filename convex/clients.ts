@@ -187,8 +187,12 @@ export const get = businessQuery({
       .query('activity')
       .withIndex('by_client', (q) => q.eq('clientId', client._id))
       .collect()
+    const mergedInto = client.mergedIntoId
+      ? await ctx.db.get('clients', client.mergedIntoId)
+      : null
     return {
       client,
+      mergedIntoName: mergedInto?.name,
       jobs: jobRows,
       owedCents: jobRows
         .filter((job) => job.owes)

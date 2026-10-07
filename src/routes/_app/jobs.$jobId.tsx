@@ -24,6 +24,7 @@ import { RefundForm } from '#/components/money/refund-form'
 import { RemovePayment } from '#/components/money/remove-payment'
 import { WriteOffForm } from '#/components/money/write-off-form'
 import { JobEditForm } from '#/components/job/job-edit-form'
+import { JobSummaryButton } from '#/components/job-summary-sheet'
 import { LinesEditor } from '#/components/job/lines-editor'
 import { formatMoment } from '#/components/job-row'
 import { ListSkeleton } from '#/components/list-skeleton'
@@ -139,14 +140,17 @@ function JobPage() {
           <h1 className="text-2xl leading-tight font-semibold tracking-tight">
             {job.title}
           </h1>
-          <Button
-            variant="ghost"
-            size="icon-xl"
-            aria-label={m.job_edit()}
-            onClick={() => setPanel({ kind: 'edit' })}
-          >
-            <PencilSimpleIcon />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <JobSummaryButton businessId={business._id} jobId={job._id} />
+            <Button
+              variant="ghost"
+              size="icon-xl"
+              aria-label={m.job_edit()}
+              onClick={() => setPanel({ kind: 'edit' })}
+            >
+              <PencilSimpleIcon />
+            </Button>
+          </div>
         </div>
         {client && (
           <div className="flex items-center justify-between gap-3">
