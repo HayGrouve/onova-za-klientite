@@ -79,4 +79,57 @@ describe('reminders', () => {
       }),
     ).rejects.toThrow(/job.otherClient/)
   })
+
+  it('the rule never reminds about a job of the built-in No client', async () => {
+    const t = setupConvex()
+    const { owner, businessId, noClientId } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Елена',
+    })
+    const walkIn = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: noClientId,
+      title: 'Бърз ремонт',
+    })
+    const named = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Фреон',
+    })
+    await expect(
+      owner.mutation(api.reminders.add, {
+        businessId,
+        jobId: walkIn,
+        date: '2027-10-01',
+        note: 'Бърз ремонт',
+        source: 'rule',
+      }),
+    ).rejects.toThrow(/client.noClient/)
+    await expect(
+      owner.mutation(api.reminders.add, {
+        businessId,
+        clientId: noClientId,
+        date: '2027-10-01',
+        note: 'x',
+        source: 'rule',
+      }),
+    ).rejects.toThrow(/client.noClient/)
+    // A rule reminder with nobody to follow up is refused too.
+    await expect(
+      owner.mutation(api.reminders.add, {
+        businessId,
+        date: '2027-10-01',
+        note: 'x',
+        source: 'rule',
+      }),
+    ).rejects.toThrow(/client.noClient/)
+    await owner.mutation(api.reminders.add, {
+      businessId,
+      jobId: named,
+      date: '2027-10-01',
+      note: 'Фреон',
+      source: 'rule',
+    })
+  })
 })
