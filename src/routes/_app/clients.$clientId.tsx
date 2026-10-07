@@ -421,6 +421,9 @@ function ClientPage() {
                       reminderId={reminder._id}
                       note={reminder.note}
                       detail={formatDay(reminder.date, today)}
+                      date={reminder.date}
+                      jobId={reminder.jobId}
+                      itemId={reminder.itemId}
                     />
                   ))}
                 </PanelList>

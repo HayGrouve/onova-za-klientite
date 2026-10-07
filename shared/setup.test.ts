@@ -5,6 +5,9 @@ import {
   JOB_WORDS,
   MAX_SERVICES,
   OWN_ITEM_FIELDS,
+  REMINDER_MONTHS,
+  REPEAT_EVERY,
+  RULE_MONTHS,
   answersFromBusiness,
   defaultBusiness,
   jobFormFields,
@@ -13,6 +16,7 @@ import {
   stagesAfter,
 } from './setup'
 import type { CurrentSetup, SetupPlan } from './setup'
+import { REPEAT_CHOICES } from './repeat'
 import { STAGE_GROUPS, stagesFor } from './stages'
 
 const fresh = (): CurrentSetup => ({
@@ -127,6 +131,46 @@ describe('settingsFromAnswers', () => {
     })
     expect(settings.repeatDefault).toEqual({ every: 2, unit: 'week' })
     expect(settings.modules.reminders).toBe(false)
+  })
+
+  it('setup offers the same repeat intervals as a Job does', () => {
+    expect([...REPEAT_EVERY]).toEqual(REPEAT_CHOICES.map(({ key }) => key))
+    for (const { key, every, unit } of REPEAT_CHOICES) {
+      const settings = settingsFromAnswers({
+        repeat: 'schedule',
+        repeatEvery: key,
+      })
+      expect(settings.repeatDefault).toEqual({ every, unit })
+    }
+  })
+
+  it('a business that repeats every 3 months starts there when setup runs again', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      repeatDefault: { every: 3, unit: 'month' },
+      setupDone: true,
+    }
+    expect(answersFromBusiness(current)).toMatchObject({
+      repeat: 'schedule',
+      repeatEvery: '3months',
+    })
+  })
+
+  it('the dog groomer’s reminder is after 2 months, and setup offers 1 and 2 months', () => {
+    expect([...REMINDER_MONTHS]).toEqual([1, 2, 3, 6, 12])
+    for (const months of REMINDER_MONTHS) {
+      expect(
+        settingsFromAnswers({ repeat: 'months', reminderMonths: months })
+          .reminderRule,
+      ).toEqual({ months })
+    }
+  })
+
+  it('Settings offers every delay setup does, and two years', () => {
+    expect([...RULE_MONTHS]).toEqual([1, 2, 3, 6, 12, 24])
+    for (const months of REMINDER_MONTHS) {
+      expect(RULE_MONTHS).toContain(months)
+    }
   })
 
   it('an own word without a plural gets one guessed', () => {

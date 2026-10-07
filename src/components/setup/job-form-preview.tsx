@@ -4,6 +4,7 @@ import {
   RepeatIcon,
 } from '@phosphor-icons/react'
 import { cn } from 'cn'
+import { repeatLabel } from '#/components/job/repeat-section'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
@@ -13,7 +14,6 @@ import { formatMoney } from '../../../shared/money'
 import { jobFormFields } from '../../../shared/setup'
 import type { FormField, SetupSettings, SetupStep } from '../../../shared/setup'
 import type { StageGroup } from '../../../shared/stages'
-import { repeatDefaultLabel } from '#/components/setup/steps'
 
 const FIELD_STEP: Record<FormField, SetupStep> = {
   client: 'import',
@@ -173,7 +173,7 @@ export function JobFormPreview({
               </Row>
             )
           case 'repeat': {
-            const label = repeatDefaultLabel(
+            const label = repeatLabel(
               settings.repeatDefault ?? { every: 1, unit: 'week' },
             )
             return (

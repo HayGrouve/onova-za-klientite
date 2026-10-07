@@ -36,7 +36,6 @@ import {
   REPEAT_EVERY,
 } from '../../../shared/setup'
 import type {
-  RepeatDefault,
   RepeatEvery,
   SetupAnswers,
   SetupStep,
@@ -74,16 +73,17 @@ export const REPEAT_LABEL: Record<RepeatEvery, () => string> = {
   week: m.repeat_week,
   '2weeks': m.repeat_2weeks,
   month: m.repeat_month,
+  '3months': m.repeat_3months,
+  '6months': m.repeat_6months,
+  year: m.repeat_year,
 }
 
-/** The label of a repeat default, however it was set. */
-export function repeatDefaultLabel(every: RepeatDefault) {
-  if (every.unit === 'month') return REPEAT_LABEL.month()
-  return every.every === 2 ? REPEAT_LABEL['2weeks']() : REPEAT_LABEL.week()
-}
-
+/** How long after a job the reminder rule asks: one month, 2 months, a year. */
 export function monthsLabel(months: number) {
-  return months === 12 ? m.setup_after_year() : m.setup_after_months({ months })
+  if (months === 1) return m.setup_after_month()
+  if (months === 12) return m.setup_after_year()
+  if (months % 12 === 0) return m.setup_after_years({ years: months / 12 })
+  return m.setup_after_months({ months })
 }
 
 function NameStep({ answers, update }: StepProps) {

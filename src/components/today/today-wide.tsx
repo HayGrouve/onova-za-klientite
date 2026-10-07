@@ -124,6 +124,10 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
               detail={[reminder.clientName, formatDay(reminder.date, today)]
                 .filter(Boolean)
                 .join(' · ')}
+              date={reminder.date}
+              clientId={reminder.clientId}
+              jobId={reminder.jobId}
+              itemId={reminder.itemId}
             />
           ))}
         </ListSection>

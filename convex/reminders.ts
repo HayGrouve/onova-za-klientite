@@ -111,6 +111,54 @@ function openReminders(reminders: Array<Doc<'reminders'>>) {
     }))
 }
 
+/**
+ * "Snooze": moves an open reminder to another day and answers with the day it
+ * was on, so an undo can snooze it back. Null when nothing moved: a closed
+ * reminder, or the same day.
+ */
+export const snooze = businessMutation({
+  args: { reminderId: v.id('reminders'), date: v.string() },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    requireRole(ctx.member, 'manager')
+    if (!isValidDate(args.date)) fail('invalid', { field: 'date' })
+    const reminder = await getOwned(ctx, 'reminders', args.reminderId)
+    if (reminder.status !== 'open' || reminder.date === args.date) return null
+    await ctx.db.patch('reminders', reminder._id, { date: args.date })
+    await logActivity(ctx, {
+      type: 'reminder.moved',
+      clientId: reminder.clientId,
+      jobId: reminder.jobId,
+      itemId: reminder.itemId,
+      data: { from: reminder.date, to: args.date, note: reminder.note },
+    })
+    return reminder.date
+  },
+})
+
+/** Undo of Done or Dismiss: the reminder is open again, on its old date. */
+export const reopen = businessMutation({
+  args: { reminderId: v.id('reminders') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireRole(ctx.member, 'manager')
+    const reminder = await getOwned(ctx, 'reminders', args.reminderId)
+    if (reminder.status === 'open') return null
+    await ctx.db.patch('reminders', reminder._id, {
+      status: 'open',
+      closedAt: undefined,
+    })
+    await logActivity(ctx, {
+      type: 'reminder.reopened',
+      clientId: reminder.clientId,
+      jobId: reminder.jobId,
+      itemId: reminder.itemId,
+      data: { note: reminder.note },
+    })
+    return null
+  },
+})
+
 /** A client's open reminders, soonest first. */
 export const forClient = businessQuery({
   args: { clientId: v.id('clients') },

@@ -122,6 +122,8 @@ export const ACTIVITY_TYPES = [
   'settings.changed',
   'reminder.added',
   'reminder.closed',
+  'reminder.moved',
+  'reminder.reopened',
   'job.repeatSet',
   'job.repeatStopped',
   'job.repeated',
@@ -160,7 +162,14 @@ export const vSetupAnswers = v.object({
     v.union(v.literal('none'), v.literal('schedule'), v.literal('months')),
   ),
   repeatEvery: v.optional(
-    v.union(v.literal('week'), v.literal('2weeks'), v.literal('month')),
+    v.union(
+      v.literal('week'),
+      v.literal('2weeks'),
+      v.literal('month'),
+      v.literal('3months'),
+      v.literal('6months'),
+      v.literal('year'),
+    ),
   ),
   reminderMonths: v.optional(v.number()),
   services: v.optional(

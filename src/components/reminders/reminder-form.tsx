@@ -3,10 +3,12 @@ import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useSubmit } from '#/components/money/use-submit'
+import { DatePicks } from '#/components/reminders/date-picks'
 import { Button } from '#/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
+import { useToday } from '#/hooks/use-today'
 import { m } from '#/paraglide/messages.js'
 
 /** A reminder for a client, job or item. The rule (Q5) only fills this in; saving is the person's call. */
@@ -29,6 +31,7 @@ export function ReminderForm({
 }) {
   const add = useMutation(api.reminders.add)
   const { busy, run } = useSubmit(onDone)
+  const today = useToday()
   const [date, setDate] = useState(initialDate)
   const [note, setNote] = useState(initialNote)
   return (
@@ -42,6 +45,7 @@ export function ReminderForm({
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="reminder-date">{m.reminder_date()}</FieldLabel>
+          <DatePicks today={today} value={date} onPick={setDate} />
           <Input
             id="reminder-date"
             type="date"

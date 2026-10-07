@@ -1,4 +1,5 @@
-import { monthsLabel, repeatDefaultLabel } from '#/components/setup/steps'
+import { repeatLabel } from '#/components/job/repeat-section'
+import { monthsLabel } from '#/components/setup/steps'
 import { m } from '#/paraglide/messages.js'
 import type { Modules, SetupPlan, SetupSettings } from '../../../shared/setup'
 import type { JobFlow } from '../../../shared/stages'
@@ -59,7 +60,7 @@ export function SetupChanges({
     plan.repeatChange &&
       (plan.repeatChange.to
         ? m.setup_change_repeat_on({
-            every: repeatDefaultLabel(plan.repeatChange.to),
+            every: repeatLabel(plan.repeatChange.to),
           })
         : m.setup_change_repeat_off()),
     plan.reminderRuleChange &&
