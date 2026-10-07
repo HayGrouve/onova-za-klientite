@@ -97,6 +97,7 @@ export const ACTIVITY_TYPES = [
   'job.writeOffRemoved',
   'job.cancelled',
   'payment.added',
+  'payment.edited',
   'payment.removed',
   'credit.used',
   'cost.added',

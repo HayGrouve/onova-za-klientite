@@ -92,3 +92,154 @@ describe('money.summary', () => {
     ).rejects.toThrow(/invalid/)
   })
 })
+
+describe('money.summary: who owes me', () => {
+  it('splits what a client owes into finished work and work still going, and carries their phone', async () => {
+    const t = setupConvex()
+    const { owner, businessId, stage } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Мария',
+      phones: [{ number: '0888123456' }],
+    })
+    const done = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Шкаф',
+      typedPriceCents: 155000,
+    })
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId: done,
+      stageId: stage('done'),
+    })
+    const going = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Кухня',
+      typedPriceCents: 125000,
+    })
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId: going,
+      stageId: stage('in_progress'),
+    })
+    // A cancelled job never owes.
+    const cancelled = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Врата',
+      typedPriceCents: 9900,
+    })
+    await owner.mutation(api.jobs.cancel, { businessId, jobId: cancelled })
+    const walkIn = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Без телефон',
+    })
+    await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: walkIn,
+      title: 'Рафт',
+      typedPriceCents: 2000,
+    })
+
+    const { whoOwesMe } = await owner.query(api.money.summary, {
+      businessId,
+      month: '2026-10',
+    })
+    const row = whoOwesMe.find((item) => item.clientId === clientId)!
+    expect(row).toMatchObject({
+      owedCents: 280000,
+      doneOwedCents: 155000,
+      jobs: 2,
+      doneJobs: 1,
+    })
+    expect(row.phone).toBe('+359888123456')
+    const other = whoOwesMe.find((item) => item.clientId === walkIn)!
+    expect(other).toMatchObject({ owedCents: 2000, doneOwedCents: 0 })
+    expect(other.phone).toBeUndefined()
+    for (const item of whoOwesMe) {
+      expect(item.doneOwedCents).toBeLessThanOrEqual(item.owedCents)
+    }
+  })
+
+  it("names the job on each of the month's payments, or says prepaid", async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Ани',
+    })
+    const first = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Профилактика',
+      typedPriceCents: 10000,
+    })
+    const second = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Ремонт',
+      typedPriceCents: 3000,
+    })
+    const split = await owner.mutation(api.payments.addFromClient, {
+      businessId,
+      clientId,
+      amountCents: 14000,
+      date: '2026-10-03',
+      method: 'cash',
+    })
+    const third = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Монтаж',
+      typedPriceCents: 5000,
+    })
+    const onJob = await owner.mutation(api.payments.addFromJob, {
+      businessId,
+      jobId: third,
+      amountCents: 2000,
+      date: '2026-10-04',
+      method: 'card',
+    })
+    const refundFromCredit = await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      amountCents: 500,
+      date: '2026-10-05',
+      method: 'cash',
+    })
+    const refundFromJob = await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      jobId: third,
+      amountCents: 300,
+      date: '2026-10-06',
+      method: 'cash',
+    })
+    const { payments } = await owner.query(api.money.summary, {
+      businessId,
+      month: '2026-10',
+    })
+    const byId = new Map(payments.map((payment) => [payment._id, payment]))
+    expect(byId.get(split)).toMatchObject({
+      jobs: [
+        { _id: first, title: 'Профилактика' },
+        { _id: second, title: 'Ремонт' },
+      ],
+      creditCents: 1000,
+    })
+    expect(byId.get(onJob)).toMatchObject({
+      jobs: [{ _id: third, title: 'Монтаж' }],
+      creditCents: 0,
+    })
+    expect(byId.get(refundFromCredit)).toMatchObject({
+      jobs: [],
+      creditCents: 500,
+    })
+    expect(byId.get(refundFromJob)).toMatchObject({
+      jobs: [{ _id: third, title: 'Монтаж' }],
+      creditCents: 0,
+    })
+  })
+})

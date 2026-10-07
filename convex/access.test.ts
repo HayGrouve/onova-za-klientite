@@ -252,6 +252,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     date: '2026-10-06',
     method: 'cash',
   }),
+  'payments:get': (ids) => ({ paymentId: ids.paymentId }),
   'payments:refund': (ids) => ({
     clientId: ids.clientId,
     amountCents: 100,
@@ -259,6 +260,12 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     method: 'cash',
   }),
   'payments:remove': (ids) => ({ paymentId: ids.paymentId }),
+  'payments:update': (ids) => ({
+    paymentId: ids.paymentId,
+    amountCents: 30000,
+    date: '2026-10-06',
+    method: 'cash',
+  }),
   'payments:useCredit': (ids) => ({ jobId: ids.jobId }),
   'reminders:add': (ids) => ({
     clientId: ids.clientId,
@@ -415,6 +422,7 @@ const EVENTS: Record<string, string | null> = {
   'payments:addFromJob': 'payment.added',
   'payments:refund': 'payment.added',
   'payments:remove': 'payment.removed',
+  'payments:update': 'payment.edited',
   'payments:useCredit': 'credit.used',
   'push:setNotify': null,
   'reminders:add': 'reminder.added',
