@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestone 1 is next. Nothing below is built yet.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestone 1 (foundation) is built and in review. Vercel is linked after it merges.
 
 ## Contents
 
@@ -592,6 +592,10 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D18 | Photos | Compressed in the browser before upload (long side 2000 px, JPEG) | Phone photos are 3–8 MB and uploads time out after 2 minutes on slow networks |
 | D19 | Convex while developing | The team's Free plan. Every dev and preview deployment is disposable and holds only seed data, and so does the Free project's production deployment that Vercel production uses until launch. The real production deployment is created fresh in EU (Ireland) at launch, with the owner's OK, and Vercel's production deploy key is switched to it (Q19, Q21) | Nothing needs keeping until the first user's real data, and a region can't be changed after creation |
 | D20 | Excel import | `.xlsx` through `read-excel-file`, CSV through `papaparse`, both lazy-loaded. Legacy `.xls` isn't read: the import screen asks to save the file as `.xlsx` or CSV, which any Excel since 2007 can do (Q20) | The owner chose ordinary npm packages over a vendored SheetJS. Losing `.xls` costs one extra step for an old file |
+| D21 | Clerk ↔ Convex | Clerk's session token carries `aud: "convex"`, plus `name`, `email` and `picture` claims, set with `clerk config patch`. That is what Clerk's Convex integration does, and `ConvexProviderWithClerk` then uses the session token directly | The integration's dashboard switch has no CLI equivalent, and the claims are the whole of it |
+| D22 | Clerk SDK | `@clerk/tanstack-react-start` works in SPA mode without `clerkMiddleware()`: sign-in, sign-out and reload all work from the static shell. `@clerk/react` isn't needed (spike 1) | Fewer moving parts; the server only serves the shell |
+| D23 | Dev seed | Seed businesses carry a `seedKey`. `seed:dev` and `seed:preview` rebuild their contents in place, so ids stay stable and a second run gives the same result. They refuse unless the deployment has `ALLOW_SEED=true`, which production never gets. On such deployments, every user joins the seed businesses at first sign-in | Previews are seeded before anyone signs in, and the Clerk test users must see both businesses |
+| D24 | Typed Convex env | Env vars are declared in `convex/convex.config.ts` and read from `env` in `_generated/server`, as the Convex ESLint plugin asks. `auth.config.ts` is the one exception, since it is read at push time | Typos in env names become type errors |
 
 ## Spikes
 
@@ -609,10 +613,11 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
 
 - **Done:**
   - milestone 0 (#13);
+  - milestone 1 built (#2), in review: TanStack Start SPA with the service worker shell, shadcn `base-nova`, Paraglide, Clerk (Google and email code, Bulgarian), Convex dev deployment in `aws-eu-west-1`, the signed-in shell with the business switcher, the dev seed, PWA manifest and icons, CI;
   - the design doc picks for prototypes 1 and 2 (#1);
   - Q19 and Q21: Free plan while developing, with production created in EU at launch.
   - Q20: dependencies approved, with `read-excel-file` + `papaparse` instead of SheetJS.
-- **Next:** milestone 1, Foundation (#2).
+- **Next:** merge milestone 1, then link Vercel (Q22) and the first production deploy, with the owner's OK. Milestone 2, Domain core (#3), is stacked on the milestone 1 branch meanwhile.
 - **Open:**
   - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26.
