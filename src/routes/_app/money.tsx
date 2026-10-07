@@ -16,7 +16,7 @@ import {
   TrendUpIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { cn } from 'cn'
 import { useState } from 'react'
@@ -47,6 +47,12 @@ import { addMonths, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 
 export const Route = createFileRoute('/_app/money')({
+  // The month is in the address, so Back returns to the month that was open.
+  validateSearch: (search: Record<string, unknown>): { month?: string } =>
+    typeof search.month === 'string' &&
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(search.month)
+      ? { month: search.month }
+      : {},
   staticData: { layout: 'wide' },
   component: MoneyPage,
 })
@@ -72,7 +78,16 @@ const METHOD_ICON: Record<Doc<'payments'>['method'], Icon> = {
 function MoneyPage() {
   const { business } = useViewer()
   const today = useToday()
-  const [month, setMonth] = useState(() => monthOf(today))
+  const thisMonth = monthOf(today)
+  const navigate = useNavigate({ from: Route.fullPath })
+  const picked = Route.useSearch({ select: (search) => search.month })
+  // Never past the current month, whatever the address says.
+  const month = picked && picked <= thisMonth ? picked : thisMonth
+  const setMonth = (next: string) =>
+    void navigate({
+      search: { month: next === thisMonth ? undefined : next },
+      replace: true,
+    })
   const [costPanel, setCostPanel] = useState<{
     cost?: Pick<
       Doc<'costs'>,
