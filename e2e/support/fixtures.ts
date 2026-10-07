@@ -62,42 +62,60 @@ type StorageState = Exclude<
   string | undefined
 >
 
-type Worker = { account: TestUser; authState: StorageState }
+type Account = { user: TestUser; state: StorageState }
+
+type Worker = { accountFor: (file: string) => Promise<Account> }
+
+/** A fresh Clerk user, signed in once. The first load creates its business. */
+async function newAccount(browser: Browser, baseURL: string): Promise<Account> {
+  const user = await createTestUser()
+  const context = await browser.newContext({ ...MOBILE, baseURL })
+  try {
+    const page = await context.newPage()
+    await signIn(page, user.email)
+    // The first load creates the user's business and sends them to setup.
+    await page.waitForURL(/\/setup$/)
+    return { user, state: await context.storageState() }
+  } catch (error) {
+    await deleteClerkUser(user.id).catch(() => {})
+    throw error
+  } finally {
+    await context.close()
+  }
+}
 
 /**
- * `account` is one fresh Clerk user per worker, i.e. per spec file, deleted
- * (with its Convex data) when the worker ends, even after a failure.
- * The worker signs in once; every test's page starts from that session.
+ * One fresh Clerk user per spec file, deleted (with its Convex data) when the
+ * worker ends, even after a failure. Keyed by file, not by worker: with one
+ * worker (CI) every spec file runs in the same worker, and a spec must not
+ * start on the businesses another spec made.
+ * Each user signs in once; every test's page starts from that session.
  */
 export const test = base.extend<object, Worker>({
-  account: [
+  accountFor: [
     async ({ browser }, use, workerInfo) => {
-      const user = await createTestUser()
+      const baseURL = String(workerInfo.project.use.baseURL)
+      const byFile = new Map<string, Promise<Account>>()
       try {
-        await use(user)
+        await use((file) => {
+          let account = byFile.get(file)
+          if (!account) {
+            account = newAccount(browser, baseURL)
+            byFile.set(file, account)
+          }
+          return account
+        })
       } finally {
-        const baseURL = String(workerInfo.project.use.baseURL)
-        await deleteAccount(browser, user, baseURL)
+        for (const account of byFile.values()) {
+          const created = await account.catch(() => null)
+          if (created) await deleteAccount(browser, created.user, baseURL)
+        }
       }
     },
-    { scope: 'worker', timeout: 120_000 },
+    { scope: 'worker', timeout: 300_000 },
   ],
-  authState: [
-    async ({ browser, account }, use, workerInfo) => {
-      const baseURL = String(workerInfo.project.use.baseURL)
-      const context = await browser.newContext({ ...MOBILE, baseURL })
-      const page = await context.newPage()
-      await signIn(page, account.email)
-      // The first load creates the user's business and sends them to setup.
-      await page.waitForURL(/\/setup$/)
-      const state = await context.storageState()
-      await context.close()
-      await use(state)
-    },
-    { scope: 'worker' },
-  ],
-  storageState: async ({ authState }, use) => {
-    await use(authState)
+  storageState: async ({ accountFor }, use, testInfo) => {
+    await use((await accountFor(testInfo.file)).state)
   },
   page: async ({ page }, use) => {
     await setupClerkTestingToken({ page })
