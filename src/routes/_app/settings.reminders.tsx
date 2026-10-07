@@ -47,9 +47,9 @@ function RemindersSettings() {
   )
   const owner = settings?.role === 'owner'
   const save = (months: number | null) =>
-    void setRule({ businessId: business._id, months }).catch((error: unknown) =>
-      toast.error(errorMessage(error)),
-    )
+    void setRule({ businessId: business._id, months })
+      .then(() => toast.success(m.saved()))
+      .catch((error: unknown) => toast.error(errorMessage(error)))
 
   const moduleOff = settings !== undefined && !settings.modules.reminders
 

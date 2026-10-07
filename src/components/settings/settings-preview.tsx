@@ -59,7 +59,7 @@ export function SettingsPreview({
         className={cn(
           'rounded-2xl border bg-card p-4 shadow-sm shadow-zinc-900/5',
           // The phone's strip stays short and scrolls inside.
-          'max-xl:max-h-[32dvh] max-xl:overflow-y-auto max-xl:overscroll-contain',
+          'max-xl:max-h-[32dvh] max-xl:overflow-y-auto max-xl:overscroll-contain lg:max-xl:max-h-[42dvh]',
           !open && 'max-xl:hidden',
         )}
       >

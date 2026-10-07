@@ -28,7 +28,9 @@ function Row({ to, icon: IconComponent, title, body }: SettingsSection) {
         <IconTile icon={IconComponent} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{title}</span>
-          <span className="truncate text-sm text-muted-foreground">{body}</span>
+          <span className="line-clamp-2 text-sm text-muted-foreground">
+            {body}
+          </span>
         </span>
         <CaretRightIcon className="size-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
       </Link>

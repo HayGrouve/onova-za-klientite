@@ -20,6 +20,7 @@ import { errorMessage } from '#/lib/errors'
 import { buildExportZip } from '#/lib/export-zip'
 import { wipeSnapshots } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
+import { todayInSofia } from '../../../shared/dates'
 
 export const Route = createFileRoute('/_app/settings/data')({
   component: DataSettings,
@@ -77,7 +78,7 @@ function ExportRow() {
       )
       const link = document.createElement('a')
       link.href = url
-      link.download = `onova-${new Date().toISOString().slice(0, 10)}.zip`
+      link.download = `onova-${todayInSofia(Date.now())}.zip`
       link.click()
       URL.revokeObjectURL(url)
     } catch (error) {

@@ -10,6 +10,7 @@ import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
 import type { FunctionReturnType } from 'convex/server'
 import type { api } from '../../convex/_generated/api'
+import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
@@ -110,6 +111,7 @@ export function JobRow({
             )}
           </div>
         )}
+        <ListExtras target="job" values={job.listExtra} />
       </Link>
     </li>
   )

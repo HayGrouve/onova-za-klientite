@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { SettingsPage } from '#/components/settings/settings-page'
+import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
 import { Field, FieldLabel } from '#/components/ui/field'
 import { Switch } from '#/components/ui/switch'
 import { useViewer } from '#/hooks/use-viewer'
@@ -70,9 +71,62 @@ function NotificationsSettings() {
     body = <NotificationSwitches publicKey={vapidPublicKey} />
   }
   return (
-    <SettingsPage title={m.push_title()} help={m.push_help()}>
+    <SettingsPage
+      title={m.push_title()}
+      help={m.push_help()}
+      preview={<MorningPreview />}
+    >
       {body}
     </SettingsPage>
+  )
+}
+
+/**
+ * The morning summary as the phone shows it, built like the server's text
+ * (convex/lib/pushText.ts) from sample counts and the switches as they are.
+ */
+function MorningPreview() {
+  const { business } = useViewer()
+  const settings = useQuery(api.push.settings, { businessId: business._id })
+  if (!settings) return null
+  const { notify } = settings
+  const parts = [
+    m.count({ label: business.words.appointment.plural, count: 2 }),
+    ...(notify.overdue
+      ? [m.count({ label: m.push_preview_overdue(), count: 1 })]
+      : []),
+    ...(notify.remindersDue
+      ? [m.count({ label: m.push_preview_reminders(), count: 3 })]
+      : []),
+  ]
+  return (
+    <SettingsPreview title={m.push_preview_title()}>
+      <Flash watch={notify}>
+        {notify.morningSummary ? (
+          <div className="flex gap-3 rounded-2xl bg-muted/70 p-3 text-sm">
+            <img
+              src="/icon-192.png"
+              alt=""
+              className="size-9 shrink-0 rounded-lg"
+            />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                <span className="truncate">{m.push_preview_app()}</span>
+                <span className="shrink-0 tabular-nums">7:30</span>
+              </div>
+              <p className="truncate font-semibold">
+                {m.push_preview_heading({ name: business.name })}
+              </p>
+              <p className="text-muted-foreground">{parts.join(' · ')}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="py-1 text-sm text-muted-foreground">
+            {m.push_preview_off()}
+          </p>
+        )}
+      </Flash>
+    </SettingsPreview>
   )
 }
 
@@ -80,7 +134,17 @@ function NotificationSwitches({ publicKey }: { publicKey: string }) {
   const { business } = useViewer()
   const args = { businessId: business._id }
   const settings = useQuery(api.push.settings, args)
-  const setNotify = useMutation(api.push.setNotify)
+  // Optimistic, so the switch and the preview move at the tap.
+  const setNotify = useMutation(api.push.setNotify).withOptimisticUpdate(
+    (store, { businessId, ...change }) => {
+      const current = store.getQuery(api.push.settings, { businessId })
+      if (!current) return
+      const notify = { ...current.notify }
+      for (const key of ['morningSummary', 'remindersDue', 'overdue'] as const)
+        if (change[key] !== undefined) notify[key] = change[key]
+      store.setQuery(api.push.settings, { businessId }, { ...current, notify })
+    },
+  )
   const subscribe = useMutation(api.push.subscribe)
   const unsubscribe = useMutation(api.push.unsubscribe)
   const [deviceOn, setDeviceOn] = useState<boolean | undefined>(undefined)
@@ -126,9 +190,9 @@ function NotificationSwitches({ publicKey }: { publicKey: string }) {
     remindersDue?: boolean
     overdue?: boolean
   }) =>
-    void setNotify({ ...args, ...change }).catch((error: unknown) =>
-      toast.error(errorMessage(error)),
-    )
+    void setNotify({ ...args, ...change })
+      .then(() => toast.success(m.saved()))
+      .catch((error: unknown) => toast.error(errorMessage(error)))
 
   if (!settings || deviceOn === undefined) return <ListSkeleton />
 

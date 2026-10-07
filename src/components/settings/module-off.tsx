@@ -42,7 +42,9 @@ export function ModuleOff({
             void setModules({
               businessId,
               modules: { ...modules, [module]: true },
-            }).catch((error: unknown) => toast.error(errorMessage(error)))
+            })
+              .then(() => toast.success(m.saved()))
+              .catch((error: unknown) => toast.error(errorMessage(error)))
           }
         >
           {m.module_turn_on()}

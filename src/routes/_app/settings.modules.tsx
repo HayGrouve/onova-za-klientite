@@ -95,6 +95,7 @@ function ModulesSettings() {
   const { words } = business
   const owner = settings?.role === 'owner'
   const fail = (error: unknown) => toast.error(errorMessage(error))
+  const saved = () => toast.success(m.saved())
   // The switch just moved: show the view it changes, and mark the part.
   const show = (key: Switchable) => {
     setView(SHOWN_IN[key].view)
@@ -167,7 +168,9 @@ function ModulesSettings() {
                 void setModules({
                   businessId: business._id,
                   modules: { ...settings.modules, [key]: checked },
-                }).catch(fail)
+                })
+                  .then(saved)
+                  .catch(fail)
               }}
             />
           ))}
@@ -182,7 +185,9 @@ function ModulesSettings() {
               void setNewJob({
                 businessId: business._id,
                 depositsOnNewJob: checked,
-              }).catch(fail)
+              })
+                .then(saved)
+                .catch(fail)
             }}
           />
         </ListCard>

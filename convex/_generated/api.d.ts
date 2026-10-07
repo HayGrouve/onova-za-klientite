@@ -30,6 +30,7 @@ import type * as lib_errors from "../lib/errors.js";
 import type * as lib_extra from "../lib/extra.js";
 import type * as lib_insertStage from "../lib/insertStage.js";
 import type * as lib_jobWrite from "../lib/jobWrite.js";
+import type * as lib_listFields from "../lib/listFields.js";
 import type * as lib_moveJob from "../lib/moveJob.js";
 import type * as lib_pushText from "../lib/pushText.js";
 import type * as lib_recompute from "../lib/recompute.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "lib/extra": typeof lib_extra;
   "lib/insertStage": typeof lib_insertStage;
   "lib/jobWrite": typeof lib_jobWrite;
+  "lib/listFields": typeof lib_listFields;
   "lib/moveJob": typeof lib_moveJob;
   "lib/pushText": typeof lib_pushText;
   "lib/recompute": typeof lib_recompute;

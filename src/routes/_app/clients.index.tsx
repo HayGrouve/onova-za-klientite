@@ -15,6 +15,7 @@ import { api } from '../../../convex/_generated/api'
 import { ClientsTable } from '#/components/clients-table'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { ListCard } from '#/components/list-section'
+import { ListExtras } from '#/components/list-extras'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { EmptyState, PageTitle } from '#/components/page'
 import { buttonVariants } from '#/components/ui/button'
@@ -160,6 +161,7 @@ function ClientsPage() {
                           </span>
                         )}
                       </span>
+                      <ListExtras target="client" values={client.listExtra} />
                     </span>
                     <CaretRightIcon
                       aria-hidden
