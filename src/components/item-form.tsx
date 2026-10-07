@@ -6,6 +6,7 @@ import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { activeValues } from '#/components/client-form'
 import { ExtraFieldsEditor } from '#/components/extra-fields'
 import type { ExtraValues } from '#/components/extra-fields'
+import { FormFooter } from '#/components/form-footer'
 import { AddFieldLink } from '#/components/settings/add-field-link'
 import { Button } from '#/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '#/components/ui/field'
@@ -71,10 +72,17 @@ export function ItemForm({
         <ExtraFieldsEditor fields={fields} values={extra} onChange={setExtra} />
         <AddFieldLink target="item" />
       </FieldGroup>
-      <Button type="submit" size="xl" disabled={saving || !name.trim()}>
-        {saving && <Spinner data-icon="inline-start" />}
-        {m.save()}
-      </Button>
+      <FormFooter>
+        <Button
+          type="submit"
+          size="xl"
+          className="flex-1"
+          disabled={saving || !name.trim()}
+        >
+          {saving && <Spinner data-icon="inline-start" />}
+          {m.save()}
+        </Button>
+      </FormFooter>
     </form>
   )
 }
