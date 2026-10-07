@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
+import { cn } from 'cn'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import { JobRow } from '#/components/job-row'
@@ -274,30 +275,43 @@ function DayHeading({ children }: { children: React.ReactNode }) {
 function AgendaRow({ item }: { item: AppointmentRow }) {
   const { job } = item
   if (!job) return null
+  const owes = job.owes && job.balanceCents > 0
   return (
     <li>
       <Link
         to="/jobs/$jobId"
         params={{ jobId: job._id }}
-        className="flex items-center gap-4 pressable px-4 py-3"
+        className="relative flex items-center gap-4 pressable py-3 pr-4 pl-4"
       >
         <span className="w-14 shrink-0 text-sm font-semibold tabular-nums">
           {item.allDay ? m.all_day() : TIME.format(item.start)}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="line-clamp-2 font-medium">{job.title}</span>
+          {/* The title keeps clear of the stage in the corner, unless the
+              balance (shown from xl) already does. */}
+          <span
+            className={cn('line-clamp-2 pr-24 font-medium', owes && 'xl:pr-0')}
+          >
+            {job.title}
+          </span>
           <span className="truncate text-sm text-muted-foreground">
             {[job.isNoClient ? m.no_client() : job.clientName, item.label]
               .filter(Boolean)
               .join(' · ')}
           </span>
         </span>
-        {job.owes && job.balanceCents > 0 && (
-          <span className="hidden shrink-0 text-sm text-muted-foreground tabular-nums xl:inline">
+        {owes && (
+          <span className="hidden shrink-0 self-end text-sm text-muted-foreground tabular-nums xl:inline">
             {m.balance_short({ amount: formatMoney(job.balanceCents) })}
           </span>
         )}
-        <StageBadge name={job.stageName} group={job.stageGroup} />
+        {/* Joined to the row's top-right corner, as on the phone's rows. */}
+        <StageBadge
+          name={job.stageName}
+          group={job.stageGroup}
+          corner
+          className="absolute top-0 right-0"
+        />
       </Link>
     </li>
   )
