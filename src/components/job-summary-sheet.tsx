@@ -1,3 +1,4 @@
+import { cn } from 'cn'
 import {
   CopyIcon,
   DownloadSimpleIcon,
@@ -169,10 +170,12 @@ function SummaryBody({
           <a
             href={made.url}
             download={FILE_NAME}
-            className={buttonVariants({
-              variant: 'outline',
-              className: 'h-11',
-            })}
+            className={cn(
+              buttonVariants({
+                variant: 'outline',
+                className: 'h-11',
+              }),
+            )}
           >
             <DownloadSimpleIcon data-icon="inline-start" />
             {m.summary_download()}

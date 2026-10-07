@@ -63,9 +63,9 @@ function IconTile({ icon: IconComponent }: { icon: Icon }) {
   return (
     <span
       aria-hidden
-      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground/70"
     >
-      <IconComponent className="size-5.5" weight="duotone" />
+      <IconComponent className="size-5.5" />
     </span>
   )
 }

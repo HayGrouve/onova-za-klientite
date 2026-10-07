@@ -6,7 +6,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { REPEAT_LABEL } from '#/components/setup/steps'
 import { Button, buttonVariants } from '#/components/ui/button'
-import { SectionHeader } from '#/components/list-section'
+import { Panel, PanelBody } from '#/components/panel'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
 import { errorMessage } from '#/lib/errors'
@@ -39,10 +39,9 @@ export function RepeatSection({ job }: { job: Doc<'jobs'> }) {
   const active = job.repeat && job.repeat.stoppedAt === undefined
 
   return (
-    <section className="flex flex-col gap-2">
-      <SectionHeader title={m.repeat_title()} icon={RepeatIcon} />
+    <Panel title={m.repeat_title()} icon={RepeatIcon}>
       {active && job.repeat ? (
-        <div className="mx-4 flex flex-wrap items-center gap-2 surface py-1.5 pr-1.5 pl-4">
+        <PanelBody className="flex flex-wrap items-center gap-2 py-1.5 pr-1.5">
           <span className="text-sm">
             {m.repeat_on({ every: lower(repeatLabel(job.repeat)) })}
           </span>
@@ -70,14 +69,14 @@ export function RepeatSection({ job }: { job: Doc<'jobs'> }) {
           >
             {m.repeat_stop()}
           </Button>
-        </div>
+        </PanelBody>
       ) : (
-        <div className="flex flex-wrap gap-2 px-4">
+        <PanelBody className="flex flex-wrap gap-2">
           {CHOICES.map((choice) => (
             <Button
               key={choice.key}
               variant="outline"
-              className="h-11 rounded-xl shadow-xs"
+              className="h-11 rounded-xl"
               onClick={() =>
                 void setRepeat({
                   businessId: business._id,
@@ -90,8 +89,8 @@ export function RepeatSection({ job }: { job: Doc<'jobs'> }) {
               {REPEAT_LABEL[choice.key]()}
             </Button>
           ))}
-        </div>
+        </PanelBody>
       )}
-    </section>
+    </Panel>
   )
 }

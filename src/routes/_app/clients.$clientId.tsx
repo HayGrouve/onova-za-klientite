@@ -15,6 +15,7 @@ import {
   WalletIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
+import { cn } from 'cn'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useState } from 'react'
@@ -31,8 +32,9 @@ import { ReminderForm } from '#/components/reminders/reminder-form'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { RefundForm } from '#/components/money/refund-form'
 import { RemovePayment } from '#/components/money/remove-payment'
-import { ListNote, ListSection, SectionHeader } from '#/components/list-section'
+import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
@@ -84,7 +86,7 @@ function ClientPage() {
   const phone = client.phones.at(0)?.e164
 
   return (
-    <div className="flex flex-col gap-5 pb-6">
+    <div className="flex flex-col gap-4 pb-6">
       <header className="flex flex-col gap-3 px-4 pt-2">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -131,21 +133,20 @@ function ClientPage() {
           <div className="flex gap-2">
             <a
               href={telHref(phone)}
-              className={buttonVariants({
-                size: 'xl',
-                className: 'flex-1 shadow-md shadow-primary/25',
-              })}
+              className={buttonVariants({ size: 'xl', className: 'flex-1' })}
             >
               <PhoneIcon data-icon="inline-start" weight="fill" />
               {m.client_call()}
             </a>
             <a
               href={viberHref(phone)}
-              className={buttonVariants({
-                variant: 'outline',
-                size: 'xl',
-                className: 'flex-1 shadow-xs',
-              })}
+              className={cn(
+                buttonVariants({
+                  variant: 'outline',
+                  size: 'xl',
+                  className: 'flex-1',
+                }),
+              )}
             >
               {/* Viber's own purple, so the button is recognised at a glance. */}
               <ChatCircleIcon
@@ -188,19 +189,19 @@ function ClientPage() {
       </header>
 
       {(data.owedCents > 0 || client.creditCents > 0) && (
-        <div className="mx-4 grid stagger grid-cols-2 gap-2.5">
+        <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface">
           <MoneyFigure
             label={m.client_owes_total()}
             cents={data.owedCents}
             hint={m.hint_owes_total()}
-            tone={data.owedCents > 0 ? 'highlight' : 'plain'}
+            emphasis={data.owedCents > 0 ? 'primary' : undefined}
           />
           <MoneyFigure
             label={m.client_credit()}
             cents={client.creditCents}
             hint={m.hint_credit()}
           />
-        </div>
+        </section>
       )}
 
       <ExtraFieldsView
@@ -209,16 +210,93 @@ function ClientPage() {
         today={today}
       />
       {client.note && (
-        <section className="flex flex-col gap-2">
-          <SectionHeader title={m.client_note()} icon={NoteIcon} />
-          <p className="mx-4 surface px-4 py-3 text-sm whitespace-pre-wrap">
+        <Panel title={m.client_note()} icon={NoteIcon}>
+          <PanelBody className="text-sm whitespace-pre-wrap">
             {client.note}
-          </p>
-        </section>
+          </PanelBody>
+        </Panel>
       )}
 
+      <Panel
+        title={words.job.plural}
+        icon={ClipboardTextIcon}
+        count={data.jobs.length || undefined}
+      >
+        <PanelList>
+          {data.jobs.length === 0 ? (
+            <ListNote>{m.client_no_jobs()}</ListNote>
+          ) : (
+            data.jobs.map((job) => (
+              <JobRow
+                key={job._id}
+                job={job}
+                today={today}
+                showClient={false}
+              />
+            ))
+          )}
+        </PanelList>
+      </Panel>
+
+      <Panel
+        title={m.client_payments()}
+        icon={WalletIcon}
+        footer={
+          <>
+            <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
+              <PlusIcon data-icon="inline-start" />
+              {m.pay_add()}
+            </Button>
+            {client.creditCents > 0 && (
+              <Button
+                variant="outline"
+                size="xl"
+                onClick={() => setPanel({ kind: 'refund' })}
+              >
+                {m.refund_add()}
+              </Button>
+            )}
+          </>
+        }
+      >
+        <PanelList>
+          {data.payments.length === 0 ? (
+            <ListNote>{m.client_no_payments()}</ListNote>
+          ) : (
+            data.payments.map((payment) => (
+              <li key={payment._id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPanel({
+                      kind: 'removePayment',
+                      paymentId: payment._id,
+                      amountCents: payment.amountCents,
+                    })
+                  }
+                  className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
+                >
+                  <span className="flex flex-col">
+                    <span>
+                      {payment.label ?? METHOD_LABEL[payment.method]()}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {formatDay(payment.date, today)} ·{' '}
+                      {METHOD_LABEL[payment.method]()}
+                    </span>
+                  </span>
+                  <span className="font-medium tabular-nums">
+                    {formatMoney(payment.amountCents)}
+                  </span>
+                </button>
+              </li>
+            ))
+          )}
+        </PanelList>
+      </Panel>
+
       {business.modules.items && !client.isNoClient && (
-        <ListSection
+        <Panel
           title={words.item.plural}
           icon={StackIcon}
           action={
@@ -235,26 +313,28 @@ function ClientPage() {
             </Link>
           }
         >
-          {data.items.map((item) => (
-            <li key={item._id}>
-              <Link
-                to="/items/$itemId"
-                params={{ itemId: item._id }}
-                className="flex items-center justify-between gap-3 pressable px-4 py-3 font-medium"
-              >
-                {item.name}
-                <CaretRightIcon
-                  aria-hidden
-                  className="size-4 shrink-0 text-muted-foreground/60"
-                />
-              </Link>
-            </li>
-          ))}
-        </ListSection>
+          <PanelList>
+            {data.items.map((item) => (
+              <li key={item._id}>
+                <Link
+                  to="/items/$itemId"
+                  params={{ itemId: item._id }}
+                  className="flex items-center justify-between gap-3 pressable px-4 py-3 font-medium"
+                >
+                  {item.name}
+                  <CaretRightIcon
+                    aria-hidden
+                    className="size-4 shrink-0 text-muted-foreground/60"
+                  />
+                </Link>
+              </li>
+            ))}
+          </PanelList>
+        </Panel>
       )}
 
       {business.modules.reminders && !client.isNoClient && (
-        <ListSection
+        <Panel
           title={m.reminder_list()}
           icon={BellIcon}
           action={
@@ -268,103 +348,36 @@ function ClientPage() {
             </Button>
           }
         >
-          {(reminders ?? []).map((reminder) => (
-            <ReminderRow
-              key={reminder._id}
-              reminderId={reminder._id}
-              note={reminder.note}
-              detail={formatDay(reminder.date, today)}
-            />
-          ))}
-        </ListSection>
+          <PanelList>
+            {(reminders ?? []).map((reminder) => (
+              <ReminderRow
+                key={reminder._id}
+                reminderId={reminder._id}
+                note={reminder.note}
+                detail={formatDay(reminder.date, today)}
+              />
+            ))}
+          </PanelList>
+        </Panel>
       )}
 
-      <ListSection
-        title={words.job.plural}
-        icon={ClipboardTextIcon}
-        count={data.jobs.length || undefined}
-      >
-        {data.jobs.length === 0 ? (
-          <ListNote>{m.client_no_jobs()}</ListNote>
-        ) : (
-          data.jobs.map((job) => (
-            <JobRow key={job._id} job={job} today={today} showClient={false} />
-          ))
-        )}
-      </ListSection>
-
-      <ListSection
-        title={m.client_payments()}
-        icon={WalletIcon}
-        footer={
-          <div className="flex flex-wrap gap-2 px-4 pt-1">
-            <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
-              <PlusIcon data-icon="inline-start" />
-              {m.pay_add()}
-            </Button>
-            {client.creditCents > 0 && (
-              <Button
-                variant="outline"
-                size="xl"
-                className="shadow-xs"
-                onClick={() => setPanel({ kind: 'refund' })}
-              >
-                {m.refund_add()}
-              </Button>
-            )}
-          </div>
-        }
-      >
-        {data.payments.length === 0 ? (
-          <ListNote>{m.client_no_payments()}</ListNote>
-        ) : (
-          data.payments.map((payment) => (
-            <li key={payment._id}>
-              <button
-                type="button"
-                onClick={() =>
-                  setPanel({
-                    kind: 'removePayment',
-                    paymentId: payment._id,
-                    amountCents: payment.amountCents,
-                  })
-                }
-                className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
-              >
-                <span className="flex flex-col">
-                  <span>{payment.label ?? METHOD_LABEL[payment.method]()}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {formatDay(payment.date, today)} ·{' '}
-                    {METHOD_LABEL[payment.method]()}
-                  </span>
-                </span>
-                <span className="font-medium tabular-nums">
-                  {formatMoney(payment.amountCents)}
-                </span>
-              </button>
-            </li>
-          ))
-        )}
-      </ListSection>
-
       {!client.isNoClient && (
-        <section className="flex flex-col gap-2">
-          <SectionHeader title={m.job_files()} icon={PaperclipIcon} />
-          <FileGallery
-            businessId={business._id}
-            target={{ kind: 'client', clientId: client._id }}
-          />
-        </section>
+        <Panel title={m.job_files()} icon={PaperclipIcon}>
+          <PanelBody className="px-0">
+            <FileGallery
+              businessId={business._id}
+              target={{ kind: 'client', clientId: client._id }}
+            />
+          </PanelBody>
+        </Panel>
       )}
 
       {data.timeline.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <SectionHeader
-            title={m.client_history()}
-            icon={ClockCounterClockwiseIcon}
-          />
-          <Timeline items={data.timeline} />
-        </section>
+        <Panel title={m.client_history()} icon={ClockCounterClockwiseIcon}>
+          <PanelBody className="px-0">
+            <Timeline items={data.timeline} />
+          </PanelBody>
+        </Panel>
       )}
 
       <Sheet open={panel !== null} onOpenChange={(open) => !open && close()}>

@@ -74,18 +74,13 @@ export function JobRow({
       <Link
         to="/jobs/$jobId"
         params={{ jobId: job._id }}
-        className={cn(
-          'relative flex flex-col gap-1.5 pressable px-4 py-3',
-          // A thin red edge marks a late job at a glance.
-          late &&
-            'before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-destructive',
-        )}
+        className="flex flex-col gap-1.5 pressable px-4 py-3"
       >
         <div className="flex items-start justify-between gap-3">
           <span className="min-w-0 text-base leading-snug font-medium">
             {job.title}
           </span>
-          <StageBadge name={job.stageName} color={job.stageColor} />
+          <StageBadge name={job.stageName} group={job.stageGroup} />
         </div>
         {(client || timing || owes) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">

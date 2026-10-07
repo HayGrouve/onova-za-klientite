@@ -7,6 +7,7 @@ import {
   UserCircleDashedIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
+import { cn } from 'cn'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useState } from 'react'
@@ -58,11 +59,13 @@ function ClientsPage() {
         <PageTitle>{words.client.plural}</PageTitle>
         <Link
           to="/clients/new"
-          className={buttonVariants({
-            variant: 'outline',
-            size: 'xl',
-            className: 'shadow-xs',
-          })}
+          className={cn(
+            buttonVariants({
+              variant: 'outline',
+              size: 'xl',
+              className: 'shadow-xs',
+            }),
+          )}
         >
           <PlusIcon data-icon="inline-start" />
           {m.clients_add()}
@@ -132,7 +135,7 @@ function ClientsPage() {
                           <span className="inline-flex items-center gap-1 font-medium text-foreground">
                             <CoinsIcon
                               aria-hidden
-                              className="size-4 text-amber-600"
+                              className="size-4 text-muted-foreground"
                             />
                             {m.clients_owes({
                               amount: formatMoney(client.owedCents),
@@ -143,7 +146,7 @@ function ClientsPage() {
                           <span className="inline-flex items-center gap-1">
                             <PiggyBankIcon
                               aria-hidden
-                              className="size-4 text-primary"
+                              className="size-4 text-muted-foreground"
                             />
                             {m.clients_credit({
                               amount: formatMoney(client.creditCents),

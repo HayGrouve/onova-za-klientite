@@ -105,7 +105,6 @@ function TodayPage() {
             <ListSection
               title={m.today_due_soon()}
               icon={HourglassMediumIcon}
-              tone="warning"
               count={data.dueSoon.length}
             >
               {data.dueSoon.map((job) => (
@@ -135,7 +134,6 @@ function TodayPage() {
             <ListSection
               title={m.today_done_unpaid()}
               icon={HandCoinsIcon}
-              tone="success"
               count={data.doneUnpaid.length}
             >
               {data.doneUnpaid.map((job) => (
@@ -147,7 +145,6 @@ function TodayPage() {
             <ListSection
               title={m.today_upcoming()}
               icon={CalendarDotsIcon}
-              tone="muted"
               count={data.upcoming.length}
             >
               {data.upcoming.map(

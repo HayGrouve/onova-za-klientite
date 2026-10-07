@@ -52,7 +52,7 @@ function JobsPage() {
             >
               {GROUP_LABEL[key]()}
               {data && data.counts[key] > 0 && (
-                <span className="rounded-full bg-foreground/8 px-1 text-xs text-muted-foreground tabular-nums">
+                <span className="text-xs text-muted-foreground tabular-nums">
                   {data.counts[key]}
                 </span>
               )}

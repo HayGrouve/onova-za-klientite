@@ -3,63 +3,46 @@ import { cn } from 'cn'
 import { Hint } from '#/components/hint'
 import { formatMoney } from '../../../shared/money'
 
-const TONE = {
-  plain: 'surface',
-  highlight: 'rounded-2xl bg-primary/8 ring-1 ring-primary/25',
-  strong:
-    'rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25',
+// Colour only where it means something: what is owed, and profit or loss.
+const EMPHASIS = {
+  primary: 'text-primary',
+  positive: 'text-green-700',
+  negative: 'text-destructive',
 }
 
 /**
- * One amount on a card: the label, the amount under it, and an "i" in the
- * corner that explains the term. The hint comes last in the markup, so the
- * amount stays the label's next sibling.
+ * One amount: the label, the amount under it, and an "i" in the corner that
+ * explains the term. No card of its own: a card holds several figures, split
+ * by lines. The hint comes last in the markup, so the amount stays the label's
+ * next sibling.
  */
 export function MoneyFigure({
   label,
   cents,
   hint,
   icon: IconComponent,
-  tone = 'plain',
+  emphasis,
   size = 'md',
 }: {
   label: string
   cents: number
   hint: string
   icon?: Icon
-  tone?: keyof typeof TONE
+  emphasis?: keyof typeof EMPHASIS
   /** `sm` fits three to a row. */
   size?: 'sm' | 'md'
 }) {
-  const strong = tone === 'strong'
   const small = size === 'sm'
   return (
-    <div
-      className={cn(
-        'relative flex h-full flex-col',
-        small ? 'gap-1 p-3' : 'gap-2 p-3.5',
-        TONE[tone],
-      )}
-    >
+    <div className={cn('relative flex flex-col gap-1', small ? 'p-3' : 'p-4')}>
       <span
         className={cn(
-          'flex min-w-0 items-center gap-2 leading-tight',
+          'flex min-w-0 items-center gap-1.5 leading-tight text-muted-foreground',
           small ? 'pr-6 text-xs' : 'pr-7 text-sm',
-          strong ? 'text-primary-foreground/85' : 'text-muted-foreground',
         )}
       >
         {IconComponent && (
-          <span
-            aria-hidden
-            className={cn(
-              'flex size-7 shrink-0 items-center justify-center rounded-lg',
-              strong
-                ? 'bg-primary-foreground/15 text-primary-foreground'
-                : 'bg-primary/10 text-primary',
-            )}
-          >
-            <IconComponent className="size-4" weight="bold" />
-          </span>
+          <IconComponent aria-hidden className="size-4 shrink-0" />
         )}
         {label}
       </span>
@@ -67,20 +50,14 @@ export function MoneyFigure({
         className={cn(
           'font-semibold tracking-tight tabular-nums',
           small ? 'text-lg' : 'text-2xl',
-          tone === 'highlight' && 'text-primary',
+          emphasis && EMPHASIS[emphasis],
         )}
       >
         {formatMoney(cents)}
       </div>
       <Hint
         term={label}
-        className={cn(
-          'absolute',
-          small ? 'top-2 right-2' : 'right-3',
-          !small && (IconComponent ? 'top-4' : 'top-3'),
-          strong &&
-            'text-primary-foreground/70 hover:text-primary-foreground data-popup-open:text-primary-foreground',
-        )}
+        className={cn('absolute', small ? 'top-2 right-2' : 'top-3 right-3')}
       >
         {hint}
       </Hint>

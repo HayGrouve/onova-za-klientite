@@ -1,6 +1,7 @@
 import {
   BellIcon,
   CalendarBlankIcon,
+  CheckIcon,
   ClockCounterClockwiseIcon,
   FlagIcon,
   FlowArrowIcon,
@@ -42,10 +43,9 @@ import { LinesEditor } from '#/components/job/lines-editor'
 import { Hint } from '#/components/hint'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { formatMoment } from '#/components/job-row'
-import { ListCard, SectionHeader } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
-import { StageBadge } from '#/components/stage-badge'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
 import {
@@ -63,12 +63,13 @@ import { m } from '#/paraglide/messages.js'
 import { addMonths, isOverdue } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
 import { telHref } from '../../../shared/phone-format'
+import type { StageGroup } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/jobs/$jobId')({
   component: JobPage,
 })
 
-type Panel =
+type OpenSheet =
   | { kind: 'edit' }
   | { kind: 'lines' }
   | { kind: 'appointment'; appointment?: Doc<'appointments'> }
@@ -80,25 +81,12 @@ type Panel =
   | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
   | { kind: 'reminder'; rule: boolean }
 
-function Section({
-  title,
-  icon,
-  hint,
-  action,
-  children,
-}: {
-  title: string
-  icon: Icon
-  hint?: React.ReactNode
-  action?: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <section className="flex flex-col gap-2">
-      <SectionHeader title={title} icon={icon} hint={hint} action={action} />
-      {children}
-    </section>
-  )
+// The current stage is the one filled chip; colour follows its group (D53).
+const CURRENT_STAGE: Record<StageGroup, string> = {
+  new: 'bg-primary text-primary-foreground',
+  in_progress: 'bg-primary text-primary-foreground',
+  done: 'bg-green-600 text-white',
+  cancelled: 'bg-destructive text-white',
 }
 
 /** One fact about the job, with an icon in front. */
@@ -137,7 +125,7 @@ function JobPage() {
   const changeStage = useMutation(api.jobs.changeStage)
   const applyCredit = useMutation(api.payments.useCredit)
   const removeWriteOff = useMutation(api.jobs.removeWriteOff)
-  const [panel, setPanel] = useState<Panel | null>(null)
+  const [panel, setPanel] = useState<OpenSheet | null>(null)
   const { words, modules } = business
 
   if (!data || !fields) return <ListSkeleton />
@@ -180,123 +168,128 @@ function JobPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5 pb-6">
-      <header className="flex flex-col gap-2 px-4 pt-2">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight">
-            {job.title}
-          </h1>
-          <div className="flex shrink-0 items-center gap-1">
-            <JobSummaryButton businessId={business._id} jobId={job._id} />
-            <Tip label={m.job_edit()}>
-              <Button
-                variant="ghost"
-                size="icon-xl"
-                aria-label={m.job_edit()}
-                onClick={() => setPanel({ kind: 'edit' })}
-              >
-                <PencilSimpleIcon />
-              </Button>
-            </Tip>
-          </div>
+    <div className="flex flex-col gap-4 pb-6">
+      <header className="flex items-start justify-between gap-3 px-4 pt-2">
+        <h1 className="text-2xl leading-tight font-semibold tracking-tight">
+          {job.title}
+        </h1>
+        <div className="flex shrink-0 items-center gap-1">
+          <JobSummaryButton businessId={business._id} jobId={job._id} />
+          <Tip label={m.job_edit()}>
+            <Button
+              variant="ghost"
+              size="icon-xl"
+              aria-label={m.job_edit()}
+              onClick={() => setPanel({ kind: 'edit' })}
+            >
+              <PencilSimpleIcon />
+            </Button>
+          </Tip>
         </div>
-        {(client || job.address || job.dueDate) && (
-          <div className="flex animate-rise flex-col divide-y divide-border/70 overflow-hidden surface">
-            {client && (
-              <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4">
-                <InitialsAvatar
-                  name={client.isNoClient ? m.no_client() : client.name}
-                  className="size-9 text-xs"
-                />
-                <Link
-                  to="/clients/$clientId"
-                  params={{ clientId: client._id }}
-                  className="min-w-0 flex-1 truncate text-base font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  {client.isNoClient ? m.no_client() : client.name}
-                </Link>
-                {phone && (
-                  <Tip label={m.client_call()}>
-                    <a
-                      href={telHref(phone)}
-                      aria-label={m.client_call()}
-                      className={buttonVariants({
-                        variant: 'outline',
-                        size: 'icon-xl',
-                        className: 'text-primary',
-                      })}
-                    >
-                      <PhoneIcon weight="fill" />
-                    </a>
-                  </Tip>
-                )}
-              </div>
-            )}
-            {job.address && (
-              <InfoRow icon={MapPinIcon} className="text-muted-foreground">
-                {job.address}
-              </InfoRow>
-            )}
-            {job.dueDate && (
-              <InfoRow
-                icon={late ? WarningCircleIcon : FlagIcon}
-                className={
-                  late
-                    ? 'bg-destructive/5 font-medium text-destructive'
-                    : 'text-muted-foreground'
-                }
-              >
-                {late
-                  ? m.late_since({ date: formatDay(job.dueDate, today) })
-                  : m.due_short({ date: formatDay(job.dueDate, today) })}
-              </InfoRow>
-            )}
-          </div>
-        )}
       </header>
 
-      <Section
+      {(client || job.address || job.dueDate) && (
+        <div className="mx-4 flex animate-rise flex-col divide-y divide-border/70 overflow-hidden surface">
+          {client && (
+            <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4">
+              <InitialsAvatar
+                name={client.isNoClient ? m.no_client() : client.name}
+                className="size-9 text-xs"
+              />
+              <Link
+                to="/clients/$clientId"
+                params={{ clientId: client._id }}
+                className="min-w-0 flex-1 truncate text-base font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {client.isNoClient ? m.no_client() : client.name}
+              </Link>
+              {phone && (
+                <Tip label={m.client_call()}>
+                  <a
+                    href={telHref(phone)}
+                    aria-label={m.client_call()}
+                    className={buttonVariants({
+                      variant: 'ghost',
+                      size: 'icon-xl',
+                      className: 'text-primary',
+                    })}
+                  >
+                    <PhoneIcon weight="fill" />
+                  </a>
+                </Tip>
+              )}
+            </div>
+          )}
+          {job.address && (
+            <InfoRow icon={MapPinIcon} className="text-muted-foreground">
+              {job.address}
+            </InfoRow>
+          )}
+          {job.dueDate && (
+            <InfoRow
+              icon={late ? WarningCircleIcon : FlagIcon}
+              className={
+                late ? 'font-medium text-destructive' : 'text-muted-foreground'
+              }
+            >
+              {late
+                ? m.late_since({ date: formatDay(job.dueDate, today) })
+                : m.due_short({ date: formatDay(job.dueDate, today) })}
+            </InfoRow>
+          )}
+        </div>
+      )}
+
+      <Panel
         title={m.job_stage()}
         icon={FlowArrowIcon}
         hint={<Hint term={m.job_stage()}>{m.hint_stage()}</Hint>}
       >
-        <div
-          className="flex flex-wrap gap-2 px-4"
-          role="radiogroup"
-          aria-label={m.job_stage()}
-        >
-          {data.stages.map((stage) => {
-            const current = stage._id === job.stageId
-            return (
-              <button
-                key={stage._id}
-                type="button"
-                role="radio"
-                aria-checked={current}
-                onClick={() => !current && void moveTo(stage._id)}
-                className={cn(
-                  'rounded-full ring-offset-2 ring-offset-canvas transition-[box-shadow,transform] duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95',
-                  current ? 'shadow-sm ring-2 ring-primary' : 'hover:shadow-sm',
-                )}
-              >
-                <StageBadge
-                  name={stage.name}
-                  color={stage.color}
-                  className="h-9 px-3.5 text-sm"
-                />
-              </button>
-            )
-          })}
-        </div>
-        {job.cancelReason && job.stageGroup === 'cancelled' && (
-          <p className="px-4 text-sm text-muted-foreground">
-            {m.job_cancel_reason()}: {job.cancelReason}
-          </p>
-        )}
-      </Section>
+        <PanelBody>
+          <div
+            className="flex flex-wrap gap-2"
+            role="radiogroup"
+            aria-label={m.job_stage()}
+          >
+            {data.stages.map((stage) => {
+              const current = stage._id === job.stageId
+              return (
+                <button
+                  key={stage._id}
+                  type="button"
+                  role="radio"
+                  aria-checked={current}
+                  onClick={() => !current && void moveTo(stage._id)}
+                  className={cn(
+                    'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-[background-color,color,transform] duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95',
+                    current
+                      ? cn('shadow-sm', CURRENT_STAGE[stage.group])
+                      : cn(
+                          'bg-card ring-1 ring-border ring-inset hover:bg-muted',
+                          stage.group === 'cancelled'
+                            ? 'text-destructive'
+                            : 'text-foreground/80',
+                        ),
+                  )}
+                >
+                  {current && (
+                    <CheckIcon aria-hidden className="size-4" weight="bold" />
+                  )}
+                  {stage.name}
+                </button>
+              )
+            })}
+          </div>
+          {job.cancelReason && job.stageGroup === 'cancelled' && (
+            <p className="pt-3 text-sm text-muted-foreground">
+              {m.job_cancel_reason()}: {job.cancelReason}
+            </p>
+          )}
+        </PanelBody>
+      </Panel>
 
       {modules.appointments && (
-        <Section
+        <Panel
           title={words.appointment.plural}
           icon={CalendarBlankIcon}
           action={editButton(
@@ -305,43 +298,60 @@ function JobPage() {
             PlusIcon,
           )}
         >
-          <ListCard>
+          <PanelList>
             {data.appointments.map((appointment) => (
               <li key={appointment._id}>
                 <button
                   type="button"
                   onClick={() => setPanel({ kind: 'appointment', appointment })}
-                  className="flex w-full items-center gap-3 pressable px-4 py-2.5 text-left"
+                  className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-3 text-left"
                 >
-                  <span
-                    aria-hidden
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
-                  >
-                    <CalendarBlankIcon className="size-5" />
+                  <span className="font-medium">
+                    {formatMoment(appointment.start, appointment.allDay, today)}
                   </span>
-                  <span className="flex flex-col">
-                    <span>
-                      {formatMoment(
-                        appointment.start,
-                        appointment.allDay,
-                        today,
-                      )}
+                  {appointment.label && (
+                    <span className="truncate text-sm text-muted-foreground">
+                      {appointment.label}
                     </span>
-                    {appointment.label && (
-                      <span className="text-sm text-muted-foreground">
-                        {appointment.label}
-                      </span>
-                    )}
-                  </span>
+                  )}
                 </button>
               </li>
             ))}
-          </ListCard>
-        </Section>
+          </PanelList>
+        </Panel>
       )}
 
-      <Section title={m.job_money()} icon={WalletIcon}>
-        <div className="mx-4 grid stagger grid-cols-3 gap-2">
+      <Panel
+        title={m.job_money()}
+        icon={WalletIcon}
+        footer={
+          <>
+            <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
+              <PlusIcon data-icon="inline-start" />
+              {m.pay_add()}
+            </Button>
+            {job.paidCents > 0 && (
+              <Button
+                variant="outline"
+                size="xl"
+                onClick={() => setPanel({ kind: 'refund' })}
+              >
+                {m.refund_add()}
+              </Button>
+            )}
+            {job.owes && job.paidCents < job.priceCents && (
+              <Button
+                variant="ghost"
+                size="xl"
+                onClick={() => setPanel({ kind: 'writeOff' })}
+              >
+                {m.writeoff_add()}
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="grid grid-cols-3 divide-x divide-border/70 border-t border-border/70">
           <MoneyFigure
             size="sm"
             label={m.job_price()}
@@ -359,17 +369,22 @@ function JobPage() {
             label={m.job_balance()}
             cents={job.balanceCents}
             hint={m.hint_balance()}
-            tone={job.owes && job.balanceCents > 0 ? 'highlight' : 'plain'}
+            emphasis={job.owes && job.balanceCents > 0 ? 'primary' : undefined}
           />
         </div>
         {modules.costs && (
-          <p className="flex items-center gap-1 px-4 text-sm text-muted-foreground">
-            {m.job_profit()}: {formatMoney(job.paidCents - job.costCents)}
-            <Hint term={m.job_profit()}>{m.hint_job_profit()}</Hint>
-          </p>
+          <div className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2.5 text-sm">
+            <span className="flex items-center gap-1 text-muted-foreground">
+              {m.job_profit()}
+              <Hint term={m.job_profit()}>{m.hint_job_profit()}</Hint>
+            </span>
+            <span className="font-medium tabular-nums">
+              {formatMoney(job.paidCents - job.costCents)}
+            </span>
+          </div>
         )}
         {client && client.creditCents > 0 && job.owes && (
-          <div className="mx-4 flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2">
+          <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-primary/5 py-2 pr-2 pl-4">
             <span className="text-sm font-medium">
               {m.credit_banner({ amount: formatMoney(client.creditCents) })}
             </span>
@@ -391,7 +406,7 @@ function JobPage() {
           </div>
         )}
         {job.writeOff && (
-          <div className="flex items-center justify-between gap-3 px-4 text-sm text-muted-foreground">
+          <div className="flex items-center justify-between gap-3 border-t border-border/70 py-1.5 pr-2 pl-4 text-sm text-muted-foreground">
             <span>
               {m.job_written_off()}: {formatMoney(job.writeOff.amountCents)} ·{' '}
               {job.writeOff.note}
@@ -410,60 +425,36 @@ function JobPage() {
             </Button>
           </div>
         )}
-        {data.payments.length > 0 && (
-          <ListCard>
-            {data.payments.map((payment) => (
-              <li key={payment._id}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPanel({
-                      kind: 'removePayment',
-                      paymentId: payment.paymentId,
-                      amountCents: payment.paymentAmountCents,
-                    })
-                  }
-                  className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
-                >
-                  <span>
-                    {payment.label ?? METHOD_LABEL[payment.method]()} ·{' '}
+        <PanelList>
+          {data.payments.map((payment) => (
+            <li key={payment._id}>
+              <button
+                type="button"
+                onClick={() =>
+                  setPanel({
+                    kind: 'removePayment',
+                    paymentId: payment.paymentId,
+                    amountCents: payment.paymentAmountCents,
+                  })
+                }
+                className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
+              >
+                <span>
+                  {payment.label ?? METHOD_LABEL[payment.method]()} ·{' '}
+                  <span className="text-muted-foreground">
                     {formatDay(payment.date, today)}
                   </span>
-                  <span className="font-medium tabular-nums">
-                    {formatMoney(payment.amountCents)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ListCard>
-        )}
-        <div className="flex flex-wrap gap-2 px-4">
-          <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
-            <PlusIcon data-icon="inline-start" />
-            {m.pay_add()}
-          </Button>
-          {job.paidCents > 0 && (
-            <Button
-              variant="outline"
-              size="xl"
-              onClick={() => setPanel({ kind: 'refund' })}
-            >
-              {m.refund_add()}
-            </Button>
-          )}
-          {job.owes && job.paidCents < job.priceCents && (
-            <Button
-              variant="ghost"
-              size="xl"
-              onClick={() => setPanel({ kind: 'writeOff' })}
-            >
-              {m.writeoff_add()}
-            </Button>
-          )}
-        </div>
-      </Section>
+                </span>
+                <span className="font-medium tabular-nums">
+                  {formatMoney(payment.amountCents)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </PanelList>
+      </Panel>
 
-      <Section
+      <Panel
         title={m.job_lines()}
         icon={ListBulletsIcon}
         action={editButton(
@@ -473,7 +464,7 @@ function JobPage() {
         )}
       >
         {job.lines.length > 0 ? (
-          <ListCard>
+          <PanelList>
             {job.lines.map((line) => (
               <li
                 key={line.id}
@@ -494,18 +485,18 @@ function JobPage() {
                 </span>
               </li>
             ))}
-          </ListCard>
+          </PanelList>
         ) : (
           job.typedPriceCents !== undefined && (
-            <p className="px-4 text-sm text-muted-foreground">
+            <PanelBody className="py-3 text-sm text-muted-foreground">
               {m.job_typed_price()}: {formatMoney(job.typedPriceCents)}
-            </p>
+            </PanelBody>
           )
         )}
-      </Section>
+      </Panel>
 
       {modules.costs && (
-        <Section
+        <Panel
           title={m.job_costs()}
           icon={ReceiptIcon}
           action={editButton(
@@ -514,7 +505,7 @@ function JobPage() {
             PlusIcon,
           )}
         >
-          <ListCard>
+          <PanelList>
             {data.costs.map((cost) => (
               <li key={cost._id}>
                 <button
@@ -523,7 +514,10 @@ function JobPage() {
                   className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
                 >
                   <span>
-                    {cost.label} · {formatDay(cost.date, today)}
+                    {cost.label} ·{' '}
+                    <span className="text-muted-foreground">
+                      {formatDay(cost.date, today)}
+                    </span>
                   </span>
                   <span className="tabular-nums">
                     {formatMoney(cost.amountCents)}
@@ -531,70 +525,77 @@ function JobPage() {
                 </button>
               </li>
             ))}
-          </ListCard>
-        </Section>
+          </PanelList>
+        </Panel>
       )}
 
       {modules.items && client && !client.isNoClient && (
-        <Section
+        <Panel
           title={words.item.plural}
           icon={StackIcon}
           action={editButton(() => setPanel({ kind: 'items' }))}
         >
-          <div className="flex flex-wrap gap-2 px-4">
-            {data.items.map((item) => (
-              <Link
-                key={item._id}
-                to="/items/$itemId"
-                params={{ itemId: item._id }}
-                className={buttonVariants({
-                  variant: 'outline',
-                  className: 'h-11 rounded-xl shadow-xs',
-                })}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </div>
-        </Section>
+          {data.items.length > 0 && (
+            <PanelBody className="flex flex-wrap gap-2">
+              {data.items.map((item) => (
+                <Link
+                  key={item._id}
+                  to="/items/$itemId"
+                  params={{ itemId: item._id }}
+                  className={cn(
+                    buttonVariants({
+                      variant: 'outline',
+                      className: 'h-11 rounded-xl',
+                    }),
+                  )}
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </PanelBody>
+          )}
+        </Panel>
       )}
 
       <ExtraFieldsView fields={fields} values={job.extra} today={today} />
 
       {job.notes && (
-        <Section title={m.job_notes()} icon={NoteIcon}>
-          <p className="mx-4 surface px-4 py-3 text-sm whitespace-pre-wrap">
+        <Panel title={m.job_notes()} icon={NoteIcon}>
+          <PanelBody className="text-sm whitespace-pre-wrap">
             {job.notes}
-          </p>
-        </Section>
+          </PanelBody>
+        </Panel>
       )}
 
       <RepeatSection job={job} />
 
       {modules.reminders && client && !client.isNoClient && (
-        <div className="px-4">
-          <Button
-            variant="outline"
-            className="h-11"
-            onClick={() => setPanel({ kind: 'reminder', rule: false })}
-          >
-            <BellIcon data-icon="inline-start" />
-            {m.reminder_add()}
-          </Button>
-        </div>
+        <Panel
+          title={m.reminder_list()}
+          icon={BellIcon}
+          action={editButton(
+            () => setPanel({ kind: 'reminder', rule: false }),
+            m.reminder_add(),
+            PlusIcon,
+          )}
+        />
       )}
 
-      <Section title={m.job_files()} icon={PaperclipIcon}>
-        <FileGallery
-          businessId={business._id}
-          target={{ kind: 'job', jobId: job._id }}
-        />
-      </Section>
+      <Panel title={m.job_files()} icon={PaperclipIcon}>
+        <PanelBody className="px-0">
+          <FileGallery
+            businessId={business._id}
+            target={{ kind: 'job', jobId: job._id }}
+          />
+        </PanelBody>
+      </Panel>
 
       {data.timeline.length > 0 && (
-        <Section title={m.job_history()} icon={ClockCounterClockwiseIcon}>
-          <Timeline items={data.timeline} />
-        </Section>
+        <Panel title={m.job_history()} icon={ClockCounterClockwiseIcon}>
+          <PanelBody className="px-0">
+            <Timeline items={data.timeline} />
+          </PanelBody>
+        </Panel>
       )}
 
       <Sheet open={panel !== null} onOpenChange={(open) => !open && close()}>

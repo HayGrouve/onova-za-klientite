@@ -15,7 +15,7 @@ import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { ItemForm } from '#/components/item-form'
 import { JobRow } from '#/components/job-row'
-import { ListSection, SectionHeader } from '#/components/list-section'
+import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { Timeline } from '#/components/timeline'
@@ -50,7 +50,7 @@ function ItemPage() {
   const { item, client } = data
 
   return (
-    <div className="flex flex-col gap-5 pb-6">
+    <div className="flex flex-col gap-4 pb-6">
       <header className="flex flex-col gap-2 px-4 pt-2">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl leading-tight font-semibold tracking-tight">
@@ -95,32 +95,33 @@ function ItemPage() {
 
       <ExtraFieldsView fields={data.fields} values={item.extra} today={today} />
 
-      <ListSection
+      <Panel
         title={business.words.job.plural}
         icon={ClipboardTextIcon}
         count={data.jobs.length || undefined}
       >
-        {data.jobs.map((job) => (
-          <JobRow key={job._id} job={job} today={today} />
-        ))}
-      </ListSection>
+        <PanelList>
+          {data.jobs.map((job) => (
+            <JobRow key={job._id} job={job} today={today} />
+          ))}
+        </PanelList>
+      </Panel>
 
-      <section className="flex flex-col gap-2">
-        <SectionHeader title={m.job_files()} icon={PaperclipIcon} />
-        <FileGallery
-          businessId={business._id}
-          target={{ kind: 'item', itemId: item._id }}
-        />
-      </section>
+      <Panel title={m.job_files()} icon={PaperclipIcon}>
+        <PanelBody className="px-0">
+          <FileGallery
+            businessId={business._id}
+            target={{ kind: 'item', itemId: item._id }}
+          />
+        </PanelBody>
+      </Panel>
 
       {data.timeline.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <SectionHeader
-            title={m.item_history()}
-            icon={ClockCounterClockwiseIcon}
-          />
-          <Timeline items={data.timeline} />
-        </section>
+        <Panel title={m.item_history()} icon={ClockCounterClockwiseIcon}>
+          <PanelBody className="px-0">
+            <Timeline items={data.timeline} />
+          </PanelBody>
+        </Panel>
       )}
 
       <Sheet

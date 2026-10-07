@@ -1,21 +1,19 @@
 import type { Icon } from '@phosphor-icons/react'
 import { cn } from 'cn'
 
-export type Tone = 'primary' | 'danger' | 'warning' | 'success' | 'muted'
+// Icons stay quiet; red marks the one section that needs attention now.
+type Tone = 'muted' | 'danger'
 
 const TONE: Record<Tone, string> = {
-  primary: 'text-primary',
-  danger: 'text-destructive',
-  warning: 'text-amber-600',
-  success: 'text-green-600',
   muted: 'text-muted-foreground',
+  danger: 'text-destructive',
 }
 
 /** The heading above a group: an icon, the title, a count, a hint and an action. */
 export function SectionHeader({
   title,
   icon: IconComponent,
-  tone = 'primary',
+  tone = 'muted',
   count,
   hint,
   action,
@@ -33,7 +31,6 @@ export function SectionHeader({
         {IconComponent && (
           <IconComponent
             aria-hidden
-            weight="duotone"
             className={cn('size-5 shrink-0', TONE[tone])}
           />
         )}

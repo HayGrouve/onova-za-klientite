@@ -39,9 +39,9 @@ function DataSettings() {
           >
             <span
               aria-hidden
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground/70"
             >
-              <UploadSimpleIcon className="size-5.5" weight="duotone" />
+              <UploadSimpleIcon className="size-5.5" />
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="font-medium">{m.data_import()}</span>
@@ -96,12 +96,12 @@ function ExportRow() {
       >
         <span
           aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground/70"
         >
           {busy ? (
             <Spinner className="size-5.5" />
           ) : (
-            <DownloadSimpleIcon className="size-5.5" weight="duotone" />
+            <DownloadSimpleIcon className="size-5.5" />
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
