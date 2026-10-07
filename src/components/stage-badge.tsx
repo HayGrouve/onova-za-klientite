@@ -2,7 +2,7 @@ import { cn } from 'cn'
 import type { StageColor } from '../../shared/stages'
 
 const COLORS: Record<StageColor, string> = {
-  gray: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200',
+  gray: 'bg-zinc-200/70 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200',
   blue: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
   amber: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
   violet:
@@ -23,11 +23,15 @@ export function StageBadge({
   return (
     <span
       className={cn(
-        'inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-xs font-medium',
+        'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium',
         COLORS[color],
         className,
       )}
     >
+      <span
+        aria-hidden
+        className="size-1.5 rounded-full bg-current opacity-70"
+      />
       {name}
     </span>
   )

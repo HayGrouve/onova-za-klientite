@@ -10,7 +10,8 @@ const toggleVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        outline: "border border-input bg-transparent hover:bg-muted",
+        // Local change (ADR 0005): white on the tinted page.
+        outline: "border border-input bg-card hover:bg-muted",
       },
       size: {
         default:

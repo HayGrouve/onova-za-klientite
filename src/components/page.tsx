@@ -25,12 +25,12 @@ export function EmptyState({
   body: string
 }) {
   return (
-    <Empty className="px-8">
+    <Empty className="animate-rise px-8">
       <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <IconComponent />
+        <EmptyMedia className="size-16 rounded-3xl bg-primary/10 text-primary">
+          <IconComponent className="size-8" weight="duotone" />
         </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyTitle className="text-base">{title}</EmptyTitle>
         <EmptyDescription>{body}</EmptyDescription>
       </EmptyHeader>
     </Empty>
