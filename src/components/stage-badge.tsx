@@ -15,10 +15,17 @@ const GROUP_STYLE: Record<StageGroup, string> = {
 export function StageBadge({
   name,
   group,
+  corner = false,
   className,
 }: {
   name: string
   group: StageGroup
+  /**
+   * A tab joined to the top-right corner of its row: square at the top and
+   * right, so the card's own clipping gives it the card's corner, or a
+   * right angle under a divider. The caller pulls it to the edges.
+   */
+  corner?: boolean
   className?: string
 }) {
   return (
@@ -26,6 +33,7 @@ export function StageBadge({
       className={cn(
         'inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-xs font-medium ring-1 ring-inset',
         GROUP_STYLE[group],
+        corner && 'h-7 rounded-none rounded-bl-xl px-3 ring-0',
         className,
       )}
     >

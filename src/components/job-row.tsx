@@ -80,7 +80,13 @@ export function JobRow({
           <span className="min-w-0 text-base leading-snug font-medium">
             {job.title}
           </span>
-          <StageBadge name={job.stageName} group={job.stageGroup} />
+          {/* Pulled over the row's padding onto its top and right edges. */}
+          <StageBadge
+            name={job.stageName}
+            group={job.stageGroup}
+            corner
+            className="-mt-3 -mr-4"
+          />
         </div>
         {(client || timing || owes) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
