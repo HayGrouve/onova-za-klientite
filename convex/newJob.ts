@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { sofiaTimeToUtc } from '../shared/dates'
+import { sofiaTimeToUtc, stampMoment } from '../shared/dates'
 import { logActivity } from './lib/activity'
 import {
   businessMutation,
@@ -209,11 +209,7 @@ export const save = businessMutation({
         type: 'appointment.added',
         jobId,
         clientId,
-        data: {
-          to: time
-            ? `${date} ${time.hour}:${String(time.minute).padStart(2, '0')}`
-            : date,
-        },
+        data: { to: stampMoment(date, time) },
       })
     }
     // Repeating needs the job's date; without one the switch is ignored.

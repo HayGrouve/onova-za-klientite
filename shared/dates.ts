@@ -102,6 +102,30 @@ export function isDueSoon(
   )
 }
 
+/**
+ * A date, or a date and a Sofia time, as text for the activity log: the
+ * history keeps "2026-10-08 14:00" and shows it in the reader's own format.
+ */
+export function stampMoment(
+  date: string,
+  time?: { hour: number; minute: number },
+): string {
+  return time ? `${date} ${time.hour}:${pad(time.minute)}` : date
+}
+
+/** Reads what `stampMoment` wrote. Anything else is not a moment. */
+export function parseMoment(
+  text: string,
+): { date: string; time?: { hour: number; minute: number } } | undefined {
+  const match = /^(\d{4}-\d{2}-\d{2})(?: (\d{1,2}):(\d{2}))?$/.exec(text)
+  if (!match || !isValidDate(match[1])) return undefined
+  if (match[2] === undefined) return { date: match[1] }
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  if (hour > 23 || minute > 59) return undefined
+  return { date: match[1], time: { hour, minute } }
+}
+
 /** Sunday is 0. */
 export function weekdayOf(date: string): number {
   return (((toDayNumber(date) + 4) % 7) + 7) % 7
