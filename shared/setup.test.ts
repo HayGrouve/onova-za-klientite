@@ -4,6 +4,7 @@ import {
   JOB_WORDS,
   REMINDER_MONTHS,
   REPEAT_EVERY,
+  RULE_MONTHS,
   answersFromBusiness,
   defaultBusiness,
   jobFormFields,
@@ -158,6 +159,13 @@ describe('settingsFromAnswers', () => {
         settingsFromAnswers({ repeat: 'months', reminderMonths: months })
           .reminderRule,
       ).toEqual({ months })
+    }
+  })
+
+  it('Settings offers every delay setup does, and two years', () => {
+    expect([...RULE_MONTHS]).toEqual([1, 2, 3, 6, 12, 24])
+    for (const months of REMINDER_MONTHS) {
+      expect(RULE_MONTHS).toContain(months)
     }
   })
 

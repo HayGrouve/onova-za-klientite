@@ -107,6 +107,9 @@ export type RepeatEvery = RepeatKey
 /** Setup step 6, "Every few months": a groomer's reminder is about 2 months, a service's a year. */
 export const REMINDER_MONTHS = [1, 2, 3, 6, 12] as const
 
+/** Settings → Reminders offers every setup delay, and two years. */
+export const RULE_MONTHS = [...REMINDER_MONTHS, 24] as const
+
 export const MAX_SERVICES = 8
 
 /** Raw wizard answers. `undefined` means skipped, so the current value or a default applies. */

@@ -18,13 +18,12 @@ import { formatLongDay } from '#/i18n/dates'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import { addMonths } from '../../../shared/dates'
+import { RULE_MONTHS } from '../../../shared/setup'
 import type { Words } from '../../../shared/words'
 
 export const Route = createFileRoute('/_app/settings/reminders')({
   component: RemindersSettings,
 })
-
-const MONTHS = [3, 6, 12, 24]
 
 function RemindersSettings() {
   const { business } = useViewer()
@@ -107,7 +106,7 @@ function RemindersSettings() {
                 className="w-full flex-wrap"
                 disabled={!owner}
               >
-                {MONTHS.map((months) => (
+                {RULE_MONTHS.map((months) => (
                   <ToggleGroupItem
                     key={months}
                     value={String(months)}

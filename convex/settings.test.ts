@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
+import { RULE_MONTHS } from '../shared/setup'
 import { getDoc, setupBusiness, setupConvex, storeBlob } from './test.setup'
 
 describe('Settings → Business, Names, Modules, Reminders', () => {
@@ -79,6 +80,20 @@ describe('Settings → Business, Names, Modules, Reminders', () => {
     await expect(
       owner.mutation(api.businesses.setReminderRule, { businessId, months: 0 }),
     ).rejects.toThrow(/invalid/)
+  })
+
+  it('the rule takes every delay Settings offers, from a month to two years', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    for (const months of RULE_MONTHS) {
+      await owner.mutation(api.businesses.setReminderRule, {
+        businessId,
+        months,
+      })
+      expect((await getDoc(t, 'businesses', businessId)).reminderRule).toEqual({
+        months,
+      })
+    }
   })
 
   it('a new logo replaces the old one and keeps storageBytes right', async () => {
