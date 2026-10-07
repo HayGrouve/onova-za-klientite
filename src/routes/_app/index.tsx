@@ -16,6 +16,7 @@ import { ReminderRow } from '#/components/reminders/reminder-row'
 import { ListSection } from '#/components/list-section'
 import { EmptyState, PageTitle } from '#/components/page'
 import { TodayWide } from '#/components/today/today-wide'
+import { VisitRow } from '#/components/today/visit-row'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
@@ -79,22 +80,9 @@ function TodayPage() {
               icon={CalendarCheckIcon}
               count={data.appointments.length}
             >
-              {data.appointments.map(
-                (item) =>
-                  item.job && (
-                    <JobRow
-                      key={item._id}
-                      job={{
-                        ...item.job,
-                        nextAppointment: {
-                          start: item.start,
-                          allDay: item.allDay,
-                        },
-                      }}
-                      today={today}
-                    />
-                  ),
-              )}
+              {data.appointments.map((item) => (
+                <VisitRow key={item._id} item={item} today={today} />
+              ))}
             </ListSection>
           )}
           {data.overdue.length > 0 && (
@@ -105,7 +93,12 @@ function TodayPage() {
               count={data.overdue.length}
             >
               {data.overdue.map((job) => (
-                <JobRow key={job._id} job={job} today={today} />
+                <JobRow
+                  key={job._id}
+                  job={job}
+                  today={today}
+                  lead={{ kind: 'due' }}
+                />
               ))}
             </ListSection>
           )}
@@ -116,7 +109,12 @@ function TodayPage() {
               count={data.dueSoon.length}
             >
               {data.dueSoon.map((job) => (
-                <JobRow key={job._id} job={job} today={today} />
+                <JobRow
+                  key={job._id}
+                  job={job}
+                  today={today}
+                  lead={{ kind: 'due' }}
+                />
               ))}
             </ListSection>
           )}
@@ -145,7 +143,12 @@ function TodayPage() {
               count={data.doneUnpaid.length}
             >
               {data.doneUnpaid.map((job) => (
-                <JobRow key={job._id} job={job} today={today} />
+                <JobRow
+                  key={job._id}
+                  job={job}
+                  today={today}
+                  lead={{ kind: 'none' }}
+                />
               ))}
             </ListSection>
           )}
@@ -155,22 +158,9 @@ function TodayPage() {
               icon={CalendarDotsIcon}
               count={data.upcoming.length}
             >
-              {data.upcoming.map(
-                (item) =>
-                  item.job && (
-                    <JobRow
-                      key={item._id}
-                      job={{
-                        ...item.job,
-                        nextAppointment: {
-                          start: item.start,
-                          allDay: item.allDay,
-                        },
-                      }}
-                      today={today}
-                    />
-                  ),
-              )}
+              {data.upcoming.map((item) => (
+                <VisitRow key={item._id} item={item} today={today} />
+              ))}
             </ListSection>
           )}
         </div>

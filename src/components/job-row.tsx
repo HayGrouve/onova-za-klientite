@@ -13,8 +13,9 @@ import type { api } from '../../convex/_generated/api'
 import { StageBadge } from '#/components/stage-badge'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
-import { dateInSofia, isOverdue } from '../../shared/dates'
+import { dateInSofia } from '../../shared/dates'
 import { formatMoney } from '../../shared/money'
+import { isJobLate } from '../../shared/today'
 
 export type JobRowData = FunctionReturnType<
   typeof api.jobs.list
@@ -31,41 +32,94 @@ export function formatMoment(ms: number, allDay: boolean, today: string) {
   return allDay ? day : `${day}, ${TIME.format(ms)}`
 }
 
+/**
+ * What a row leads with when its list has a reason for showing the job. Left
+ * out, a row shows how late it is, else its next appointment, else its due date.
+ * - `appointment`: that appointment's time and label, then how late the job is.
+ * - `due`: how late it is, or its due date, then its next appointment.
+ * - `none`: no timing at all, e.g. a done job whose list is about money.
+ */
+export type JobRowLead =
+  | { kind: 'appointment'; start: number; allDay: boolean; label?: string }
+  | { kind: 'due' }
+  | { kind: 'none' }
+
+type Timing = { icon: Icon; text: string; late?: boolean }
+
+/** A row's timing: what it leads with, shown before the client, then the rest. */
+function timingsOf(
+  job: JobRowData,
+  today: string,
+  lead?: JobRowLead,
+): { first?: Timing; rest: Timing[] } {
+  const late: Timing | undefined =
+    isJobLate(job, today) && job.dueDate
+      ? {
+          icon: WarningCircleIcon,
+          text: m.late_since({ date: formatDay(job.dueDate, today) }),
+          late: true,
+        }
+      : undefined
+  const due: Timing | undefined = job.dueDate
+    ? {
+        icon: FlagIcon,
+        text: m.due_short({ date: formatDay(job.dueDate, today) }),
+      }
+    : undefined
+  const next: Timing | undefined = job.nextAppointment
+    ? {
+        icon: CalendarBlankIcon,
+        text: formatMoment(
+          job.nextAppointment.start,
+          job.nextAppointment.allDay,
+          today,
+        ),
+      }
+    : undefined
+  const compact = (timings: Array<Timing | undefined>) =>
+    timings.filter((timing) => timing !== undefined)
+
+  switch (lead?.kind) {
+    case 'appointment': {
+      // On today's date the day is known, so the time stands alone.
+      const { start, allDay, label } = lead
+      const when =
+        dateInSofia(start) !== today
+          ? formatMoment(start, allDay, today)
+          : allDay
+            ? m.all_day()
+            : TIME.format(start)
+      return {
+        first: {
+          icon: CalendarBlankIcon,
+          text: label ? `${when} · ${label}` : when,
+        },
+        rest: compact([late]),
+      }
+    }
+    case 'due':
+      return { rest: compact([late ?? due, next]) }
+    case 'none':
+      return { rest: [] }
+    default:
+      // Lateness comes first: an overdue job shows how late it is even with an appointment ahead.
+      return { rest: compact([late ?? next ?? due]) }
+  }
+}
+
 /** One job in a list: title, client, stage, when, and what is still owed. */
 export function JobRow({
   job,
   today,
   showClient = true,
+  lead,
 }: {
   job: JobRowData
   today: string
   showClient?: boolean
+  lead?: JobRowLead
 }) {
-  const late =
-    (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
-    isOverdue(job.dueDate, today)
-  // Lateness comes first: an overdue job shows how late it is even with an appointment ahead.
-  const timing =
-    late && job.dueDate
-      ? {
-          icon: WarningCircleIcon,
-          text: m.late_since({ date: formatDay(job.dueDate, today) }),
-        }
-      : job.nextAppointment
-        ? {
-            icon: CalendarBlankIcon,
-            text: formatMoment(
-              job.nextAppointment.start,
-              job.nextAppointment.allDay,
-              today,
-            ),
-          }
-        : job.dueDate
-          ? {
-              icon: FlagIcon,
-              text: m.due_short({ date: formatDay(job.dueDate, today) }),
-            }
-          : null
+  const timing = timingsOf(job, today, lead)
   const owes = job.owes && job.priceCents > 0
   const client = showClient && job.clientName
 
@@ -88,21 +142,30 @@ export function JobRow({
             className="-mt-3 -mr-4"
           />
         </div>
-        {(client || timing || owes) && (
+        {(client || timing.first || timing.rest.length > 0 || owes) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            {timing.first && (
+              <Meta
+                icon={timing.first.icon}
+                className="font-medium text-foreground"
+              >
+                {timing.first.text}
+              </Meta>
+            )}
             {client && (
               <Meta icon={UserIcon} className="min-w-0">
                 <span className="truncate">{job.clientName}</span>
               </Meta>
             )}
-            {timing && (
+            {timing.rest.map((item) => (
               <Meta
-                icon={timing.icon}
-                className={cn(late && 'font-medium text-destructive')}
+                key={item.text}
+                icon={item.icon}
+                className={cn(item.late && 'font-medium text-destructive')}
               >
-                {timing.text}
+                {item.text}
               </Meta>
-            )}
+            ))}
             {owes && (
               <Meta icon={CoinsIcon} className="text-foreground/80">
                 {m.balance_short({ amount: formatMoney(job.balanceCents) })}
