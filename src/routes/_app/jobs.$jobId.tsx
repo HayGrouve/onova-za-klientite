@@ -1,5 +1,4 @@
 import {
-  BellIcon,
   CalendarBlankIcon,
   CheckIcon,
   ClockCounterClockwiseIcon,
@@ -21,15 +20,17 @@ import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { cn } from 'cn'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import { AddressLink } from '#/components/address-link'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { AppointmentForm } from '#/components/job/appointment-form'
 import { RepeatSection } from '#/components/job/repeat-section'
 import { ReminderForm } from '#/components/reminders/reminder-form'
+import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { monthsLabel } from '#/components/setup/steps'
 import { CostForm } from '#/components/money/cost-form'
 import { MoneyFigure } from '#/components/money/money-figure'
@@ -55,6 +56,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useToday } from '#/hooks/use-today'
 import { useMoveJob } from '#/hooks/use-move-job'
 import { useViewer } from '#/hooks/use-viewer'
@@ -83,6 +85,11 @@ type OpenSheet =
   | { kind: 'cost'; cost?: Doc<'costs'> }
   | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
   | { kind: 'reminder'; rule: boolean }
+
+type StageRef = { _id: Id<'stages'>; name: string; group: StageGroup }
+
+/** One toast at a time for stage changes: a new one replaces the last. */
+const STAGE_TOAST = 'stage-moved'
 
 // The current stage is the one filled chip; colour follows its group (D53).
 const CURRENT_STAGE: Record<StageGroup, string> = {
@@ -125,11 +132,22 @@ function JobPage() {
     target: 'job',
   })
   const services = useQuery(api.services.list, { businessId: business._id })
+  const reminders = useQuery(
+    api.reminders.forJob,
+    business.modules.reminders
+      ? { businessId: business._id, jobId: jobId as Id<'jobs'> }
+      : 'skip',
+  )
   const move = useMoveJob()
   const applyCredit = useMutation(api.payments.useCredit)
   const removeWriteOff = useMutation(api.jobs.removeWriteOff)
   const [panel, setPanel] = useState<OpenSheet | null>(null)
+  // The stage toast waits here while the reminder offer is open (see moveTo).
+  const afterSheet = useRef<(() => void) | null>(null)
   const { words, modules } = business
+
+  // A toast's undo and payment buttons belong to this job's page.
+  useEffect(() => () => void toast.dismiss(STAGE_TOAST), [jobId])
 
   if (!data || !fields) return <ListSkeleton />
   const { job, client } = data
@@ -138,14 +156,54 @@ function JobPage() {
     (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
     isOverdue(job.dueDate, today)
 
-  const moveTo = async (stageId: Id<'stages'>) => {
-    const target = data.stages.find((stage) => stage._id === stageId)
-    // Q5: reaching Done offers the reminder rule's reminder, pre-filled.
-    if (target && (await move(job, target))) {
-      setPanel({ kind: 'reminder', rule: true })
-    }
+  // Tells the person which stage the job is in now, with a way back. Reaching
+  // Done with a balance also offers the payment.
+  const announceMove = (target: StageRef, previous: StageRef | undefined) => {
+    const undo = previous
+      ? {
+          label: m.undo(),
+          onClick: () =>
+            void move({ _id: job._id, stageGroup: target.group }, previous),
+        }
+      : undefined
+    const offerPayment =
+      target.group === 'done' &&
+      job.stageGroup !== 'done' &&
+      job.balanceCents > 0
+    toast.success(m.job_stage_moved({ stage: target.name }), {
+      id: STAGE_TOAST,
+      duration: offerPayment ? 10_000 : 6000,
+      ...(offerPayment
+        ? {
+            action: {
+              label: m.pay_add(),
+              onClick: () => setPanel({ kind: 'payment' }),
+            },
+            cancel: undo,
+          }
+        : { action: undo }),
+    })
   }
-  const close = () => setPanel(null)
+  const moveTo = (stageId: Id<'stages'>) => {
+    const target = data.stages.find((stage) => stage._id === stageId)
+    const previous = data.stages.find((stage) => stage._id === job.stageId)
+    if (!target) return
+    void move(job, target, (offerRule) => {
+      // Q5: reaching Done offers the reminder rule's reminder, pre-filled. Its
+      // sheet covers the page, so the toast comes once the sheet is closed.
+      if (offerRule) {
+        afterSheet.current = () => announceMove(target, previous)
+        setPanel({ kind: 'reminder', rule: true })
+      } else {
+        announceMove(target, previous)
+      }
+    })
+  }
+  const close = () => {
+    setPanel(null)
+    afterSheet.current?.()
+    afterSheet.current = null
+  }
   const editButton = (
     onClick: () => void,
     label = m.edit(),
@@ -222,7 +280,7 @@ function JobPage() {
                 )}
                 {job.address && (
                   <InfoRow icon={MapPinIcon} className="text-muted-foreground">
-                    {job.address}
+                    <AddressLink address={job.address} />
                   </InfoRow>
                 )}
                 {job.dueDate && (
@@ -264,7 +322,7 @@ function JobPage() {
                           type="button"
                           role="radio"
                           aria-checked={current}
-                          onClick={() => !current && void moveTo(stage._id)}
+                          onClick={() => !current && moveTo(stage._id)}
                           className={cn(
                             'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-[background-color,color,transform] duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95',
                             current
@@ -633,14 +691,10 @@ function JobPage() {
             key: 'reminders',
             side: true,
             node: modules.reminders && client && !client.isNoClient && (
-              <Panel
-                title={m.reminder_list()}
-                icon={BellIcon}
-                action={editButton(
-                  () => setPanel({ kind: 'reminder', rule: false }),
-                  m.reminder_add(),
-                  PlusIcon,
-                )}
+              <RemindersPanel
+                reminders={reminders ?? []}
+                today={today}
+                onAdd={() => setPanel({ kind: 'reminder', rule: false })}
               />
             ),
           },
@@ -828,33 +882,35 @@ function ItemsPicker({
   clientId: Id<'clients'>
   onDone: () => void
 }) {
+  const { business } = useViewer()
   const items = useQuery(api.items.byClient, { businessId, clientId })
   const setItems = useMutation(api.jobs.setItems)
   const [chosen, setChosen] = useState<Array<Id<'items'>>>(job.itemIds)
   if (!items) return <ListSkeleton />
-  const toggle = (itemId: Id<'items'>) =>
-    setChosen(
-      chosen.includes(itemId)
-        ? chosen.filter((id) => id !== itemId)
-        : [...chosen, itemId],
-    )
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => (
-          <Button
-            key={item._id}
-            variant={chosen.includes(item._id) ? 'secondary' : 'outline'}
-            aria-pressed={chosen.includes(item._id)}
-            className="h-11 rounded-xl aria-pressed:border-primary"
-            onClick={() => toggle(item._id)}
-          >
-            {item.name}
-          </Button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          multiple
+          aria-label={business.words.item.plural}
+          value={chosen}
+          onValueChange={(next: string[]) =>
+            setChosen(next as Array<Id<'items'>>)
+          }
+          variant="outline"
+          size="xl"
+          className="flex-wrap"
+        >
+          {items.map((item) => (
+            <ToggleGroupItem key={item._id} value={item._id}>
+              {item.name}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        {/* The new item comes back to this job, linked to it. */}
         <Link
           to="/items/new"
-          search={{ clientId }}
+          search={{ clientId, jobId: job._id }}
           className={buttonVariants({
             variant: 'ghost',
             className: 'h-11 rounded-xl',
