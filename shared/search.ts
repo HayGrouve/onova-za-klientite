@@ -68,3 +68,56 @@ export function buildSearchText(values: Array<string | undefined>): string {
   }
   return [...keys].join(' ')
 }
+
+/**
+ * A query-side fold for matching names: transliterated, with the Latin
+ * spellings people mix up made equal (x/h, w/v, c/ts).
+ */
+export function foldName(text: string): string {
+  return transliterate(text)
+    .replace(/x/g, 'h')
+    .replace(/w/g, 'v')
+    .replace(/c(?!h)/g, 'ts')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Every query word starts a word of the name. "iv pet" finds "Иван Петров". */
+export function nameMatches(query: string, name: string): boolean {
+  const q = foldName(query)
+  if (!q) return false
+  const nameWords = foldName(name).split(' ')
+  return q
+    .split(' ')
+    .every((part) => nameWords.some((word) => word.startsWith(part)))
+}
+
+export function digitsOf(text: string): string {
+  return text.replace(/\D/g, '')
+}
+
+export type ClientCandidate = { id: string; name: string; phones: string[] }
+
+/** Clients whose name matches, or whose phone holds the typed digits (3 or more). */
+export function searchClients<T extends ClientCandidate>(
+  clients: T[],
+  query: string,
+  limit = 5,
+): T[] {
+  const q = query.trim()
+  if (!q) return []
+  const digits = digitsOf(q)
+  const byPhone =
+    digits.length >= 3 && digits.length >= q.replace(/\s/g, '').length - 1
+  return clients
+    .filter(
+      (client) =>
+        nameMatches(q, client.name) ||
+        (byPhone &&
+          client.phones.some((phone) =>
+            digitsOf(phone).includes(digits.replace(/^0/, '')),
+          )),
+    )
+    .slice(0, limit)
+}

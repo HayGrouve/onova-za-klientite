@@ -132,6 +132,11 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   'jobs:setLines': (ids) => ({ jobId: ids.jobId, lines: [] }),
   'jobs:update': (ids) => ({ jobId: ids.jobId, title: 'Друга' }),
   'jobs:writeOff': (ids) => ({ jobId: ids.jobId, note: 'x' }),
+  'newJob:context': () => ({}),
+  'newJob:save': (ids) => ({
+    client: { kind: 'existing', clientId: ids.clientId },
+    title: 'Нова',
+  }),
   'payments:addFromClient': (ids) => ({
     clientId: ids.clientId,
     amountCents: 100,
@@ -173,6 +178,7 @@ const USER_SCOPED = [
 const NO_RECORD_IDS = new Set([
   'clients:create',
   'fields:add',
+  'newJob:context',
   'setup:apply',
   'setup:current',
   'stages:add',
@@ -244,6 +250,7 @@ const EVENTS: Record<string, string | null> = {
   'jobs:setLines': 'job.linesChanged',
   'jobs:update': 'job.edited',
   'jobs:writeOff': 'job.writtenOff',
+  'newJob:save': 'job.created',
   'payments:addFromClient': 'payment.added',
   'payments:addFromJob': 'payment.added',
   'payments:refund': 'payment.added',

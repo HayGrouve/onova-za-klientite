@@ -6,7 +6,7 @@ import { findCurrentUser, findMembership, userMutation } from './lib/auth'
 import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
 import { joinSeedBusinesses } from './lib/seedAccess'
-import { vModules, vRole, vWords } from './validators'
+import { vJobFlow, vModules, vRole, vWords } from './validators'
 
 function displayName(identity: { name?: string; email?: string }) {
   return identity.name?.trim() || identity.email?.split('@')[0] || ''
@@ -84,6 +84,8 @@ const vViewer = v.union(
         name: v.string(),
         words: vWords,
         modules: vModules,
+        jobFlow: vJobFlow,
+        depositsOnNewJob: v.boolean(),
         setupDone: v.boolean(),
       }),
     ),
@@ -126,6 +128,8 @@ export const viewer = query({
             name: active.name,
             words: active.words,
             modules: active.modules,
+            jobFlow: active.jobFlow,
+            depositsOnNewJob: active.depositsOnNewJob,
             setupDone: active.setup.completedAt !== undefined,
           }
         : null,
