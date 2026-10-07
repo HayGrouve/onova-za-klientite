@@ -13,6 +13,7 @@ export const PICK_LABEL: Record<ReminderPick, () => string> = {
   tomorrow: m.reminder_pick_tomorrow,
   week: m.reminder_pick_week,
   month: () => monthsLabel(1),
+  '2months': () => monthsLabel(2),
   '3months': () => monthsLabel(3),
   '6months': () => monthsLabel(6),
   year: () => monthsLabel(12),

@@ -21,6 +21,7 @@ import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { ListExtras } from '#/components/list-extras'
 import { AddressLink } from '#/components/address-link'
 import { ClientAdmin } from '#/components/client-admin'
 import { ClientForm } from '#/components/client-form'
@@ -403,9 +404,12 @@ function ClientPage() {
                       <Link
                         to="/items/$itemId"
                         params={{ itemId: item._id }}
-                        className="flex items-center justify-between gap-3 pressable px-4 py-3 font-medium"
+                        className="flex items-center justify-between gap-3 pressable px-4 py-3"
                       >
-                        {item.name}
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="font-medium">{item.name}</span>
+                          <ListExtras target="item" values={item.extra} />
+                        </span>
                         <CaretRightIcon
                           aria-hidden
                           className="size-4 shrink-0 text-muted-foreground/60"

@@ -73,6 +73,7 @@ export const REPEAT_LABEL: Record<RepeatEvery, () => string> = {
   week: m.repeat_week,
   '2weeks': m.repeat_2weeks,
   month: m.repeat_month,
+  '2months': m.repeat_2months,
   '3months': m.repeat_3months,
   '6months': m.repeat_6months,
   year: m.repeat_year,

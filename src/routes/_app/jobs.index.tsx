@@ -29,7 +29,7 @@ import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
 import { GROUP_LABEL } from '#/i18n/groups'
 import { m } from '#/paraglide/messages.js'
-import { filterJobs } from '../../../shared/board'
+import { filterJobs, isFiltering } from '../../../shared/board'
 import type { JobFilter } from '../../../shared/board'
 import {
   nextSort,
@@ -207,9 +207,11 @@ function JobsList({
     search.group === 'all' && !table ? 'new' : (search.group ?? 'new')
   const setSearch = useListSearch()
   const today = useToday()
+  // A filter counts what it finds in every tab, so it reads all of them.
+  const filtering = table && isFiltering(filter)
   const data = useQuery(
     api.jobs.list,
-    group === 'all'
+    group === 'all' || filtering
       ? { businessId: business._id }
       : { businessId: business._id, group },
   )
@@ -217,7 +219,19 @@ function JobsList({
   const counts = useLatest(data?.counts)
   const { words } = business
   const sort = sortFromSearch(search)
-  const jobs = data && filterJobs(data.jobs, filter, today)
+  const found = data && filterJobs(data.jobs, filter, today)
+  const jobs =
+    found &&
+    (group === 'all' ? found : found.filter((job) => job.stageGroup === group))
+  // "2/6" in a tab while filtering, as the board's columns do.
+  const shown = (key: StageGroup | 'all', total: number) => {
+    if (!filtering || !found) return String(total)
+    const hits =
+      key === 'all'
+        ? found.length
+        : found.filter((job) => job.stageGroup === key).length
+    return `${hits}/${total}`
+  }
 
   return (
     <>
@@ -238,7 +252,7 @@ function JobsList({
                 {GROUP_LABEL[key]()}
                 {counts && counts[key] > 0 && (
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {counts[key]}
+                    {shown(key, counts[key])}
                   </span>
                 )}
               </TabsTrigger>
@@ -251,10 +265,13 @@ function JobsList({
                 {m.jobs_group_all()}
                 {counts && (
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {counts.new +
-                      counts.in_progress +
-                      counts.done +
-                      counts.cancelled}
+                    {shown(
+                      'all',
+                      counts.new +
+                        counts.in_progress +
+                        counts.done +
+                        counts.cancelled,
+                    )}
                   </span>
                 )}
               </TabsTrigger>

@@ -10,13 +10,14 @@ export type RepeatInterval = { every: number; unit: RepeatUnit }
 /**
  * The intervals offered on a Job and in setup, shortest first. The server
  * takes any whole number from 1 to 52 weeks or months; these are the ones
- * trades actually use (a cleaner weekly, an air-conditioning service every
- * 3, 6 or 12 months).
+ * trades actually use (a cleaner weekly, a groomer every 2 months, an
+ * air-conditioning service every 3, 6 or 12 months).
  */
 export const REPEAT_CHOICES = [
   { key: 'week', every: 1, unit: 'week' },
   { key: '2weeks', every: 2, unit: 'week' },
   { key: 'month', every: 1, unit: 'month' },
+  { key: '2months', every: 2, unit: 'month' },
   { key: '3months', every: 3, unit: 'month' },
   { key: '6months', every: 6, unit: 'month' },
   { key: 'year', every: 12, unit: 'month' },

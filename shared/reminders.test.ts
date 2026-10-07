@@ -55,11 +55,12 @@ describe('pickReminderDate', () => {
 })
 
 describe('the picks', () => {
-  it('offers tomorrow, a week, a month, 3 months, 6 months and a year', () => {
+  it('offers tomorrow, a week, a month, 2, 3 and 6 months, and a year', () => {
     expect([...REMINDER_PICKS]).toEqual([
       'tomorrow',
       'week',
       'month',
+      '2months',
       '3months',
       '6months',
       'year',

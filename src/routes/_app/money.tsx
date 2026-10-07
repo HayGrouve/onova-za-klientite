@@ -27,6 +27,7 @@ import { InitialsAvatar } from '#/components/initials-avatar'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { ClientPaymentSheet } from '#/components/money/client-payment-sheet'
+import { PaymentSheet } from '#/components/money/payment-sheet'
 import { CostForm } from '#/components/money/cost-form'
 import { MoneyFigure } from '#/components/money/money-figure'
 import { PageTitle } from '#/components/page'
@@ -97,6 +98,7 @@ function MoneyPage() {
       '_id' | 'label' | 'amountCents' | 'date' | 'note' | 'jobId'
     >
   } | null>(null)
+  const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const [payClient, setPayClient] = useState<{
     _id: Id<'clients'>
     name: string
@@ -317,10 +319,11 @@ function MoneyPage() {
                   ) : (
                     data.payments.map((payment) => (
                       <li key={payment._id}>
-                        <Link
-                          to="/clients/$clientId"
-                          params={{ clientId: payment.clientId }}
-                          className="flex items-center gap-3 pressable px-4 py-2.5"
+                        {/* Opens the payment itself: its split, edit, delete. */}
+                        <button
+                          type="button"
+                          onClick={() => setOpenPayment(payment._id)}
+                          className="flex w-full items-center gap-3 pressable px-4 py-2.5 text-left"
                         >
                           <MethodBadge method={payment.method} />
                           <span className="flex min-w-0 flex-1 flex-col">
@@ -340,7 +343,7 @@ function MoneyPage() {
                           <span className="tabular-nums">
                             {formatMoney(payment.amountCents)}
                           </span>
-                        </Link>
+                        </button>
                       </li>
                     ))
                   )}
@@ -403,6 +406,12 @@ function MoneyPage() {
         client={payClient}
         today={today}
         onClose={() => setPayClient(null)}
+      />
+      <PaymentSheet
+        businessId={business._id}
+        paymentId={openPayment}
+        today={today}
+        onClose={() => setOpenPayment(null)}
       />
       <Sheet
         open={costPanel !== null}

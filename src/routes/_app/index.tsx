@@ -1,4 +1,5 @@
 import {
+  PlusIcon,
   BellIcon,
   CalendarCheckIcon,
   CalendarDotsIcon,
@@ -7,10 +8,11 @@ import {
   SunIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { JobRow } from '#/components/job-row'
+import { buttonVariants } from '#/components/ui/button'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { ListSection } from '#/components/list-section'
@@ -69,6 +71,12 @@ function TodayPage() {
           icon={SunIcon}
           title={m.today_empty_title()}
           body={m.today_empty_body()}
+          action={
+            <Link to="/new" className={buttonVariants({ size: 'xl' })}>
+              <PlusIcon data-icon="inline-start" weight="bold" />
+              {words.job.singular}
+            </Link>
+          }
         />
       ) : (
         <div className="flex flex-col gap-5">

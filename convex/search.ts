@@ -4,8 +4,10 @@ import { internalMutation } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import { foldQuery } from '../shared/search'
 import { businessQuery } from './lib/auth'
+import { listExtra, listFieldIds } from './lib/listFields'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { jobRow, newLookups, vJobRow } from './lib/views'
+import { vExtra } from './validators'
 
 const PER_KIND = 8
 
@@ -20,6 +22,7 @@ type ItemHit = {
   name: string
   clientId: Id<'clients'>
   clientName: string
+  listExtra?: Doc<'items'>['extra']
 }
 
 /**
@@ -44,6 +47,7 @@ export const all = businessQuery({
         name: v.string(),
         clientId: v.id('clients'),
         clientName: v.string(),
+        listExtra: v.optional(vExtra),
       }),
     ),
   }),
@@ -53,6 +57,7 @@ export const all = businessQuery({
     const clients = new Map<string, ClientHit>()
     const jobs = new Map<string, Awaited<ReturnType<typeof jobRow>>>()
     const items = new Map<string, ItemHit>()
+    let shownItemFields: Set<string> | undefined
     const lookups = newLookups()
 
     for (const variant of variants) {
@@ -83,6 +88,7 @@ export const all = businessQuery({
           jobs.set(job._id, await jobRow(ctx, job, lookups))
       }
       if (ctx.business.modules.items) {
+        shownItemFields ??= await listFieldIds(ctx, businessId, 'item')
         const foundItems = await ctx.db
           .query('items')
           .withSearchIndex('search', (q) =>
@@ -97,6 +103,7 @@ export const all = businessQuery({
             name: item.name,
             clientId: item.clientId,
             clientName: owner?.name ?? '',
+            listExtra: listExtra(item.extra, shownItemFields),
           })
         }
       }

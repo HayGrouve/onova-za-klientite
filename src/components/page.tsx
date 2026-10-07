@@ -1,6 +1,7 @@
 import type { Icon } from '@phosphor-icons/react'
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -22,10 +23,13 @@ export function EmptyState({
   icon: IconComponent,
   title,
   body,
+  action,
 }: {
   icon: Icon
   title: string
   body: string
+  /** The first step to take, when there's an obvious one. */
+  action?: React.ReactNode
 }) {
   return (
     <Empty className="animate-rise px-8">
@@ -36,6 +40,7 @@ export function EmptyState({
         <EmptyTitle className="text-base">{title}</EmptyTitle>
         <EmptyDescription>{body}</EmptyDescription>
       </EmptyHeader>
+      {action && <EmptyContent>{action}</EmptyContent>}
     </Empty>
   )
 }

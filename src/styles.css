@@ -146,6 +146,16 @@
   }
 }
 
+/* Toasts sit just above the phone's bottom nav; from lg there is none. */
+:root {
+  --toast-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 64rem) {
+  :root {
+    --toast-bottom: 1.5rem;
+  }
+}
+
 /* Flashes the part of the setup preview an answer just changed. */
 @keyframes flash {
   from {

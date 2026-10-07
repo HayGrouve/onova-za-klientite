@@ -105,7 +105,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
-        <Toaster position="top-center" />
+        {/* Above the phone's bottom nav, where the thumb is, and never over
+            the header's search and business switcher (--toast-bottom). */}
+        <Toaster
+          position="bottom-center"
+          offset={{ bottom: 'var(--toast-bottom)' }}
+          mobileOffset={{ bottom: 'var(--toast-bottom)' }}
+        />
         <ServiceWorkerRegister />
         <Scripts />
       </body>

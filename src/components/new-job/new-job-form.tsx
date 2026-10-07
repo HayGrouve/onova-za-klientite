@@ -16,7 +16,7 @@ import type { Icon } from '@phosphor-icons/react'
 import { useBlocker, useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { cn } from 'cn'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -319,6 +319,22 @@ export function NewJobForm({
   // Leaving with a line typed asks first, whether by the close button or the back button.
   const leaving = useRef(false)
   const dirty = text.trim() !== ''
+  // Esc closes "+" like the close button, at a desk; a dialog or menu open
+  // above it (the discard question included) takes its own Esc.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (
+        document.querySelector(
+          '[role="dialog"], [role="alertdialog"], [role="menu"]',
+        )
+      )
+        return
+      void leave()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
   const blocker = useBlocker({
     shouldBlockFn: useCallback(() => dirty && !leaving.current, [dirty]),
     enableBeforeUnload: dirty,

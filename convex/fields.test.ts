@@ -219,4 +219,44 @@ describe('show in list', () => {
       clientsAfter.find((client) => client._id === clientId)?.listExtra,
     ).toBeUndefined()
   })
+
+  it("an item's fields shown in lists come with it on the job page and in search", async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const settings = await owner.query(api.businesses.settings, { businessId })
+    await owner.mutation(api.businesses.setModules, {
+      businessId,
+      modules: { ...settings.modules, items: true },
+    })
+    const size = await owner.mutation(api.fields.add, {
+      businessId,
+      target: 'item',
+      name: 'Размер',
+      type: 'text',
+      showInList: true,
+    })
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Георги',
+    })
+    const itemId = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Бъди',
+      extra: { [size]: 'Средно' },
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Къпане',
+      itemIds: [itemId],
+    })
+    const job = await owner.query(api.jobs.get, { businessId, jobId })
+    expect(job.items[0].listExtra).toEqual({ [size]: 'Средно' })
+    const found = await owner.query(api.search.all, {
+      businessId,
+      query: 'Бъди',
+    })
+    expect(found.items[0].listExtra).toEqual({ [size]: 'Средно' })
+  })
 })

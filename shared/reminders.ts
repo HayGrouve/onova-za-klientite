@@ -8,6 +8,7 @@ export const REMINDER_PICKS = [
   'tomorrow',
   'week',
   'month',
+  '2months',
   '3months',
   '6months',
   'year',
@@ -31,6 +32,8 @@ export function pickReminderDate(today: string, pick: ReminderPick) {
       return addDays(today, 7)
     case 'month':
       return addMonths(today, 1)
+    case '2months':
+      return addMonths(today, 2)
     case '3months':
       return addMonths(today, 3)
     case '6months':

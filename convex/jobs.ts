@@ -12,6 +12,7 @@ import {
 } from './lib/auth'
 import { fail } from './lib/errors'
 import { mergeExtra } from './lib/extra'
+import { listExtra, listFieldIds } from './lib/listFields'
 import { moveJobToStage } from './lib/moveJob'
 import {
   businessStages,
@@ -352,9 +353,16 @@ export const get = businessQuery({
       .withIndex('by_job', (q) => q.eq('jobId', job._id))
       .collect()
     const items = []
+    const shownItemFields = await listFieldIds(ctx, ctx.business._id, 'item')
     for (const itemId of job.itemIds) {
       const item = await ctx.db.get('items', itemId)
-      if (item) items.push({ _id: item._id, name: item.name })
+      if (item) {
+        items.push({
+          _id: item._id,
+          name: item.name,
+          listExtra: listExtra(item.extra, shownItemFields),
+        })
+      }
     }
     const allocations = await ctx.db
       .query('allocations')

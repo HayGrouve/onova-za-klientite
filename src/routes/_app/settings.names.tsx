@@ -121,7 +121,7 @@ function NamesForm({
         <fieldset disabled={!owner} className="contents">
           {KEYS.map(({ key, label, about, icon }) => (
             <Panel key={key} title={label()} icon={icon} className="mx-0">
-              {/* A named group, so "Едно" and "Много" say which word they are. */}
+              {/* A named group, so the two inputs say which word they are. */}
               <PanelBody
                 role="group"
                 aria-label={label()}
@@ -214,7 +214,7 @@ function AppPreview({ words, items }: { words: Words; items: boolean }) {
           <div className={row}>
             <ClipboardTextIcon aria-hidden className="size-4 shrink-0" />
             <span className="font-medium">
-              {m.count({ label: job.plural, count: 3 })}
+              {m.count({ label: job.plural, count: 5 })}
             </span>
           </div>
         </Flash>
@@ -223,7 +223,7 @@ function AppPreview({ words, items }: { words: Words; items: boolean }) {
             <div className={row}>
               <StackIcon aria-hidden className="size-4 shrink-0" />
               <span className="font-medium">
-                {m.count({ label: item.plural, count: 2 })}
+                {m.count({ label: item.plural, count: 5 })}
               </span>
             </div>
           </Flash>

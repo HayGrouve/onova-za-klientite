@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import { ListExtras } from '#/components/list-extras'
 import { AddressLink } from '#/components/address-link'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
@@ -697,11 +698,17 @@ function JobPage() {
                         className={cn(
                           buttonVariants({
                             variant: 'outline',
-                            className: 'h-11 rounded-xl',
+                            className:
+                              'h-auto min-h-11 flex-col items-start gap-0 rounded-xl py-1.5 whitespace-normal',
                           }),
                         )}
                       >
                         {item.name}
+                        <ListExtras
+                          target="item"
+                          values={item.listExtra}
+                          className="text-xs font-normal"
+                        />
                       </Link>
                     ))}
                   </PanelBody>

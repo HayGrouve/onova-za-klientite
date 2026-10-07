@@ -48,8 +48,18 @@ export function SetupWizard({
   const navigate = useNavigate()
   const { businesses } = useViewer()
   const apply = useMutation(api.setup.apply)
-  const [answers, setAnswers] = useState(initialAnswers)
-  const [step, setStep] = useState(0)
+  // A reload (a phone's pull to refresh) keeps the answers so far, per business.
+  const draftKey = `setup-draft:${businessId}`
+  const [draft] = useState(() => readDraft(draftKey))
+  const [answers, setAnswers] = useState(draft?.answers ?? initialAnswers)
+  const [step, setStep] = useState(draft?.step ?? 0)
+  useEffect(() => {
+    sessionStorage.setItem(draftKey, JSON.stringify({ answers, step }))
+  }, [draftKey, answers, step])
+  // Leaving setup inside the app drops the draft, so a later run starts from
+  // the business as it is then (D69). Only a reload, which runs no cleanup,
+  // finds it again.
+  useEffect(() => () => sessionStorage.removeItem(draftKey), [draftKey])
   const [fromReview, setFromReview] = useState(false)
   const [pulse, setPulse] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -115,6 +125,7 @@ export function SetupWizard({
     setSaving(true)
     try {
       await apply({ businessId, answers })
+      sessionStorage.removeItem(draftKey)
       const importing =
         answers.importFrom === 'phone' || answers.importFrom === 'excel'
       await navigate({ to: importing ? '/import' : '/', replace: true })
@@ -258,4 +269,18 @@ export function SetupWizard({
       </section>
     </main>
   )
+}
+
+/** The answers and step kept for this tab, if a reload left any. */
+function readDraft(
+  key: string,
+): { answers: SetupAnswers; step: number } | undefined {
+  try {
+    const stored = sessionStorage.getItem(key)
+    if (!stored) return undefined
+    const draft = JSON.parse(stored) as { answers: SetupAnswers; step: number }
+    return Number.isInteger(draft.step) && draft.step >= 0 ? draft : undefined
+  } catch {
+    return undefined
+  }
 }

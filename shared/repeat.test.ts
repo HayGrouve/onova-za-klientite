@@ -12,13 +12,14 @@ const at = (date: string, hour = 9, minute = 0) =>
   sofiaTimeToUtc(date, hour, minute)
 
 describe('REPEAT_CHOICES', () => {
-  it('offers week, 2 weeks, month, 3 months, 6 months and year, in that order', () => {
+  it('offers week, 2 weeks, month, 2, 3 and 6 months, and year, in that order', () => {
     expect(
       REPEAT_CHOICES.map(({ key, every, unit }) => [key, every, unit]),
     ).toEqual([
       ['week', 1, 'week'],
       ['2weeks', 2, 'week'],
       ['month', 1, 'month'],
+      ['2months', 2, 'month'],
       ['3months', 3, 'month'],
       ['6months', 6, 'month'],
       ['year', 12, 'month'],
