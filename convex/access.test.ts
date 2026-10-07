@@ -267,6 +267,8 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'reminders:close': (ids) => ({ reminderId: ids.reminderId, status: 'done' }),
   'reminders:forClient': (ids) => ({ clientId: ids.clientId }),
+  'reminders:forItem': (ids) => ({ itemId: ids.itemId }),
+  'reminders:forJob': (ids) => ({ jobId: ids.jobId }),
   'search:all': () => ({ query: 'ivan' }),
   'services:add': () => ({ name: 'Нова', priceCents: 100 }),
   'services:list': () => ({}),

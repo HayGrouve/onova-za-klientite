@@ -171,6 +171,64 @@ describe('jobs', () => {
     ).rejects.toThrow(/job.otherClient/)
   })
 
+  it('an item added from a job is linked to that job, next to the ones it has', async () => {
+    const { t, owner, businessId, clientId } = await withClient()
+    const first = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Daikin, хол',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Профилактика',
+      itemIds: [first],
+    })
+    const added = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Daikin, спалня',
+      jobId,
+    })
+    expect((await getDoc(t, 'jobs', jobId)).itemIds).toEqual([first, added])
+    const links = await t.run((ctx) =>
+      ctx.db
+        .query('jobItems')
+        .withIndex('by_job', (q) => q.eq('jobId', jobId))
+        .collect(),
+    )
+    expect(links.map((row) => row.itemId).sort()).toEqual([first, added].sort())
+    const item = await owner.query(api.items.get, {
+      businessId,
+      itemId: added,
+    })
+    expect(item.jobs.map((job) => job._id)).toEqual([jobId])
+  })
+
+  it("an item can't be added to another client's job", async () => {
+    const { t, owner, businessId, clientId } = await withClient()
+    const otherId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Мария',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: otherId,
+      title: 'Профилактика',
+    })
+    await expect(
+      owner.mutation(api.items.create, {
+        businessId,
+        clientId,
+        name: 'Daikin, хол',
+        jobId,
+      }),
+    ).rejects.toThrow(/job.otherClient/)
+    // Nothing was saved: the failed call rolled back.
+    const items = await t.run((ctx) => ctx.db.query('items').collect())
+    expect(items).toEqual([])
+  })
+
   it('item history survives a move to another client', async () => {
     const { t, owner, businessId, clientId } = await withClient()
     const itemId = await owner.mutation(api.items.create, {

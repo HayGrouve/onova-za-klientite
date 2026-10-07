@@ -1,4 +1,5 @@
 import * as React from "react"
+import { CheckIcon } from "@phosphor-icons/react"
 import { Toggle as TogglePrimitive } from "@base-ui/react/toggle"
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group"
 import { type VariantProps } from "class-variance-authority"
@@ -59,8 +60,14 @@ function ToggleGroupItem({
   children,
   variant = "default",
   size = "default",
+  check = true,
   ...props
-}: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
+}: TogglePrimitive.Props &
+  VariantProps<typeof toggleVariants> & {
+    // Local change (ADR 0005): a check on the chosen outline item, so the
+    // choice doesn't rest on colour alone. Off where the item draws its own.
+    check?: boolean
+  }) {
   const context = React.useContext(ToggleGroupContext)
 
   return (
@@ -79,6 +86,13 @@ function ToggleGroupItem({
       )}
       {...props}
     >
+      {check && (context.variant || variant) === "outline" && (
+        <CheckIcon
+          aria-hidden
+          weight="bold"
+          className="hidden size-4 shrink-0 group-aria-pressed/toggle:block"
+        />
+      )}
       {children}
     </TogglePrimitive>
   )

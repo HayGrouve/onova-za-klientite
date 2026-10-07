@@ -17,12 +17,15 @@ import { m } from '#/paraglide/messages.js'
 export function ItemForm({
   businessId,
   clientId,
+  jobId,
   item,
   fields,
   onSaved,
 }: {
   businessId: Id<'businesses'>
   clientId: Id<'clients'>
+  /** A new item is linked to this job as it is saved. */
+  jobId?: Id<'jobs'>
   item?: Doc<'items'>
   fields: Array<Doc<'fields'>>
   onSaved: (itemId: Id<'items'>) => void
@@ -42,7 +45,7 @@ export function ItemForm({
         await update({ businessId, itemId: item._id, ...values })
         onSaved(item._id)
       } else {
-        onSaved(await create({ businessId, clientId, ...values }))
+        onSaved(await create({ businessId, clientId, jobId, ...values }))
       }
       toast.success(m.saved())
     } catch (error) {

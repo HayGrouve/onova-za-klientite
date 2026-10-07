@@ -22,6 +22,47 @@ describe('newJob.save', () => {
     expect((await getDoc(t, 'jobs', jobId)).title).toBe('Ключ')
   })
 
+  it('links the items it is started from, which must be the client’s own', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Елена',
+    })
+    const otherId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Мария',
+    })
+    const itemId = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Daikin, хол',
+    })
+    const foreignId = await owner.mutation(api.items.create, {
+      businessId,
+      clientId: otherId,
+      name: 'Daikin, спалня',
+    })
+    const { jobId } = await owner.mutation(api.newJob.save, {
+      businessId,
+      client: { kind: 'existing', clientId },
+      title: 'Профилактика',
+      itemIds: [itemId],
+    })
+    expect((await getDoc(t, 'jobs', jobId)).itemIds).toEqual([itemId])
+    const item = await owner.query(api.items.get, { businessId, itemId })
+    expect(item.jobs.map((job) => job._id)).toEqual([jobId])
+
+    await expect(
+      owner.mutation(api.newJob.save, {
+        businessId,
+        client: { kind: 'existing', clientId },
+        title: 'Друга',
+        itemIds: [foreignId],
+      }),
+    ).rejects.toThrow(/job.otherClient/)
+  })
+
   it('saves a new client, the job, the deposit and the appointment in one go', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)

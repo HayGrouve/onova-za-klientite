@@ -14,10 +14,9 @@ import { mergeExtra } from './lib/extra'
 import { moveJobToStage } from './lib/moveJob'
 import {
   businessStages,
-  checkItems,
   checkLines,
   createJob,
-  syncJobItems,
+  setJobItems,
   vCreateJobArgs,
 } from './lib/jobWrite'
 import { recomputeJob } from './lib/recompute'
@@ -164,19 +163,7 @@ export const setItems = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    const itemIds = await checkItems(
-      ctx,
-      job.clientId,
-      args.itemIds,
-      job.itemIds,
-    )
-    await ctx.db.patch('jobs', job._id, { itemIds })
-    await syncJobItems(ctx, job._id, itemIds)
-    await logActivity(ctx, {
-      type: 'job.itemsChanged',
-      jobId: job._id,
-      clientId: job.clientId,
-    })
+    await setJobItems(ctx, job, args.itemIds)
     return null
   },
 })

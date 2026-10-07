@@ -111,6 +111,8 @@ export const save = businessMutation({
       }),
     ),
     dueDate: v.optional(v.string()),
+    /** Items the job is for, when "+" is started from an item. They must be the client's own. */
+    itemIds: v.optional(v.array(v.id('items'))),
     repeat: v.optional(
       v.object({
         every: v.number(),
@@ -141,6 +143,7 @@ export const save = businessMutation({
       title: args.title,
       typedPriceCents: args.typedPriceCents,
       dueDate: args.dueDate,
+      itemIds: args.itemIds,
       source: 'manual',
     })
 

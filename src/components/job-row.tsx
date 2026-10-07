@@ -1,5 +1,6 @@
 import {
   CalendarBlankIcon,
+  CheckCircleIcon,
   CoinsIcon,
   FlagIcon,
   UserIcon,
@@ -52,6 +53,7 @@ function timingsOf(
   job: JobRowData,
   today: string,
   lead?: JobRowLead,
+  showDone = false,
 ): { first?: Timing; rest: Timing[] } {
   const late: Timing | undefined =
     isJobLate(job, today) && job.dueDate
@@ -103,6 +105,12 @@ function timingsOf(
     case 'none':
       return { rest: [] }
     default:
+      if (showDone && job.stageGroup === 'done' && job.doneAt) {
+        const date = formatDay(dateInSofia(job.doneAt), today)
+        return {
+          rest: [{ icon: CheckCircleIcon, text: m.done_short({ date }) }],
+        }
+      }
       // Lateness comes first: an overdue job shows how late it is even with an appointment ahead.
       return { rest: compact([late ?? next ?? due]) }
   }
@@ -114,13 +122,16 @@ export function JobRow({
   today,
   showClient = true,
   lead,
+  showDone = false,
 }: {
   job: JobRowData
   today: string
   showClient?: boolean
   lead?: JobRowLead
+  /** A done job shows when it was done, as a history list needs. */
+  showDone?: boolean
 }) {
-  const timing = timingsOf(job, today, lead)
+  const timing = timingsOf(job, today, lead, showDone)
   const owes = job.owes && job.priceCents > 0
   const client = showClient && job.clientName
 

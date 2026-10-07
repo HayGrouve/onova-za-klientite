@@ -123,16 +123,10 @@ export function ClientForm({
           variant="outline"
           size="xl"
         >
-          <ToggleGroupItem
-            value="person"
-            className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-          >
+          <ToggleGroupItem value="person">
             {m.client_kind_person()}
           </ToggleGroupItem>
-          <ToggleGroupItem
-            value="company"
-            className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-          >
+          <ToggleGroupItem value="company">
             {m.client_kind_company()}
           </ToggleGroupItem>
         </ToggleGroup>

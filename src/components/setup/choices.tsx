@@ -45,8 +45,9 @@ export function Choices({
         <ToggleGroupItem
           key={choice.value}
           value={choice.value}
+          // The list draws its own check at the end of the row.
+          check={layout === 'wrap'}
           className={cn(
-            'aria-pressed:border-primary aria-pressed:bg-primary/8',
             layout === 'list' &&
               'h-auto min-h-14 w-full justify-start gap-3 px-4 py-3 text-left whitespace-normal',
           )}

@@ -39,7 +39,7 @@ export async function businessStages(ctx: BusinessMutationCtx) {
 }
 
 /** Items on a job must belong to the job's client. */
-export async function checkItems(
+async function checkItems(
   ctx: BusinessMutationCtx,
   clientId: Id<'clients'>,
   itemIds: Array<Id<'items'>>,
@@ -56,7 +56,7 @@ export async function checkItems(
   return unique
 }
 
-export async function syncJobItems(
+async function syncJobItems(
   ctx: BusinessMutationCtx,
   jobId: Id<'jobs'>,
   itemIds: Array<Id<'items'>>,
@@ -79,6 +79,22 @@ export async function syncJobItems(
       })
     }
   }
+}
+
+/** Sets the items a job is linked to, and logs it. Callers check roles. */
+export async function setJobItems(
+  ctx: BusinessMutationCtx,
+  job: Doc<'jobs'>,
+  itemIds: Array<Id<'items'>>,
+) {
+  const checked = await checkItems(ctx, job.clientId, itemIds, job.itemIds)
+  await ctx.db.patch('jobs', job._id, { itemIds: checked })
+  await syncJobItems(ctx, job._id, checked)
+  await logActivity(ctx, {
+    type: 'job.itemsChanged',
+    jobId: job._id,
+    clientId: job.clientId,
+  })
 }
 
 export async function checkLines(
