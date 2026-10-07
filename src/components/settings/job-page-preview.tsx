@@ -106,7 +106,7 @@ export function JobPagePreview({
                   {title}
                 </span>
                 {shown && detail && (
-                  <span className="truncate text-xs text-muted-foreground">
+                  <span className="line-clamp-2 text-xs text-muted-foreground">
                     {detail}
                   </span>
                 )}
