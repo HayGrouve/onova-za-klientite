@@ -1,6 +1,7 @@
 import { CaretLeftIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { m } from '#/paraglide/messages.js'
 
 /**
@@ -23,6 +24,7 @@ export function SettingsPage({
   previewWideOnly?: boolean
   children: React.ReactNode
 }) {
+  usePageTitle(title)
   return (
     <div
       className={cn(

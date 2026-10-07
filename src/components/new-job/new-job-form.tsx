@@ -35,6 +35,7 @@ import { Switch } from '#/components/ui/switch'
 import { Textarea } from '#/components/ui/textarea'
 import { repeatLabel } from '#/components/job/repeat-section'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { usePageTitle } from '#/hooks/use-page-title'
 import type { ActiveBusiness } from '#/hooks/use-viewer'
 import { formatDay, formatTime } from '#/i18n/dates'
 import { lower } from '#/i18n/words'
@@ -143,6 +144,7 @@ export function NewJobForm({
   services: ServiceRef[]
 }) {
   const navigate = useNavigate()
+  usePageTitle(m.preview_add({ job: lower(business.words.job.singular) }))
   const save = useMutation(api.newJob.save)
   const [startedAt] = useState(() => Date.now())
   const [today] = useState(() => todayInSofia(Date.now()))

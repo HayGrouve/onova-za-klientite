@@ -17,6 +17,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from '#/components/ui/input-group'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
@@ -38,6 +39,7 @@ function useDebounced(value: string, ms = 250) {
 }
 
 function SearchPage() {
+  usePageTitle(m.search_open())
   const { business } = useViewer()
   const today = useToday()
   const [query, setQuery] = useState('')

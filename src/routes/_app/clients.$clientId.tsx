@@ -46,6 +46,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
@@ -69,6 +70,9 @@ function ClientPage() {
     businessId: business._id,
     clientId,
   })
+  usePageTitle(
+    data && (data.client.isNoClient ? m.no_client() : data.client.name),
+  )
   const [panel, setPanel] = useState<
     | { kind: 'edit' }
     | { kind: 'payment' }

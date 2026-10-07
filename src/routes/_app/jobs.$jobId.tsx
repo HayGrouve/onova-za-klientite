@@ -56,6 +56,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useMoveJob } from '#/hooks/use-move-job'
 import { useViewer } from '#/hooks/use-viewer'
@@ -123,6 +124,7 @@ function JobPage() {
     businessId: business._id,
     jobId,
   })
+  usePageTitle(data?.job.title)
   const fields = useQuery(api.fields.list, {
     businessId: business._id,
     target: 'job',

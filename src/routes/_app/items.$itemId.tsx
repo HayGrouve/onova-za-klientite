@@ -28,6 +28,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { errorMessage } from '#/lib/errors'
@@ -49,6 +50,7 @@ function ItemPage() {
     businessId: business._id,
     itemId,
   })
+  usePageTitle(data?.item.name)
   const [panel, setPanel] = useState<'edit' | 'move' | null>(null)
   if (!data) return <ListSkeleton />
   const { item, client } = data
