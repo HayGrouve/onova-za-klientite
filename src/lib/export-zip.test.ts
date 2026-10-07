@@ -13,6 +13,15 @@ describe('export zip', () => {
     expect(csv).toContain('"[{""e164"":""+359888""}]"')
   })
 
+  it('keeps formulas from imported text as plain text, numbers as numbers', () => {
+    const csv = toCsv([
+      { name: '=HYPERLINK("x")', amountCents: -5000, phone: '+359888' },
+    ])
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`)
+    expect(csv).toContain(',-5000,')
+    expect(csv).toContain("'+359888")
+  })
+
   it('re-reading the zip finds every record', () => {
     const data = {
       exportedAt: 1,

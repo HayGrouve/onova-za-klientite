@@ -7,9 +7,11 @@ export function toCsv(rows: Array<Record<string, unknown>>): string {
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))]
   const cell = (value: unknown) => {
     if (value === undefined || value === null) return ''
-    const text =
-      typeof value === 'object' ? JSON.stringify(value) : String(value)
-    return /[",\n;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+    let text = typeof value === 'object' ? JSON.stringify(value) : String(value)
+    // Text that a spreadsheet would run as a formula is kept as text.
+    if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text))
+      text = `'${text}`
+    return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
   }
   const lines = [
     columns.join(','),
