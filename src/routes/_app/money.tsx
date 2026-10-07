@@ -88,12 +88,12 @@ function MoneyPage() {
     <>
       <PageTitle>{m.money_title()}</PageTitle>
       {/* A wide screen: the month beside the balances, then who owes me
-          beside the month's payments and costs. The phone keeps one column,
-          in the order the `order-*` classes give. */}
+          beside the month's payments and costs. The phone keeps one column in
+          the same order. */}
       <div className="flex flex-col gap-4 pb-6 lg:grid lg:grid-cols-2 lg:items-start">
         <div className="contents lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-stretch">
           {/* The month and what happened in it. */}
-          <section className="order-1 mx-4 flex flex-col overflow-hidden surface">
+          <section className="mx-4 flex flex-col overflow-hidden surface">
             <div className="flex items-center justify-between gap-2 p-1">
               <Tip label={m.money_prev_month()}>
                 <Button
@@ -172,7 +172,7 @@ function MoneyPage() {
           {data && (
             <>
               {/* Balances as of today, whatever the month. */}
-              <section className="order-2 mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface lg:grid-cols-1 lg:grid-rows-2 lg:divide-x-0 lg:divide-y">
+              <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface lg:grid-cols-1 lg:grid-rows-2 lg:divide-x-0 lg:divide-y">
                 <MoneyFigure
                   label={m.money_still_owed()}
                   cents={data.stillOwedCents}
@@ -197,7 +197,6 @@ function MoneyPage() {
           <>
             <div className="contents lg:flex lg:flex-col lg:gap-4">
               <Panel
-                className="order-3 lg:order-none"
                 title={m.money_who_owes()}
                 icon={HandCoinsIcon}
                 count={data.whoOwesMe.length || undefined}
@@ -241,11 +240,7 @@ function MoneyPage() {
               </Panel>
             </div>
             <div className="contents lg:flex lg:flex-col lg:gap-4">
-              <Panel
-                className="order-4 lg:order-none"
-                title={m.money_payments()}
-                icon={ArrowDownLeftIcon}
-              >
+              <Panel title={m.money_payments()} icon={ArrowDownLeftIcon}>
                 <PanelList>
                   {data.payments.length === 0 ? (
                     <ListNote>{m.money_none()}</ListNote>
@@ -279,7 +274,6 @@ function MoneyPage() {
 
               {costsOn && (
                 <Panel
-                  className="order-5 lg:order-none"
                   title={m.money_costs_list()}
                   icon={ReceiptIcon}
                   action={
@@ -322,7 +316,7 @@ function MoneyPage() {
                   </PanelList>
                 </Panel>
               )}
-              <p className="order-6 px-4 text-xs text-muted-foreground lg:order-none">
+              <p className="px-4 text-xs text-muted-foreground">
                 {m.money_workers_hidden()}
               </p>
             </div>

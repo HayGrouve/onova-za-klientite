@@ -52,7 +52,7 @@ function ItemPage() {
 
   return (
     // A wide screen puts the owner and fields on the left, the work and files
-    // on the right. The phone keeps one column, in `order-*` order.
+    // on the right. The phone keeps one column in the same order.
     <div className="flex flex-col gap-4 pb-6 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
       <header className="flex flex-col gap-2 px-4 pt-2 lg:col-span-2">
         <div className="flex items-start justify-between gap-3">
@@ -73,7 +73,7 @@ function ItemPage() {
       </header>
 
       <div className="contents lg:flex lg:flex-col lg:gap-4">
-        <div className="order-1 px-4 empty:hidden lg:order-none">
+        <div className="px-4 empty:hidden">
           {client && (
             <div className="flex animate-rise items-center gap-3 surface py-2 pr-2 pl-4">
               <span className="flex min-w-0 flex-1 flex-col">
@@ -99,7 +99,7 @@ function ItemPage() {
             </div>
           )}
         </div>
-        <div className="order-2 empty:hidden lg:order-none">
+        <div className="empty:hidden">
           <ExtraFieldsView
             fields={data.fields}
             values={item.extra}
@@ -110,7 +110,6 @@ function ItemPage() {
 
       <div className="contents lg:flex lg:flex-col lg:gap-4">
         <Panel
-          className="order-3 lg:order-none"
           title={business.words.job.plural}
           icon={ClipboardTextIcon}
           count={data.jobs.length || undefined}
@@ -122,11 +121,7 @@ function ItemPage() {
           </PanelList>
         </Panel>
 
-        <Panel
-          className="order-4 lg:order-none"
-          title={m.job_files()}
-          icon={PaperclipIcon}
-        >
+        <Panel title={m.job_files()} icon={PaperclipIcon}>
           <PanelBody className="px-0">
             <FileGallery
               businessId={business._id}
@@ -136,11 +131,7 @@ function ItemPage() {
         </Panel>
 
         {data.timeline.length > 0 && (
-          <Panel
-            className="order-5 lg:order-none"
-            title={m.item_history()}
-            icon={ClockCounterClockwiseIcon}
-          >
+          <Panel title={m.item_history()} icon={ClockCounterClockwiseIcon}>
             <PanelBody className="px-0">
               <Timeline items={data.timeline} />
             </PanelBody>
