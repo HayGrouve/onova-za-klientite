@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
+import { boardColumn } from '../shared/board'
 import { STAGE_GROUPS, stagesFor } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import {
@@ -260,6 +261,55 @@ export const list = businessQuery({
       rows.push(await jobRow(ctx, job, lookups))
     }
     return { jobs: rows, counts }
+  },
+})
+
+/**
+ * The jobs board on a wide screen: one column per stage group in board order
+ * (shared/board), and the stages a job can be dropped on.
+ */
+export const board = businessQuery({
+  args: {},
+  returns: v.object({
+    columns: v.array(
+      v.object({
+        group: vStageGroup,
+        jobs: v.array(vJobRow),
+        total: v.number(),
+        owedCents: v.number(),
+      }),
+    ),
+    stages: v.array(
+      v.object({ _id: v.id('stages'), name: v.string(), group: vStageGroup }),
+    ),
+  }),
+  handler: async (ctx) => {
+    const businessId = ctx.business._id
+    const lookups = newLookups()
+    const now = Date.now()
+    const columns = []
+    for (const group of STAGE_GROUPS) {
+      const jobs = await ctx.db
+        .query('jobs')
+        .withIndex('by_business_group_due', (q) =>
+          q.eq('businessId', businessId).eq('stageGroup', group),
+        )
+        .take(LIST_LIMIT)
+      const column = boardColumn(group, jobs)
+      const rows = []
+      for (const job of column.jobs) {
+        rows.push(await jobRow(ctx, job, lookups, now))
+      }
+      columns.push({ ...column, group, jobs: rows })
+    }
+    const stages = await ctx.db
+      .query('stages')
+      .withIndex('by_business_order', (q) => q.eq('businessId', businessId))
+      .collect()
+    return {
+      columns,
+      stages: stages.map(({ _id, name, group }) => ({ _id, name, group })),
+    }
   },
 })
 

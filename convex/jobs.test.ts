@@ -7,6 +7,7 @@ import {
   lastActivity,
   setupBusiness,
   setupConvex,
+  STRANGER,
 } from './test.setup'
 
 async function withClient() {
@@ -258,5 +259,55 @@ describe('jobs after settings change', () => {
         name: 'Стол',
       }),
     ).rejects.toThrow(/client.noClient/)
+  })
+})
+
+describe('jobs board', () => {
+  it('has one column per stage group, in board order, with every stage to drop on', async () => {
+    const { owner, businessId, clientId, stage, stages } = await withClient()
+    const create = (title: string, dueDate?: string) =>
+      owner.mutation(api.jobs.create, {
+        businessId,
+        clientId,
+        title,
+        dueDate,
+        typedPriceCents: 10000,
+      })
+    await create('Без срок')
+    await create('Късен срок', '2026-12-01')
+    await create('Ранен срок', '2026-11-01')
+    const doneId = await create('Готов')
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId: doneId,
+      stageId: stage('done'),
+    })
+
+    const board = await owner.query(api.jobs.board, { businessId })
+    expect(board.columns.map((column) => column.group)).toEqual([
+      'new',
+      'in_progress',
+      'done',
+      'cancelled',
+    ])
+    const [open, , done] = board.columns
+    expect(open!.jobs.map((job) => job.title)).toEqual([
+      'Ранен срок',
+      'Късен срок',
+      'Без срок',
+    ])
+    expect(open!.total).toBe(3)
+    expect(open!.owedCents).toBe(30000)
+    expect(done!.jobs.map((job) => job.title)).toEqual(['Готов'])
+    expect(board.stages.map((item) => item._id)).toEqual(
+      stages.map((item) => item._id),
+    )
+  })
+
+  it('shows another business nothing', async () => {
+    const { t, businessId } = await withClient()
+    const stranger = t.withIdentity(STRANGER)
+    await stranger.mutation(api.users.ensureCurrent, {})
+    await expect(stranger.query(api.jobs.board, { businessId })).rejects.toThrow()
   })
 })
