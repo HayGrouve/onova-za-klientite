@@ -4,6 +4,7 @@ import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import type { api } from '../../convex/_generated/api'
 import { InitialsAvatar } from '#/components/initials-avatar'
+import { ListExtras } from '#/components/list-extras'
 import { ScrollFade } from '#/components/scroll-fade'
 import { SortableHead } from '#/components/sortable-head'
 import {
@@ -140,6 +141,11 @@ export function ClientsTable({
                         {formatPhone(client.phone)}
                       </span>
                     )}
+                    <ListExtras
+                      target="client"
+                      values={client.listExtra}
+                      className="text-xs"
+                    />
                   </span>
                 </span>
               </TableCell>

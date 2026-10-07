@@ -4,6 +4,7 @@ import type { JobRowData } from '#/components/job-row'
 import { formatMoment } from '#/components/job-row'
 import { ScrollFade } from '#/components/scroll-fade'
 import { SortableHead } from '#/components/sortable-head'
+import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import {
   Table,
@@ -136,6 +137,11 @@ export function JobsTable({
                   <span className="block truncate text-xs text-muted-foreground xl:hidden">
                     {client}
                   </span>
+                  <ListExtras
+                    target="job"
+                    values={job.listExtra}
+                    className="text-xs"
+                  />
                 </TableCell>
                 <TableCell
                   className={cn(

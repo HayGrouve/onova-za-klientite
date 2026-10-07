@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
+import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import { Tip } from '#/components/tip'
 import {
@@ -590,6 +591,7 @@ function CardFace({ card, today }: { card: Card; today: string }) {
             {m.balance_short({ amount: formatMoney(card.balanceCents) })}
           </Meta>
         )}
+        <ListExtras target="job" values={card.listExtra} className="text-xs" />
       </span>
     </span>
   )
