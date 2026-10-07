@@ -67,7 +67,10 @@ export function JobsBoard({
   filter: string
   today: string
 }) {
-  const { business } = useViewer()
+  const { business, businesses } = useViewer()
+  const role = businesses.find((item) => item._id === business._id)?.role
+  // Level 2: a Worker cannot change stages, so their cards don't move.
+  const canMove = role === 'owner' || role === 'manager'
   const board = useQuery(api.jobs.board, { businessId: business._id })
   const move = useMoveJob()
   const [dragging, setDragging] = useState<Card | null>(null)
@@ -99,6 +102,7 @@ export function JobsBoard({
             filtering={filter.trim() !== ''}
             stages={stagesOf(column.group)}
             allStages={board.stages}
+            canMove={canMove}
             dragging={dragging}
             today={today}
             onDragStart={setDragging}
@@ -118,6 +122,7 @@ function Column({
   filtering,
   stages,
   allStages,
+  canMove,
   dragging,
   today,
   onDragStart,
@@ -129,6 +134,7 @@ function Column({
   filtering: boolean
   stages: Stage[]
   allStages: Stage[]
+  canMove: boolean
   dragging: Card | null
   today: string
   onDragStart: (card: Card) => void
@@ -138,17 +144,17 @@ function Column({
   const { words } = useViewer().business
   const [over, setOver] = useState(false)
   const { group } = column
-  // A column with no stage takes no drop, except Cancelled: cancelling brings
-  // its stage back (jobs.cancel).
+  // A drop on another column lands in its first stage. A column with no
+  // stage takes none, except Cancelled: cancelling brings its stage back
+  // (jobs.cancel). In its own column a card can only move to another stage.
   const columnTarget: Target | null =
-    stages.find((stage) => stage._id === dragging?.stageId) ??
-    stages.at(0) ??
-    (group === 'cancelled' ? 'cancelled' : null)
+    stages.at(0) ?? (group === 'cancelled' ? 'cancelled' : null)
   const accepts =
+    dragging !== null && columnTarget !== null && dragging.stageGroup !== group
+  const zones =
     dragging !== null &&
-    columnTarget !== null &&
-    // Dropping a card back where it is does nothing.
-    !(dragging.stageGroup === group && stages.length < 2)
+    stages.length > 1 &&
+    stages.some((stage) => stage._id !== dragging.stageId)
   const dropOn = (target: Target | null) => (event: React.DragEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -175,7 +181,7 @@ function Column({
       onDrop={dropOn(columnTarget)}
       className={cn(
         'relative flex flex-col gap-2 rounded-2xl bg-board p-2 pt-0 transition-shadow duration-150',
-        accepts && 'ring-2 ring-primary/25 ring-inset',
+        (accepts || zones) && 'ring-2 ring-primary/25 ring-inset',
         over && 'ring-primary/70',
       )}
     >
@@ -211,7 +217,7 @@ function Column({
       </header>
 
       {/* While dragging, a column with several stages offers each one. */}
-      {accepts && stages.length > 1 && (
+      {zones && (
         <ul className="flex flex-col gap-1.5">
           {stages.map((stage) => (
             <StageDropZone
@@ -236,6 +242,7 @@ function Column({
             card={card}
             showStage={stages.length > 1}
             stages={allStages}
+            canMove={canMove}
             today={today}
             dragged={dragging?._id === card._id}
             onDragStart={() => onDragStart(card)}
@@ -244,12 +251,12 @@ function Column({
           />
         ))}
       </ul>
-      {cards.length === 0 && !accepts && (
+      {cards.length === 0 && !accepts && !zones && (
         <p className="px-2 py-6 text-center text-sm text-muted-foreground">
           {filtering ? m.jobs_filter_none() : m.jobs_group_empty()}
         </p>
       )}
-      {hidden > 0 && !filtering && (
+      {hidden > 0 && (
         <p className="flex items-center justify-between gap-2 px-2 py-1 text-xs text-muted-foreground">
           {m.board_closed_shown({
             count: column.jobs.length,
@@ -307,6 +314,7 @@ function BoardCard({
   card,
   showStage,
   stages,
+  canMove,
   today,
   dragged,
   onDragStart,
@@ -316,6 +324,7 @@ function BoardCard({
   card: Card
   showStage: boolean
   stages: Stage[]
+  canMove: boolean
   today: string
   dragged: boolean
   onDragStart: () => void
@@ -350,7 +359,7 @@ function BoardCard({
 
   return (
     <li
-      draggable
+      draggable={canMove}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move'
         event.dataTransfer.setData('text/plain', card.title)
@@ -358,7 +367,8 @@ function BoardCard({
       }}
       onDragEnd={onDragEnd}
       className={cn(
-        'group/card relative cursor-grab surface transition-[opacity,box-shadow] duration-150 hover:shadow-md active:cursor-grabbing',
+        'group/card relative surface transition-[opacity,box-shadow] duration-150 hover:shadow-md',
+        canMove && 'cursor-grab active:cursor-grabbing',
         dragged && 'opacity-40',
         late && 'shadow-[inset_3px_0_0_var(--destructive)]',
       )}
@@ -406,7 +416,7 @@ function BoardCard({
           </span>
         )}
       </Link>
-      <MoveMenu card={card} stages={stages} onMove={onMove} />
+      {canMove && <MoveMenu card={card} stages={stages} onMove={onMove} />}
     </li>
   )
 }

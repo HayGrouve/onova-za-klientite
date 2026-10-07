@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
-import { boardColumn } from '../shared/board'
+import { BOARD_CLOSED_LIMIT, boardColumn } from '../shared/board'
 import { STAGE_GROUPS, stagesFor } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import {
@@ -295,7 +295,35 @@ export const board = businessQuery({
           q.eq('businessId', businessId).eq('stageGroup', group),
         )
         .take(LIST_LIMIT)
-      const column = boardColumn(group, jobs)
+      let column = boardColumn(group, jobs)
+      if (group === 'done' || group === 'cancelled') {
+        // A long history outgrows one read, so the latest closed jobs come
+        // from their own index, and what Done still owes from the owes index.
+        const latest = await ctx.db
+          .query('jobs')
+          .withIndex('by_business_group_done', (q) =>
+            q.eq('businessId', businessId).eq('stageGroup', group),
+          )
+          .order('desc')
+          .take(BOARD_CLOSED_LIMIT)
+        const owing =
+          group === 'done'
+            ? await ctx.db
+                .query('jobs')
+                .withIndex('by_business_owes', (q) =>
+                  q
+                    .eq('businessId', businessId)
+                    .eq('owes', true)
+                    .eq('stageGroup', 'done'),
+                )
+                .collect()
+            : []
+        column = {
+          jobs: boardColumn(group, latest).jobs,
+          total: column.total,
+          owedCents: boardColumn(group, owing).owedCents,
+        }
+      }
       const rows = []
       for (const job of column.jobs) {
         rows.push(await jobRow(ctx, job, lookups, now))

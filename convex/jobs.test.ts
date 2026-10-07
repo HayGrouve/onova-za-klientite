@@ -304,6 +304,40 @@ describe('jobs board', () => {
     )
   })
 
+  it('a long Done history still shows the most recently finished', async () => {
+    const { t, owner, businessId, clientId, stage } = await withClient()
+    const done = async (title: string, dueDate: string) => {
+      const jobId = await owner.mutation(api.jobs.create, {
+        businessId,
+        clientId,
+        title,
+        dueDate,
+        typedPriceCents: 1000,
+      })
+      await owner.mutation(api.jobs.changeStage, {
+        businessId,
+        jobId,
+        stageId: stage('done'),
+      })
+      return jobId
+    }
+    // More old Done jobs than one read takes, all due before the newest one.
+    const oldId = await done('Стар', '2020-01-01')
+    await t.run(async (ctx) => {
+      const { _id, _creationTime, ...old } = (await ctx.db.get('jobs', oldId))!
+      for (let index = 0; index < 510; index++) {
+        await ctx.db.insert('jobs', { ...old, doneAt: (old.doneAt ?? 0) - 1 })
+      }
+    })
+    await done('Най-нов', '2030-01-01')
+
+    const board = await owner.query(api.jobs.board, { businessId })
+    const column = board.columns.find((item) => item.group === 'done')!
+    expect(column.jobs).toHaveLength(20)
+    expect(column.jobs[0].title).toBe('Най-нов')
+    expect(column.owedCents).toBe(512 * 1000)
+  })
+
   it('shows another business nothing', async () => {
     const { t, businessId } = await withClient()
     const stranger = t.withIdentity(STRANGER)

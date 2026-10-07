@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { monthsLabel } from '#/components/setup/steps'
@@ -26,6 +27,9 @@ export function RuleReminderSheet({
   const { business } = useViewer()
   const today = useToday()
   const rule = business.reminderRule
+  // The form stays while the sheet animates closed.
+  const [shown, setShown] = useState(job)
+  if (job && job !== shown) setShown(job)
   return (
     <Sheet open={job !== null} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
@@ -35,7 +39,7 @@ export function RuleReminderSheet({
         <SheetHeader>
           <SheetTitle>{m.reminder_rule_title()}</SheetTitle>
         </SheetHeader>
-        {job && rule && (
+        {shown && rule && (
           <div className="px-4 pb-6">
             <p className="pb-4 text-sm">
               {m.reminder_rule_body({
@@ -44,9 +48,9 @@ export function RuleReminderSheet({
             </p>
             <ReminderForm
               businessId={business._id}
-              target={{ jobId: job._id, itemId: job.itemId }}
+              target={{ jobId: shown._id, itemId: shown.itemId }}
               initialDate={addMonths(today, rule.months)}
-              initialNote={job.title}
+              initialNote={shown.title}
               source="rule"
               onDone={onClose}
               onSkip={onClose}

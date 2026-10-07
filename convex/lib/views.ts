@@ -21,6 +21,8 @@ export const vJobRow = v.object({
   balanceCents: v.number(),
   owes: v.boolean(),
   doneAt: v.optional(v.number()),
+  /** The job's first item, which a reminder from the job also points at. */
+  itemId: v.optional(v.id('items')),
   /** The next appointment that isn't done or cancelled, if any. */
   nextAppointment: v.optional(
     v.object({ start: v.number(), allDay: v.boolean() }),
@@ -84,6 +86,7 @@ export async function jobRow(
     balanceCents: job.balanceCents,
     owes: job.owes,
     doneAt: job.doneAt,
+    itemId: job.itemIds.at(0),
     nextAppointment: next
       ? { start: next.start, allDay: next.allDay }
       : undefined,
