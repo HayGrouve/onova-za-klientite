@@ -8,6 +8,8 @@ const app = defineApp({
     CLERK_JWT_ISSUER_DOMAIN: v.string(),
     /** "true" on dev and preview deployments only. Never set on production. */
     ALLOW_SEED: v.optional(v.literal('true')),
+    /** Clerk Backend API key, to delete the Clerk user with the account. */
+    CLERK_SECRET_KEY: v.optional(v.string()),
     /** Web Push (ADR 0011). Optional, so a deployment without keys still runs. */
     VAPID_PUBLIC_KEY: v.optional(v.string()),
     VAPID_PRIVATE_KEY: v.optional(v.string()),

@@ -37,3 +37,12 @@ export async function pickContact(): Promise<{
   if (!name && !phone) return null
   return { name: name || phone || '', phone: phone || undefined }
 }
+
+/** Many contacts from the phone's address book at once. Empty if cancelled. */
+export async function pickContacts(): Promise<
+  Array<{ name?: Array<string | undefined>; tel?: Array<string | undefined> }>
+> {
+  const contacts = manager()
+  if (!contacts) return []
+  return await contacts.select(['name', 'tel'], { multiple: true })
+}

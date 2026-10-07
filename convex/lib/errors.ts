@@ -24,6 +24,7 @@ export type ErrorCode =
   | 'payment.zero'
   | 'credit.notEnough'
   | 'job.noDate'
+  | 'client.merged'
   | 'file.rejected'
 
 export function fail(

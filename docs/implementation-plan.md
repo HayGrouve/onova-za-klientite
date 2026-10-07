@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 8 are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 9 are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
 
 ## Contents
 
@@ -614,6 +614,10 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D40 | Search keys | Every value gives its transliteration. Values with digits (plates, models) also give the plate look-alike fold and a copy without spaces. +359 phones also give the local 0… form. A query with digits is searched twice, plain and as a compact look-alike, and the results merged. Keys are cut at 32 characters | Convex matches whole words except the last, so "СА 1234 ВР" and "CA1234BP" need both forms on each side. Plain names stay free of noise keys |
 | D41 | Repeat date | A job's date for repeating is its last non-cancelled appointment, else its due date. A job with neither can't repeat. The next job keeps the appointment's Sofia wall-clock time across daylight saving changes. The cron runs daily at 01:07 UTC | Q6 left "the job's date" open for jobs with both, and off-the-hour crons spread load |
 | D42 | Push text | The morning summary's text is built on the server in one file (`convex/lib/pushText.ts`), as "{Срещи}: 2 · Закъснели: 1 · Напомняния: 3" | Push is sent by the server, so ADR 0009's "Convex never returns UI text" has this one exception, kept in one place |
+| D43 | Summary rendering | satori is pinned to 0.32.0, the last version that embeds its layout engine. Newer ones fetch an extra `hb.wasm` that Vite serves from the wrong path. Sofia Sans ships as static woff files (Latin and Cyrillic, 400 and 700, 80 KB, OFL) in `public/fonts/`, each subset as its own family | It renders offline from the precached fonts, and digits don't fall back to boxes |
+| D44 | Merge | Merging moves jobs, payments, allocations, items, reminders, appointments, files, messages and phones to the kept client. Missing contact details are filled in, and notes are joined. The merged record stays, hidden from lists, with `mergedIntoId` | Nothing is lost, and old links to the merged client still lead somewhere |
+| D45 | Account deletion | Businesses where the user is the only active member are deleted table by table in batches of 200 (blobs included). In shared businesses only the membership goes. Then the user, push subscriptions and the Clerk user (Backend API, `CLERK_SECRET_KEY` in Convex env) | Batches stay inside Convex's per-mutation limits, and a shared business isn't destroyed by one leaver |
+| D46 | Export | One owner-only query returns every business-scoped table. The browser zips `data.json` plus a UTF-8 CSV with BOM per table (`fflate`, about 8 KB) | Level 1 data fits one query. Excel opens the CSVs with Cyrillic intact |
 
 ## Spikes
 
@@ -643,6 +647,7 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - milestone 6 built (#7), in review: payments from a job and from a client with an editable split, refunds, write-offs, using credit on request, costs on a job and general, and the Money screen by month;
   - milestone 7 built (#8), in review: every Settings section (business with logo, names with gender, modules, stages, fields, services, reminders), "+ поле" on the forms, blocked actions that explain why, and a grammar test over the translation files;
   - milestone 8 built (#9), in review: one search box (Latin/Cyrillic, plates, phones, extra fields), reminders with the rule's pre-filled offer on Done, repeating jobs with a daily idempotent cron, and Web Push (subscribe, morning summary at 07:30 Sofia, settings, iPhone guide);
+  - milestone 9 built (#10), in review: the job summary image with share fallbacks, import from contacts, Excel and CSV, duplicate warning and merge, data export as a zip, anonymize, and batched account deletion;
 - **Open:**
   - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26.

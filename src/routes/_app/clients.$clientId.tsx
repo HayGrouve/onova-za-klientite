@@ -9,6 +9,7 @@ import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { ClientAdmin } from '#/components/client-admin'
 import { ClientForm } from '#/components/client-form'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
@@ -76,21 +77,40 @@ function ClientPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             {client.isNoClient ? m.no_client() : client.name}
           </h1>
-          {!client.isNoClient && (
-            <Button
-              variant="ghost"
-              size="icon-xl"
-              aria-label={m.client_edit()}
-              onClick={() => setPanel({ kind: 'edit' })}
-            >
-              <PencilSimpleIcon />
-            </Button>
-          )}
+          <div className="flex shrink-0 items-center">
+            <ClientAdmin businessId={business._id} client={client} />
+            {!client.isNoClient &&
+              !client.anonymizedAt &&
+              !client.mergedIntoId && (
+                <Button
+                  variant="ghost"
+                  size="icon-xl"
+                  aria-label={m.client_edit()}
+                  onClick={() => setPanel({ kind: 'edit' })}
+                >
+                  <PencilSimpleIcon />
+                </Button>
+              )}
+          </div>
         </div>
         {client.isNoClient && (
           <p className="text-sm text-muted-foreground">
             {m.client_no_client_note()}
           </p>
+        )}
+        {client.anonymizedAt && (
+          <p className="text-sm text-muted-foreground">
+            {m.client_anonymized_note()}
+          </p>
+        )}
+        {client.mergedIntoId && (
+          <Link
+            to="/clients/$clientId"
+            params={{ clientId: client.mergedIntoId }}
+            className="text-sm text-primary underline underline-offset-4"
+          >
+            {m.client_merged_note({ name: data.mergedIntoName ?? '' })}
+          </Link>
         )}
         {phone && (
           <div className="flex gap-2">

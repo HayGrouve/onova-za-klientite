@@ -103,6 +103,8 @@ export const ACTIVITY_TYPES = [
   'cost.edited',
   'cost.removed',
   'client.created',
+  'client.merged',
+  'client.anonymized',
   'client.edited',
   'item.created',
   'item.edited',

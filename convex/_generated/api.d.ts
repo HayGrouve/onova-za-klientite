@@ -8,17 +8,22 @@
  * @module
  */
 
+import type * as account from "../account.js";
 import type * as appointments from "../appointments.js";
 import type * as businesses from "../businesses.js";
 import type * as clients from "../clients.js";
+import type * as clientsAdmin from "../clientsAdmin.js";
 import type * as costs from "../costs.js";
 import type * as crons from "../crons.js";
+import type * as dataExport from "../dataExport.js";
 import type * as fields from "../fields.js";
 import type * as files from "../files.js";
+import type * as import_ from "../import.js";
 import type * as items from "../items.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_activity from "../lib/activity.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_businessTables from "../lib/businessTables.js";
 import type * as lib_clientWrite from "../lib/clientWrite.js";
 import type * as lib_createBusiness from "../lib/createBusiness.js";
 import type * as lib_errors from "../lib/errors.js";
@@ -59,17 +64,22 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  account: typeof account;
   appointments: typeof appointments;
   businesses: typeof businesses;
   clients: typeof clients;
+  clientsAdmin: typeof clientsAdmin;
   costs: typeof costs;
   crons: typeof crons;
+  dataExport: typeof dataExport;
   fields: typeof fields;
   files: typeof files;
+  import: typeof import_;
   items: typeof items;
   jobs: typeof jobs;
   "lib/activity": typeof lib_activity;
   "lib/auth": typeof lib_auth;
+  "lib/businessTables": typeof lib_businessTables;
   "lib/clientWrite": typeof lib_clientWrite;
   "lib/createBusiness": typeof lib_createBusiness;
   "lib/errors": typeof lib_errors;
