@@ -303,6 +303,7 @@
   "job_typed_price": "Цена без позиции",
   "job_notes": "Бележки",
   "job_address": "Адрес",
+  "map_open": "Покажи на картата: {address}",
   "job_items": "{items}",
   "job_files": "Снимки и файлове",
   "job_history": "История",

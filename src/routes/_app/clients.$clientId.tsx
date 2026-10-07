@@ -21,6 +21,7 @@ import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { AddressLink } from '#/components/address-link'
 import { ClientAdmin } from '#/components/client-admin'
 import { ClientForm } from '#/components/client-form'
 import { Columns } from '#/components/columns'
@@ -203,7 +204,7 @@ function ClientPage() {
                     )}
                     {client.address && (
                       <ContactRow icon={MapPinIcon} label={m.client_address()}>
-                        {client.address}
+                        <AddressLink address={client.address} />
                       </ContactRow>
                     )}
                   </dl>
