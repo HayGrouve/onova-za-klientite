@@ -2,6 +2,7 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon } from '@phosphor-icons/react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
+import { cn } from 'cn'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
@@ -10,6 +11,7 @@ import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { useSubmit } from '#/components/money/use-submit'
 import { SettingsPage } from '#/components/settings/settings-page'
+import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
 import { StageBadge } from '#/components/stage-badge'
 import { Button } from '#/components/ui/button'
 import {
@@ -29,6 +31,7 @@ import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
 import { GROUP_LABEL } from '#/i18n/groups'
+import { lower } from '#/i18n/words'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import {
@@ -100,7 +103,20 @@ function StagesSettings() {
   }
 
   return (
-    <SettingsPage title={m.settings_stages()} help={m.stages_help()}>
+    <SettingsPage
+      title={m.settings_stages()}
+      help={m.stages_help()}
+      preview={
+        settings && (
+          <SettingsPreview>
+            <StagesPreview
+              stages={settings.stages}
+              job={business.words.job.singular}
+            />
+          </SettingsPreview>
+        )
+      }
+    >
       {!settings ? (
         <ListSkeleton />
       ) : (
@@ -186,6 +202,65 @@ function StagesSettings() {
         </>
       )}
     </SettingsPage>
+  )
+}
+
+/**
+ * The stages as a job page offers them, in order, and the four groups the
+ * Jobs tabs (and the board) sort them into.
+ */
+function StagesPreview({ stages, job }: { stages: Stage[]; job: string }) {
+  const watch = stages.map((stage) => [stage.name, stage.group])
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <div className="flex flex-col gap-2">
+        <p className="font-medium">
+          {m.stages_preview_page({ job: lower(job) })}
+        </p>
+        <Flash watch={watch} className="flex flex-wrap gap-1.5 py-1">
+          {stages.map((stage, index) => (
+            <StageBadge
+              key={stage._id}
+              name={stage.name}
+              group={stage.group}
+              className={cn(
+                index === 0 &&
+                  'bg-primary text-primary-foreground ring-primary',
+              )}
+            />
+          ))}
+        </Flash>
+      </div>
+      <div className="flex flex-col gap-2">
+        <p className="font-medium">{m.stages_preview_tabs()}</p>
+        <ul className="flex flex-col divide-y divide-border/70 rounded-xl border">
+          {STAGE_GROUPS.map((group) => {
+            const inGroup = stages.filter((stage) => stage.group === group)
+            return (
+              <li key={group}>
+                <Flash
+                  watch={inGroup.map((stage) => stage.name)}
+                  className="mx-0 flex items-start gap-2 px-3 py-2"
+                >
+                  <span className="w-18 shrink-0 pt-0.5 text-muted-foreground">
+                    {GROUP_LABEL[group]()}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-wrap gap-1">
+                    {inGroup.map((stage) => (
+                      <StageBadge
+                        key={stage._id}
+                        name={stage.name}
+                        group={stage.group}
+                      />
+                    ))}
+                  </span>
+                </Flash>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </div>
   )
 }
 

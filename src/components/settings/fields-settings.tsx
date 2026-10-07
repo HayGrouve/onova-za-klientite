@@ -10,6 +10,10 @@ import { FieldEditSheet } from '#/components/settings/field-edit-sheet'
 import { FIELD_TYPE_LABEL } from '#/components/settings/field-type-picker'
 import { Button } from '#/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
+import { ExtraFieldsEditor } from '#/components/extra-fields'
+import { SettingsPage } from '#/components/settings/settings-page'
+import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
+import { lower } from '#/i18n/words'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 
@@ -104,90 +108,188 @@ export function FieldsSettings({
     .find((field) => field._id === editingId)
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-6">
-      <Tabs
-        value={target}
-        onValueChange={(value) => {
-          setSelected(value as Target)
-          setShowArchived(false)
-        }}
-      >
-        <TabsList className="h-11 w-full">
-          {visibleTargets.map((item) => (
-            <TabsTrigger key={item} value={item} className="px-2 text-base">
-              {business.words[item].plural}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      {!fields ? (
-        <ListSkeleton />
-      ) : (
-        <>
-          <div className="flex flex-col gap-2">
-            {active?.map((field) => (
-              <FieldRow
-                key={field._id}
-                field={field}
-                onOpen={() => setEditingId(field._id)}
-              />
-            ))}
-            {active?.length === 0 && (
-              <p className="px-1 py-4 text-center text-muted-foreground">
-                {m.fields_settings_empty()}
-              </p>
-            )}
-          </div>
-          <Button
-            type="button"
-            size="xl"
-            variant="outline"
-            onClick={() => setAdding(true)}
+    <SettingsPage
+      title={m.fields_settings_title()}
+      help={m.fields_settings_help()}
+      preview={
+        active && (
+          <SettingsPreview
+            title={m.fields_preview_title({
+              name: lower(business.words[target].singular),
+            })}
           >
-            <PlusIcon data-icon="inline-start" />
-            {m.fields_settings_add()}
-          </Button>
-          {archived && archived.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-11 w-fit"
-                aria-expanded={showArchived}
-                onClick={() => setShowArchived(!showArchived)}
-              >
-                <CaretDownIcon
-                  data-icon="inline-start"
-                  className={cn(!showArchived && '-rotate-90')}
-                />
-                {m.fields_settings_archived({ count: archived.length })}
-              </Button>
-              {showArchived &&
-                archived.map((field) => (
-                  <FieldRow
-                    key={field._id}
-                    field={field}
-                    onOpen={() => setEditingId(field._id)}
-                  />
-                ))}
-            </div>
-          )}
-        </>
-      )}
+            <RecordFormPreview
+              target={target}
+              fields={active}
+              name={business.words[target].singular}
+            />
+          </SettingsPreview>
+        )
+      }
+    >
+      <div className="flex flex-col gap-4 px-4 pb-6">
+        <Tabs
+          value={target}
+          onValueChange={(value) => {
+            setSelected(value as Target)
+            setShowArchived(false)
+          }}
+        >
+          <TabsList className="h-11 w-full">
+            {visibleTargets.map((item) => (
+              <TabsTrigger key={item} value={item} className="px-2 text-base">
+                {business.words[item].plural}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
-      <AddFieldSheet
-        businessId={businessId}
-        target={target}
-        targetName={business.words[target].plural}
-        open={adding}
-        onOpenChange={setAdding}
-      />
-      <FieldEditSheet
-        businessId={businessId}
-        field={editing}
-        onClose={() => setEditingId(null)}
-      />
+        {!fields ? (
+          <ListSkeleton />
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              {active?.map((field) => (
+                <FieldRow
+                  key={field._id}
+                  field={field}
+                  onOpen={() => setEditingId(field._id)}
+                />
+              ))}
+              {active?.length === 0 && (
+                <p className="px-1 py-4 text-center text-muted-foreground">
+                  {m.fields_settings_empty()}
+                </p>
+              )}
+            </div>
+            <Button
+              type="button"
+              size="xl"
+              variant="outline"
+              onClick={() => setAdding(true)}
+            >
+              <PlusIcon data-icon="inline-start" />
+              {m.fields_settings_add()}
+            </Button>
+            {archived && archived.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 w-fit"
+                  aria-expanded={showArchived}
+                  onClick={() => setShowArchived(!showArchived)}
+                >
+                  <CaretDownIcon
+                    data-icon="inline-start"
+                    className={cn(!showArchived && '-rotate-90')}
+                  />
+                  {m.fields_settings_archived({ count: archived.length })}
+                </Button>
+                {showArchived &&
+                  archived.map((field) => (
+                    <FieldRow
+                      key={field._id}
+                      field={field}
+                      onOpen={() => setEditingId(field._id)}
+                    />
+                  ))}
+              </div>
+            )}
+          </>
+        )}
+
+        <AddFieldSheet
+          businessId={businessId}
+          target={target}
+          targetName={business.words[target].plural}
+          open={adding}
+          onOpenChange={setAdding}
+        />
+        <FieldEditSheet
+          businessId={businessId}
+          field={editing}
+          onClose={() => setEditingId(null)}
+        />
+      </div>
+    </SettingsPage>
+  )
+}
+
+/** The fields every record has, before the extra ones. */
+const BASE_FIELDS: Record<Target, Array<() => string>> = {
+  client: [m.client_name, m.client_phones],
+  job: [m.job_title, m.job_price],
+  item: [m.item_name],
+}
+
+/**
+ * The record's form with its extra fields, drawn with the real inputs but
+ * inert, and a list row with the fields shown there.
+ */
+function RecordFormPreview({
+  target,
+  fields,
+  name,
+}: {
+  target: Target
+  fields: Array<Doc<'fields'>>
+  name: string
+}) {
+  const inList = fields.filter((field) => field.showInList)
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <div className="flex flex-col gap-3">
+        {BASE_FIELDS[target].map((label) => (
+          <div key={label()} className="flex flex-col gap-1.5 opacity-50">
+            <span className="font-medium">{label()}</span>
+            <span className="h-9 rounded-xl border" />
+          </div>
+        ))}
+        <Flash
+          watch={fields.map((field) => [
+            field._id,
+            field.name,
+            field.type,
+            field.options?.map((option) => option.name),
+          ])}
+          className="py-1"
+        >
+          {fields.some((field) => field.type !== 'photo') ? (
+            <div inert className="flex flex-col gap-4">
+              <ExtraFieldsEditor
+                fields={fields}
+                values={{}}
+                onChange={() => {}}
+              />
+            </div>
+          ) : (
+            <p className="py-1 text-muted-foreground">
+              {m.fields_preview_none()}
+            </p>
+          )}
+        </Flash>
+      </div>
+      <div className="flex flex-col gap-2">
+        <p className="font-medium">{m.fields_preview_list()}</p>
+        <Flash
+          watch={inList.map((field) => field.name)}
+          className="flex flex-col gap-1 rounded-xl border px-3 py-2"
+        >
+          <span className="font-medium">{name}</span>
+          {inList.length > 0 ? (
+            <span className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              {inList.map((field) => (
+                <span key={field._id}>{field.name}: …</span>
+              ))}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {m.fields_preview_list_none()}
+            </span>
+          )}
+        </Flash>
+      </div>
     </div>
   )
 }
