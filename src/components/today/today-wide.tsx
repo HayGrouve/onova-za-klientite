@@ -112,7 +112,7 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
         <div className="mx-4 flex animate-rise items-center gap-3 surface p-4 text-sm text-muted-foreground">
           <CheckCircleIcon
             aria-hidden
-            className="size-6 shrink-0 text-green-700"
+            className="size-6 shrink-0 text-green-700 dark:text-green-400"
             weight="duotone"
           />
           {m.today_attention_clear()}

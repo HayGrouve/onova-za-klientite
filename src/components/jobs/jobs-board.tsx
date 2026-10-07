@@ -125,7 +125,7 @@ export function JobsBoard({
       {drag && (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-50 rotate-2 overflow-hidden surface shadow-xl ring-2 ring-primary/40"
+          className="pointer-events-none fixed z-50 animate-lift overflow-hidden surface shadow-xl ring-2 ring-primary/40"
           style={{
             left: drag.x - drag.offsetX,
             top: drag.y - drag.offsetY,
@@ -219,6 +219,8 @@ function useCardDrag(onDrop: (card: Card, key: string) => void) {
     const begin = () => {
       active = true
       document.body.style.userSelect = 'none'
+      // The whole page shows the grabbing hand while a card is held.
+      document.documentElement.classList.add('dragging-card')
       update()
       frame = requestAnimationFrame(scroll)
     }
@@ -264,6 +266,7 @@ function useCardDrag(onDrop: (card: Card, key: string) => void) {
       window.removeEventListener('keydown', onKey)
       document.removeEventListener('touchmove', onTouchMove)
       document.body.style.userSelect = ''
+      document.documentElement.classList.remove('dragging-card')
       active = false
       cleanupRef.current = undefined
       setDrag(null)
@@ -324,7 +327,7 @@ function Column({
       aria-label={GROUP_LABEL[group]()}
       data-drop={accepts ? `column:${group}` : undefined}
       className={cn(
-        'relative flex flex-col gap-2 rounded-2xl bg-board p-2 pt-0 transition-shadow duration-150',
+        'relative flex flex-col gap-2 rounded-2xl bg-board p-2 pt-0 transition-shadow duration-200 ease-out',
         (accepts || zones) && 'ring-2 ring-primary/25 ring-inset',
         over && 'ring-primary/70',
       )}
@@ -360,58 +363,68 @@ function Column({
         )}
       </header>
 
-      {/* While dragging, a column with several stages offers each one. */}
-      {zones && (
-        <ul className="flex flex-col gap-1.5">
-          {stages.map(
-            (stage) =>
-              stage._id !== dragging.stageId && (
-                <li
-                  key={stage._id}
-                  data-drop={`zone:${stage._id}`}
-                  className={cn(
-                    'flex h-11 items-center justify-center rounded-xl border-2 border-dashed border-primary/40 px-2 text-center text-sm font-medium text-primary transition-colors',
-                    drag?.over === `zone:${stage._id}` &&
-                      'border-primary bg-primary/10',
-                  )}
-                >
-                  {m.board_drop_stage({ stage: stage.name })}
-                </li>
-              ),
-          )}
+      {/* The cards, and over them while a card is dragged the places it can
+          land. The overlay fades in over the cards instead of pushing them
+          down, so nothing on the board jumps when a drag starts. */}
+      <div className="relative flex min-h-24 flex-col">
+        <ul className="flex stagger flex-col gap-2">
+          {cards.map((card) => (
+            <BoardCard
+              key={card._id}
+              card={card}
+              stages={allStages}
+              canMove={canMove}
+              today={today}
+              dragged={dragging?._id === card._id}
+              onPress={(event) => onPress(event, card)}
+              wasDragged={wasDragged}
+              onMove={(target) => onMove(card, target)}
+            />
+          ))}
         </ul>
-      )}
-      {accepts && stages.length < 2 && (
+        {cards.length === 0 && (
+          <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+            {filtering ? m.jobs_filter_none() : m.jobs_group_empty()}
+          </p>
+        )}
         <div
+          aria-hidden
+          data-drop={accepts ? `column:${group}` : undefined}
           className={cn(
-            'flex h-12 items-center justify-center rounded-xl border-2 border-dashed border-primary/40 text-sm font-medium text-primary transition-colors',
-            over && 'border-primary bg-primary/10',
+            'pointer-events-none absolute -inset-1 rounded-xl bg-board/60 opacity-0 backdrop-blur-[1px] transition-opacity duration-200 ease-out',
+            (accepts || zones) && 'pointer-events-auto opacity-100',
           )}
         >
-          {m.board_drop_here()}
+          {/* A column with several stages offers each one; another column
+              takes the drop anywhere. The targets stay in view under the
+              column's heading. */}
+          <ul
+            className={cn(
+              'sticky top-20 flex translate-y-1 flex-col gap-1.5 p-1 transition-transform duration-200 ease-out',
+              (accepts || zones) && 'translate-y-0',
+            )}
+          >
+            {dragging &&
+              (zones
+                ? stages
+                    .filter((stage) => stage._id !== dragging.stageId)
+                    .map((stage) => (
+                      <DropTarget
+                        key={stage._id}
+                        drop={`zone:${stage._id}`}
+                        over={drag?.over === `zone:${stage._id}`}
+                      >
+                        {m.board_drop_stage({ stage: stage.name })}
+                      </DropTarget>
+                    ))
+                : accepts && (
+                    <DropTarget drop={`column:${group}`} over={over}>
+                      {m.board_drop_here()}
+                    </DropTarget>
+                  ))}
+          </ul>
         </div>
-      )}
-
-      <ul className="flex stagger flex-col gap-2">
-        {cards.map((card) => (
-          <BoardCard
-            key={card._id}
-            card={card}
-            stages={allStages}
-            canMove={canMove}
-            today={today}
-            dragged={dragging?._id === card._id}
-            onPress={(event) => onPress(event, card)}
-            wasDragged={wasDragged}
-            onMove={(target) => onMove(card, target)}
-          />
-        ))}
-      </ul>
-      {cards.length === 0 && !accepts && !zones && (
-        <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-          {filtering ? m.jobs_filter_none() : m.jobs_group_empty()}
-        </p>
-      )}
+      </div>
       {hidden > 0 && (
         <p className="flex items-center justify-between gap-2 px-2 py-1 text-xs text-muted-foreground">
           {m.board_closed_shown({
@@ -428,6 +441,29 @@ function Column({
         </p>
       )}
     </section>
+  )
+}
+
+/** A dashed place to drop a dragged card, lit while the card is over it. */
+function DropTarget({
+  drop,
+  over,
+  children,
+}: {
+  drop: string
+  over: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <li
+      data-drop={drop}
+      className={cn(
+        'flex h-14 items-center justify-center rounded-xl border-2 border-dashed border-primary/40 bg-background/60 px-2 text-center text-sm font-medium text-primary transition-[background-color,border-color,transform] duration-150',
+        over && 'scale-[1.02] border-primary bg-primary/12',
+      )}
+    >
+      {children}
+    </li>
   )
 }
 
@@ -469,7 +505,10 @@ function BoardCard({
         params={{ jobId: card._id }}
         draggable={false}
         onClick={(event) => wasDragged() && event.preventDefault()}
-        className="block rounded-[inherit] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
+        className={cn(
+          'block rounded-[inherit] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset',
+          canMove && 'cursor-grab',
+        )}
       >
         <CardFace card={card} today={today} />
       </Link>

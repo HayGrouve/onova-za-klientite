@@ -6,7 +6,7 @@ import { formatMoney } from '../../../shared/money'
 // Colour only where it means something: what is owed, and profit or loss.
 const EMPHASIS = {
   primary: 'text-primary',
-  positive: 'text-green-700',
+  positive: 'text-green-700 dark:text-green-400',
   negative: 'text-destructive',
 }
 

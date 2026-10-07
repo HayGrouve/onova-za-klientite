@@ -8,9 +8,21 @@ import { m } from '#/paraglide/messages.js'
 
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null
 
+// The app's own theme variables, so sign-in follows light and dark with it.
 const CLERK_APPEARANCE = {
   variables: {
-    colorPrimary: 'oklch(0.45 0.15 258)',
+    colorPrimary: 'var(--primary)',
+    colorPrimaryForeground: 'var(--primary-foreground)',
+    colorBackground: 'var(--card)',
+    colorForeground: 'var(--foreground)',
+    colorMuted: 'var(--muted)',
+    colorMutedForeground: 'var(--muted-foreground)',
+    colorInput: 'var(--background)',
+    colorInputForeground: 'var(--foreground)',
+    colorBorder: 'var(--border)',
+    colorNeutral: 'var(--foreground)',
+    colorRing: 'var(--ring)',
+    colorDanger: 'var(--destructive)',
     fontFamily: "'Sofia Sans Variable', system-ui, sans-serif",
     borderRadius: '0.75rem',
   },

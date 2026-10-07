@@ -19,6 +19,12 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { m } from '#/paraglide/messages.js'
 import appCss from '../styles.css?url'
 
+// The theme follows the system's light or dark setting. It runs in <head>,
+// before the first paint, so a dark screen never flashes white, and it
+// follows a change while the app is open.
+// The browser bar takes the brand blue in light and the page colour in dark.
+const THEME_SCRIPT = `(function(){var q=window.matchMedia('(prefers-color-scheme: dark)');function a(){var d=q.matches,e=document.documentElement,t=document.querySelectorAll('meta[name="theme-color"]');e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';t.forEach(function(m){m.setAttribute('content',d?'#18181b':'#2453a4')})}a();q.addEventListener('change',a)})()`
+
 // Only a cold start without signal needs it, so it stays out of the main bundle.
 const OfflineApp = lazy(() =>
   import('#/components/offline/offline-app').then((module) => ({
@@ -47,6 +53,7 @@ export const Route = createRootRoute({
       { rel: 'icon', href: '/icon.svg', type: 'image/svg+xml' },
       { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
     ],
+    scripts: [{ children: THEME_SCRIPT }],
   }),
   component: RootLayout,
   shellComponent: RootDocument,
@@ -109,7 +116,8 @@ function RootError({ error }: ErrorComponentProps) {
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="bg">
+    // The theme script sets the class before React loads.
+    <html lang="bg" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
