@@ -118,11 +118,14 @@ describe('reminders', () => {
         .then((data) => data.reminders.map((reminder) => reminder._id))
     expect(await onToday('2026-10-08')).toEqual([reminderId])
 
-    await owner.mutation(api.reminders.snooze, {
-      businessId,
-      reminderId,
-      date: '2026-10-15',
-    })
+    // It answers with the day the reminder was on, so an undo can put it back.
+    expect(
+      await owner.mutation(api.reminders.snooze, {
+        businessId,
+        reminderId,
+        date: '2026-10-15',
+      }),
+    ).toBe('2026-10-07')
     const moved = await getDoc(t, 'reminders', reminderId)
     expect(moved.date).toBe('2026-10-15')
     expect(moved.status).toBe('open')
@@ -150,7 +153,7 @@ describe('reminders', () => {
       date: '2026-10-07',
       note: 'x',
     })
-    await owner.mutation(api.reminders.snooze, {
+    const before = await owner.mutation(api.reminders.snooze, {
       businessId,
       reminderId,
       date: '2026-11-07',
@@ -158,7 +161,7 @@ describe('reminders', () => {
     await owner.mutation(api.reminders.snooze, {
       businessId,
       reminderId,
-      date: '2026-10-07',
+      date: before!,
     })
     expect((await getDoc(t, 'reminders', reminderId)).date).toBe('2026-10-07')
   })
@@ -175,11 +178,13 @@ describe('reminders', () => {
     const events = () =>
       t.run(async (ctx) => (await ctx.db.query('activity').collect()).length)
     const before = await events()
-    await owner.mutation(api.reminders.snooze, {
-      businessId,
-      reminderId,
-      date: '2026-10-07',
-    })
+    expect(
+      await owner.mutation(api.reminders.snooze, {
+        businessId,
+        reminderId,
+        date: '2026-10-07',
+      }),
+    ).toBeNull()
     expect(await events()).toBe(before)
 
     await owner.mutation(api.reminders.close, {
@@ -188,11 +193,13 @@ describe('reminders', () => {
       status: 'done',
     })
     const closed = await events()
-    await owner.mutation(api.reminders.snooze, {
-      businessId,
-      reminderId,
-      date: '2026-12-01',
-    })
+    expect(
+      await owner.mutation(api.reminders.snooze, {
+        businessId,
+        reminderId,
+        date: '2026-12-01',
+      }),
+    ).toBeNull()
     const after = await getDoc(t, 'reminders', reminderId)
     expect(after.date).toBe('2026-10-07')
     expect(after.status).toBe('done')

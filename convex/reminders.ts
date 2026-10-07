@@ -81,12 +81,13 @@ export const close = businessMutation({
 })
 
 /**
- * "Snooze": moves an open reminder to another day. The same call puts the old
- * day back when a snooze is undone. A closed reminder is left as it is.
+ * "Snooze": moves an open reminder to another day and answers with the day it
+ * was on, so an undo can snooze it back. Null when nothing moved: a closed
+ * reminder, or the same day.
  */
 export const snooze = businessMutation({
   args: { reminderId: v.id('reminders'), date: v.string() },
-  returns: v.null(),
+  returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     if (!isValidDate(args.date)) fail('invalid', { field: 'date' })
@@ -100,7 +101,7 @@ export const snooze = businessMutation({
       itemId: reminder.itemId,
       data: { from: reminder.date, to: args.date, note: reminder.note },
     })
-    return null
+    return reminder.date
   },
 })
 
