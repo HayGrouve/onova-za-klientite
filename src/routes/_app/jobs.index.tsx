@@ -147,7 +147,7 @@ function JobsList({ table = false }: { table?: boolean }) {
         }
         className="px-4 pb-3"
       >
-        <TabsList className="w-full rounded-full bg-foreground/6 group-data-horizontal/tabs:h-11 lg:w-auto lg:min-w-120">
+        <TabsList className="w-full rounded-full bg-foreground/6 group-data-horizontal/tabs:h-11 lg:w-auto lg:min-w-120 lg:self-start">
           {STAGE_GROUPS.map((key) => (
             <TabsTrigger
               key={key}

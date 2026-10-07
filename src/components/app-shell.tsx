@@ -212,7 +212,7 @@ function NavItem({ to, icon: IconComponent, label }: NavEntry) {
 function Sidebar({ entries }: { entries: NavEntry[] }) {
   const { words } = useViewer().business
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-4 border-r border-border/70 bg-background px-3 py-4 lg:flex">
+    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-4 border-r border-border/70 bg-background px-3 py-4 lg:flex xl:w-64">
       <BusinessSwitcher />
       <Link
         to="/new"

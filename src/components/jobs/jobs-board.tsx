@@ -196,7 +196,7 @@ function Column({
               <Link
                 to="/new"
                 aria-label={m.new_job_label({ job: words.job.singular })}
-                className="ml-auto flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/8 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="-my-1 ml-auto flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/8 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <PlusIcon className="size-4" weight="bold" />
               </Link>

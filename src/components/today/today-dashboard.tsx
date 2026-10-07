@@ -129,7 +129,7 @@ export function TodayDashboard({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-4 gap-4 px-4">
+      <div className="grid grid-cols-2 gap-4 px-4 xl:grid-cols-4">
         {modules.appointments && (
           <StatTile
             to="/"
@@ -203,7 +203,7 @@ export function TodayDashboard({
       </div>
 
       {modules.appointments ? (
-        <div className="grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] items-start">
+        <div className="grid grid-cols-2 items-start xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
           <Schedule data={data} today={today} />
           <section
             id="attention"
@@ -291,7 +291,7 @@ function AgendaRow({ item }: { item: AppointmentRow }) {
           {item.allDay ? m.all_day() : TIME.format(item.start)}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate font-medium">{job.title}</span>
+          <span className="line-clamp-2 font-medium">{job.title}</span>
           <span className="truncate text-sm text-muted-foreground">
             {[job.isNoClient ? m.no_client() : job.clientName, item.label]
               .filter(Boolean)
@@ -299,7 +299,7 @@ function AgendaRow({ item }: { item: AppointmentRow }) {
           </span>
         </span>
         {job.owes && job.balanceCents > 0 && (
-          <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
+          <span className="hidden shrink-0 text-sm text-muted-foreground tabular-nums xl:inline">
             {m.balance_short({ amount: formatMoney(job.balanceCents) })}
           </span>
         )}
