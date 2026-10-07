@@ -24,8 +24,10 @@ describe('normalizePhone', () => {
 })
 
 describe('formatting and links', () => {
-  it('formats internationally', () => {
-    expect(formatPhone('+359888123456')).toBe('+359 88 812 3456')
+  it('shows a Bulgarian number the local way, and a foreign one internationally', () => {
+    expect(formatPhone('+359888123456')).toBe('088 812 3456')
+    expect(formatPhone('+35929551122')).toBe('02 955 1122')
+    expect(formatPhone('+447911123456')).toBe('+44 7911 123456')
   })
 
   it('falls back to the input when it cannot be parsed', () => {

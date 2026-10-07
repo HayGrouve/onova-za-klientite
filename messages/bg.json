@@ -714,7 +714,7 @@
   "client_actions": "Още действия",
   "client_merge": "Слей с друг",
   "client_merge_title": "В кого да се слее?",
-  "client_merge_body": "Всичко на {from} отива при избрания: записи, плащания, обекти, напомняния. Действието не се отменя.",
+  "client_merge_body": "Всичко на {from} отива при избрания: {what}. Действието не се отменя.",
   "client_merge_confirm": "Слей",
   "client_merged_note": "Данните са преместени при {name}.",
   "client_anonymize": "Анонимизирай",

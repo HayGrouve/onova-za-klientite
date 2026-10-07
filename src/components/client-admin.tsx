@@ -23,6 +23,8 @@ import {
 } from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { useViewer } from '#/hooks/use-viewer'
+import { lower } from '#/i18n/words'
 import { m } from '#/paraglide/messages.js'
 import { searchClients } from '../../shared/search'
 
@@ -110,6 +112,7 @@ function MergePicker({
   client: Doc<'clients'>
   onDone: () => void
 }) {
+  const { business } = useViewer()
   const clients = useQuery(api.clients.list, { businessId })
   const merge = useMutation(api.clientsAdmin.merge)
   const navigate = useNavigate()
@@ -132,7 +135,18 @@ function MergePicker({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        {m.client_merge_body({ from: client.name })}
+        {m.client_merge_body({
+          from: client.name,
+          // The business's own words, each standing alone (D39).
+          what: [
+            business.words.job.plural,
+            m.client_payments(),
+            ...(business.modules.items ? [business.words.item.plural] : []),
+            ...(business.modules.reminders ? [m.reminder_list()] : []),
+          ]
+            .map(lower)
+            .join(', '),
+        })}
       </p>
       <InputGroup>
         <InputGroupInput

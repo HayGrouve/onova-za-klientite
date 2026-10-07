@@ -3,8 +3,16 @@
 // new input needs the full metadata in shared/phone.ts.
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 
+/**
+ * A Bulgarian number the way people write it here ("088 812 3456"), any other
+ * with its country code. Stored and linked as E.164 either way (D9).
+ */
 export function formatPhone(e164: string): string {
-  return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164
+  const phone = parsePhoneNumberFromString(e164)
+  if (!phone) return e164
+  return phone.country === 'BG'
+    ? phone.formatNational()
+    : phone.formatInternational()
 }
 
 export function telHref(e164: string): string {

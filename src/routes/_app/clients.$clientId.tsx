@@ -272,6 +272,20 @@ function ClientPage() {
                 title={words.job.plural}
                 icon={ClipboardTextIcon}
                 count={data.jobs.length || undefined}
+                action={
+                  <Link
+                    to="/new"
+                    search={{ clientId: client._id }}
+                    aria-label={m.new_job_label({ job: words.job.singular })}
+                    className={buttonVariants({
+                      variant: 'ghost',
+                      className: 'h-9 text-primary',
+                    })}
+                  >
+                    <PlusIcon data-icon="inline-start" />
+                    {words.job.singular}
+                  </Link>
+                }
               >
                 <PanelList>
                   {data.jobs.length === 0 ? (

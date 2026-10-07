@@ -302,11 +302,17 @@ export function NewJobForm({
   const setDate = (value: ParsedDate | null) =>
     setDateFix(fix(value, parsed.date))
   const onText = (value: string) => setText(value)
-  // From an item, back to it (the new job is in its list); otherwise Today.
+  // Back where "+" was opened: the item or the client (the new job is in its
+  // list), otherwise Today.
   const leave = () =>
     start?.item
       ? navigate({ to: '/items/$itemId', params: { itemId: start.item.id } })
-      : navigate({ to: '/' })
+      : start
+        ? navigate({
+            to: '/clients/$clientId',
+            params: { clientId: start.client.id },
+          })
+        : navigate({ to: '/' })
 
   // Leaving with a line typed asks first, whether by the close button or the back button.
   const leaving = useRef(false)
