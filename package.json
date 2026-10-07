@@ -37,6 +37,7 @@
     "convex": "^1.46.0",
     "convex-helpers": "^0.1.127",
     "fflate": "^0.8.3",
+    "idb-keyval": "^6.3.0",
     "libphonenumber-js": "^1.13.14",
     "next-themes": "^0.4.6",
     "nitro": "3.0.260610-beta",

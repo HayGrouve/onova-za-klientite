@@ -188,6 +188,10 @@ export function NewJobForm({
   const submit = async () => {
     setTried(true)
     if (!chosenClient || !chosenTitle.trim()) return
+    if (!navigator.onLine) {
+      toast.error(m.offline_edit_blocked())
+      return
+    }
     setSaving(true)
     try {
       await save({

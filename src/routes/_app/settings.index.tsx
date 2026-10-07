@@ -6,13 +6,20 @@ import {
   DatabaseIcon,
   FlowArrowIcon,
   ListPlusIcon,
+  PlusCircleIcon,
   PuzzlePieceIcon,
   StorefrontIcon,
   TagIcon,
   TextAaIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useMutation } from 'convex/react'
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { api } from '../../../convex/_generated/api'
+import { Spinner } from '#/components/ui/spinner'
+import { errorMessage } from '#/lib/errors'
 import type { LinkProps } from '@tanstack/react-router'
 import { PageTitle } from '#/components/page'
 import { useViewer } from '#/hooks/use-viewer'
@@ -122,7 +129,45 @@ function SettingsIndex() {
           title={m.settings_run_setup()}
           body={m.settings_run_setup_body()}
         />
+        <AddBusinessRow />
       </ul>
     </>
+  )
+}
+
+/** Q13: a second business opens setup for itself; the switcher then appears. */
+function AddBusinessRow() {
+  const createAnother = useMutation(api.businesses.createAnother)
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  return (
+    <li>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true)
+          void createAnother({})
+            .then(() => navigate({ to: '/setup' }))
+            .catch((error: unknown) => {
+              toast.error(errorMessage(error))
+              setBusy(false)
+            })
+        }}
+        className="flex min-h-16 w-full items-center gap-3 rounded-2xl px-4 py-3 text-left outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        {busy ? (
+          <Spinner className="size-6 shrink-0" />
+        ) : (
+          <PlusCircleIcon className="size-6 shrink-0 text-primary" />
+        )}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="font-medium">{m.business_add()}</span>
+          <span className="text-sm text-muted-foreground">
+            {m.business_add_body()}
+          </span>
+        </span>
+      </button>
+    </li>
   )
 }

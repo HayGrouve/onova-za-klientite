@@ -17,6 +17,7 @@ import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { errorMessage } from '#/lib/errors'
 import { buildExportZip } from '#/lib/export-zip'
+import { wipeSnapshots } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
 
 export const Route = createFileRoute('/_app/settings/data')({
@@ -132,6 +133,7 @@ function DeleteAccount() {
         onClick={() => {
           setBusy(true)
           void deleteAccount({})
+            .then(() => wipeSnapshots())
             .then(() => signOut())
             .catch((error: unknown) => {
               toast.error(errorMessage(error))

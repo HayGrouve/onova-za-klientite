@@ -7,13 +7,16 @@ import {
 import type { ErrorComponentProps } from '@tanstack/react-router'
 import { ArrowClockwiseIcon } from '@phosphor-icons/react'
 import { AppProviders } from '#/integrations/providers'
+import { OfflineApp } from '#/components/offline/offline-app'
+import { loadLastSnapshot } from '#/lib/offline-store'
+import type { SavedSnapshot } from '#/lib/offline-store'
 import { CenteredMessage } from '#/components/centered-message'
 import { ServiceWorkerRegister } from '#/components/service-worker-register'
 import { Button } from '#/components/ui/button'
 import { Toaster } from '#/components/ui/sonner'
 import { errorMessage } from '#/lib/errors'
 import { applyTimingFlag } from '#/lib/timing'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { m } from '#/paraglide/messages.js'
 import appCss from '../styles.css?url'
 
@@ -45,9 +48,26 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
+  // A cold start with no signal shows the last snapshot read-only (ADR 0010).
+  const [offlineStart] = useState(
+    () => typeof navigator !== 'undefined' && !navigator.onLine,
+  )
+  const [saved, setSaved] = useState<SavedSnapshot | null | undefined>(
+    undefined,
+  )
   useEffect(() => {
     applyTimingFlag(window.location.search)
   }, [])
+  useEffect(() => {
+    if (!offlineStart) return
+    void loadLastSnapshot().then(setSaved)
+    const reload = () => window.location.reload()
+    window.addEventListener('online', reload)
+    return () => window.removeEventListener('online', reload)
+  }, [offlineStart])
+  if (offlineStart) {
+    return saved === undefined ? null : <OfflineApp saved={saved} />
+  }
   return (
     <AppProviders>
       <Outlet />
