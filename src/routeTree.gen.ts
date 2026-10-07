@@ -15,7 +15,6 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppImportRouteImport } from './routes/_app/import'
 import { Route as AppMoneyRouteImport } from './routes/_app/money'
 import { Route as AppNewRouteImport } from './routes/_app/new'
-import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSetupRouteImport } from './routes/_app/setup'
 import { Route as AppTimingRouteImport } from './routes/_app/timing'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients.index'
@@ -25,6 +24,15 @@ import { Route as AppItemsItemIdRouteImport } from './routes/_app/items.$itemId'
 import { Route as AppItemsNewRouteImport } from './routes/_app/items.new'
 import { Route as AppJobsIndexRouteImport } from './routes/_app/jobs.index'
 import { Route as AppJobsJobIdRouteImport } from './routes/_app/jobs.$jobId'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings.index'
+import { Route as AppSettingsBusinessRouteImport } from './routes/_app/settings.business'
+import { Route as AppSettingsDataRouteImport } from './routes/_app/settings.data'
+import { Route as AppSettingsFieldsRouteImport } from './routes/_app/settings.fields'
+import { Route as AppSettingsModulesRouteImport } from './routes/_app/settings.modules'
+import { Route as AppSettingsNamesRouteImport } from './routes/_app/settings.names'
+import { Route as AppSettingsRemindersRouteImport } from './routes/_app/settings.reminders'
+import { Route as AppSettingsServicesRouteImport } from './routes/_app/settings.services'
+import { Route as AppSettingsStagesRouteImport } from './routes/_app/settings.stages'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -53,11 +61,6 @@ const AppMoneyRoute = AppMoneyRouteImport.update({
 const AppNewRoute = AppNewRouteImport.update({
   id: '/new',
   path: '/new',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSetupRoute = AppSetupRouteImport.update({
@@ -105,6 +108,51 @@ const AppJobsJobIdRoute = AppJobsJobIdRouteImport.update({
   path: '/jobs/$jobId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsBusinessRoute = AppSettingsBusinessRouteImport.update({
+  id: '/settings/business',
+  path: '/settings/business',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsDataRoute = AppSettingsDataRouteImport.update({
+  id: '/settings/data',
+  path: '/settings/data',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsFieldsRoute = AppSettingsFieldsRouteImport.update({
+  id: '/settings/fields',
+  path: '/settings/fields',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsModulesRoute = AppSettingsModulesRouteImport.update({
+  id: '/settings/modules',
+  path: '/settings/modules',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsNamesRoute = AppSettingsNamesRouteImport.update({
+  id: '/settings/names',
+  path: '/settings/names',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRemindersRoute = AppSettingsRemindersRouteImport.update({
+  id: '/settings/reminders',
+  path: '/settings/reminders',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsServicesRoute = AppSettingsServicesRouteImport.update({
+  id: '/settings/services',
+  path: '/settings/services',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsStagesRoute = AppSettingsStagesRouteImport.update({
+  id: '/settings/stages',
+  path: '/settings/stages',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -112,7 +160,6 @@ export interface FileRoutesByFullPath {
   '/import': typeof AppImportRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
-  '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
   '/timing': typeof AppTimingRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
@@ -120,15 +167,23 @@ export interface FileRoutesByFullPath {
   '/items/$itemId': typeof AppItemsItemIdRoute
   '/items/new': typeof AppItemsNewRoute
   '/jobs/$jobId': typeof AppJobsJobIdRoute
+  '/settings/business': typeof AppSettingsBusinessRoute
+  '/settings/data': typeof AppSettingsDataRoute
+  '/settings/fields': typeof AppSettingsFieldsRoute
+  '/settings/modules': typeof AppSettingsModulesRoute
+  '/settings/names': typeof AppSettingsNamesRoute
+  '/settings/reminders': typeof AppSettingsRemindersRoute
+  '/settings/services': typeof AppSettingsServicesRoute
+  '/settings/stages': typeof AppSettingsStagesRoute
   '/clients/': typeof AppClientsIndexRoute
   '/jobs/': typeof AppJobsIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/import': typeof AppImportRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
-  '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
   '/timing': typeof AppTimingRoute
   '/': typeof AppIndexRoute
@@ -137,8 +192,17 @@ export interface FileRoutesByTo {
   '/items/$itemId': typeof AppItemsItemIdRoute
   '/items/new': typeof AppItemsNewRoute
   '/jobs/$jobId': typeof AppJobsJobIdRoute
+  '/settings/business': typeof AppSettingsBusinessRoute
+  '/settings/data': typeof AppSettingsDataRoute
+  '/settings/fields': typeof AppSettingsFieldsRoute
+  '/settings/modules': typeof AppSettingsModulesRoute
+  '/settings/names': typeof AppSettingsNamesRoute
+  '/settings/reminders': typeof AppSettingsRemindersRoute
+  '/settings/services': typeof AppSettingsServicesRoute
+  '/settings/stages': typeof AppSettingsStagesRoute
   '/clients': typeof AppClientsIndexRoute
   '/jobs': typeof AppJobsIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -147,7 +211,6 @@ export interface FileRoutesById {
   '/_app/import': typeof AppImportRoute
   '/_app/money': typeof AppMoneyRoute
   '/_app/new': typeof AppNewRoute
-  '/_app/settings': typeof AppSettingsRoute
   '/_app/setup': typeof AppSetupRoute
   '/_app/timing': typeof AppTimingRoute
   '/_app/': typeof AppIndexRoute
@@ -156,8 +219,17 @@ export interface FileRoutesById {
   '/_app/items/$itemId': typeof AppItemsItemIdRoute
   '/_app/items/new': typeof AppItemsNewRoute
   '/_app/jobs/$jobId': typeof AppJobsJobIdRoute
+  '/_app/settings/business': typeof AppSettingsBusinessRoute
+  '/_app/settings/data': typeof AppSettingsDataRoute
+  '/_app/settings/fields': typeof AppSettingsFieldsRoute
+  '/_app/settings/modules': typeof AppSettingsModulesRoute
+  '/_app/settings/names': typeof AppSettingsNamesRoute
+  '/_app/settings/reminders': typeof AppSettingsRemindersRoute
+  '/_app/settings/services': typeof AppSettingsServicesRoute
+  '/_app/settings/stages': typeof AppSettingsStagesRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/jobs/': typeof AppJobsIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -167,7 +239,6 @@ export interface FileRouteTypes {
     | '/import'
     | '/money'
     | '/new'
-    | '/settings'
     | '/setup'
     | '/timing'
     | '/clients/$clientId'
@@ -175,15 +246,23 @@ export interface FileRouteTypes {
     | '/items/$itemId'
     | '/items/new'
     | '/jobs/$jobId'
+    | '/settings/business'
+    | '/settings/data'
+    | '/settings/fields'
+    | '/settings/modules'
+    | '/settings/names'
+    | '/settings/reminders'
+    | '/settings/services'
+    | '/settings/stages'
     | '/clients/'
     | '/jobs/'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/import'
     | '/money'
     | '/new'
-    | '/settings'
     | '/setup'
     | '/timing'
     | '/'
@@ -192,8 +271,17 @@ export interface FileRouteTypes {
     | '/items/$itemId'
     | '/items/new'
     | '/jobs/$jobId'
+    | '/settings/business'
+    | '/settings/data'
+    | '/settings/fields'
+    | '/settings/modules'
+    | '/settings/names'
+    | '/settings/reminders'
+    | '/settings/services'
+    | '/settings/stages'
     | '/clients'
     | '/jobs'
+    | '/settings'
   id:
     | '__root__'
     | '/_app'
@@ -201,7 +289,6 @@ export interface FileRouteTypes {
     | '/_app/import'
     | '/_app/money'
     | '/_app/new'
-    | '/_app/settings'
     | '/_app/setup'
     | '/_app/timing'
     | '/_app/'
@@ -210,8 +297,17 @@ export interface FileRouteTypes {
     | '/_app/items/$itemId'
     | '/_app/items/new'
     | '/_app/jobs/$jobId'
+    | '/_app/settings/business'
+    | '/_app/settings/data'
+    | '/_app/settings/fields'
+    | '/_app/settings/modules'
+    | '/_app/settings/names'
+    | '/_app/settings/reminders'
+    | '/_app/settings/services'
+    | '/_app/settings/stages'
     | '/_app/clients/'
     | '/_app/jobs/'
+    | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -261,13 +357,6 @@ declare module '@tanstack/react-router' {
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof AppNewRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/settings': {
-      id: '/_app/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/setup': {
@@ -333,6 +422,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppJobsJobIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/business': {
+      id: '/_app/settings/business'
+      path: '/settings/business'
+      fullPath: '/settings/business'
+      preLoaderRoute: typeof AppSettingsBusinessRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/data': {
+      id: '/_app/settings/data'
+      path: '/settings/data'
+      fullPath: '/settings/data'
+      preLoaderRoute: typeof AppSettingsDataRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/fields': {
+      id: '/_app/settings/fields'
+      path: '/settings/fields'
+      fullPath: '/settings/fields'
+      preLoaderRoute: typeof AppSettingsFieldsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/modules': {
+      id: '/_app/settings/modules'
+      path: '/settings/modules'
+      fullPath: '/settings/modules'
+      preLoaderRoute: typeof AppSettingsModulesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/names': {
+      id: '/_app/settings/names'
+      path: '/settings/names'
+      fullPath: '/settings/names'
+      preLoaderRoute: typeof AppSettingsNamesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/reminders': {
+      id: '/_app/settings/reminders'
+      path: '/settings/reminders'
+      fullPath: '/settings/reminders'
+      preLoaderRoute: typeof AppSettingsRemindersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/services': {
+      id: '/_app/settings/services'
+      path: '/settings/services'
+      fullPath: '/settings/services'
+      preLoaderRoute: typeof AppSettingsServicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/stages': {
+      id: '/_app/settings/stages'
+      path: '/settings/stages'
+      fullPath: '/settings/stages'
+      preLoaderRoute: typeof AppSettingsStagesRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -340,7 +492,6 @@ interface AppRouteChildren {
   AppImportRoute: typeof AppImportRoute
   AppMoneyRoute: typeof AppMoneyRoute
   AppNewRoute: typeof AppNewRoute
-  AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
   AppTimingRoute: typeof AppTimingRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -349,15 +500,23 @@ interface AppRouteChildren {
   AppItemsItemIdRoute: typeof AppItemsItemIdRoute
   AppItemsNewRoute: typeof AppItemsNewRoute
   AppJobsJobIdRoute: typeof AppJobsJobIdRoute
+  AppSettingsBusinessRoute: typeof AppSettingsBusinessRoute
+  AppSettingsDataRoute: typeof AppSettingsDataRoute
+  AppSettingsFieldsRoute: typeof AppSettingsFieldsRoute
+  AppSettingsModulesRoute: typeof AppSettingsModulesRoute
+  AppSettingsNamesRoute: typeof AppSettingsNamesRoute
+  AppSettingsRemindersRoute: typeof AppSettingsRemindersRoute
+  AppSettingsServicesRoute: typeof AppSettingsServicesRoute
+  AppSettingsStagesRoute: typeof AppSettingsStagesRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppJobsIndexRoute: typeof AppJobsIndexRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppImportRoute: AppImportRoute,
   AppMoneyRoute: AppMoneyRoute,
   AppNewRoute: AppNewRoute,
-  AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,
   AppTimingRoute: AppTimingRoute,
   AppIndexRoute: AppIndexRoute,
@@ -366,8 +525,17 @@ const AppRouteChildren: AppRouteChildren = {
   AppItemsItemIdRoute: AppItemsItemIdRoute,
   AppItemsNewRoute: AppItemsNewRoute,
   AppJobsJobIdRoute: AppJobsJobIdRoute,
+  AppSettingsBusinessRoute: AppSettingsBusinessRoute,
+  AppSettingsDataRoute: AppSettingsDataRoute,
+  AppSettingsFieldsRoute: AppSettingsFieldsRoute,
+  AppSettingsModulesRoute: AppSettingsModulesRoute,
+  AppSettingsNamesRoute: AppSettingsNamesRoute,
+  AppSettingsRemindersRoute: AppSettingsRemindersRoute,
+  AppSettingsServicesRoute: AppSettingsServicesRoute,
+  AppSettingsStagesRoute: AppSettingsStagesRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppJobsIndexRoute: AppJobsIndexRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

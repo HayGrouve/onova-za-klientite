@@ -103,7 +103,13 @@ async function ownerData(t: TestConvex, b: TestBusiness) {
     jobId,
     date: '2026-10-08',
   })
+  const serviceId = await owner.mutation(api.services.add, {
+    businessId,
+    name: 'Монтаж',
+    priceCents: 4000,
+  })
   return {
+    serviceId,
     appointmentId,
     clientId,
     jobId,
@@ -129,6 +135,27 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     appointmentId: ids.appointmentId,
     date: '2026-10-10',
   }),
+  'businesses:setModules': () => ({
+    modules: {
+      appointments: true,
+      costs: true,
+      items: true,
+      reminders: false,
+      services: true,
+    },
+  }),
+  'businesses:setNewJobOptions': () => ({ depositsOnNewJob: true }),
+  'businesses:setReminderRule': () => ({ months: 6 }),
+  'businesses:setWords': () => ({
+    words: {
+      client: { singular: 'Клиент', plural: 'Клиенти', gender: 'm' },
+      job: { singular: 'Ремонт', plural: 'Ремонти', gender: 'm' },
+      item: { singular: 'Обект', plural: 'Обекти', gender: 'm' },
+      appointment: { singular: 'Среща', plural: 'Срещи', gender: 'f' },
+    },
+  }),
+  'businesses:settings': () => ({}),
+  'businesses:updateProfile': () => ({ name: 'Чужд' }),
   'clients:create': () => ({ name: 'Нов' }),
   'clients:get': (ids) => ({ clientId: ids.clientId }),
   'clients:list': () => ({}),
@@ -203,7 +230,10 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'payments:remove': (ids) => ({ paymentId: ids.paymentId }),
   'payments:useCredit': (ids) => ({ jobId: ids.jobId }),
+  'services:add': () => ({ name: 'Нова', priceCents: 100 }),
   'services:list': () => ({}),
+  'services:reorder': (ids) => ({ serviceIds: [ids.serviceId] }),
+  'services:update': (ids) => ({ serviceId: ids.serviceId, priceCents: 200 }),
   'setup:apply': () => ({ answers: { businessName: 'Чужд' } }),
   'setup:current': () => ({}),
   'stages:add': () => ({ name: 'Етап', group: 'new' }),
@@ -224,6 +254,13 @@ const USER_SCOPED = [
 
 /** Functions that take no record id, so only the business check applies. */
 const NO_RECORD_IDS = new Set([
+  'businesses:setModules',
+  'businesses:setNewJobOptions',
+  'businesses:setReminderRule',
+  'businesses:setWords',
+  'businesses:settings',
+  'businesses:updateProfile',
+  'services:add',
   'clients:list',
   'fields:list',
   'jobs:list',
@@ -287,6 +324,11 @@ const EVENTS: Record<string, string | null> = {
   'appointments:add': 'appointment.added',
   'appointments:cancel': 'appointment.cancelled',
   'appointments:update': 'appointment.changed',
+  'businesses:setModules': 'settings.changed',
+  'businesses:setNewJobOptions': 'settings.changed',
+  'businesses:setReminderRule': 'settings.changed',
+  'businesses:setWords': 'settings.changed',
+  'businesses:updateProfile': 'settings.changed',
   'clients:create': 'client.created',
   'clients:update': 'client.edited',
   'costs:add': 'cost.added',
@@ -318,6 +360,9 @@ const EVENTS: Record<string, string | null> = {
   'payments:refund': 'payment.added',
   'payments:remove': 'payment.removed',
   'payments:useCredit': 'credit.used',
+  'services:add': 'settings.changed',
+  'services:reorder': 'settings.changed',
+  'services:update': 'settings.changed',
   'setup:apply': 'setup.applied',
   'stages:add': 'stage.added',
   'stages:remove': 'stage.removed',

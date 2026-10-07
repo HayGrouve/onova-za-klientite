@@ -6,6 +6,7 @@ import { cn } from "cn"
 
 import { Button } from "#/components/ui/button.tsx"
 import { XIcon } from "@phosphor-icons/react"
+import { m } from "#/paraglide/messages.js"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -72,7 +73,8 @@ function SheetContent({
           >
             <XIcon
             />
-            <span className="sr-only">Close</span>
+            {/* Local change (ADR 0009): the label comes from the translation files. */}
+            <span className="sr-only">{m.close()}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

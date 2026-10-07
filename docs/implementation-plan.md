@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 6 are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 7 are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
 
 ## Contents
 
@@ -609,6 +609,8 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D35 | Rejected uploads | `files.save` deletes a rejected blob and returns `{ rejected }` instead of throwing, because a throw would roll back the delete | The blob is gone at once instead of waiting for the daily cleanup |
 | D36 | Money screen | One month at a time, the current month first. Received, costs and profit are for the month; still owed, who owes me and credit held are as of now. The month's payments and costs are listed under the figures, so each figure can be checked by hand | The doc lists the figures. The lists make them trustworthy |
 | D37 | Payment defaults | A payment from a job defaults to its balance, in cash, dated today. A split from a client defaults to oldest first and every row can be changed. The "Капаро" label is one tap when deposits are on | The common case is one tap, and every default can be changed |
+| D38 | Settings roles | Every Settings change is owner-only on the server. Managers and workers see the sections read-only, with one line saying so | Design: Manager has "no business settings" |
+| D39 | Grammar check | A unit test reads `messages/bg.json`: a business word may only follow nothing, "+", "Добави", a colon or a gender-free preposition, and `{count}` never comes before one | It turns the design doc's grammar rule into a failing test instead of a review item |
 
 ## Spikes
 
@@ -636,6 +638,7 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - milestone 4 built (#5), in review: the one-line "+" with a fixable read-back, saved in one mutation with the deposit and the appointment or due date;
   - milestone 5 built (#6), in review: Today, Jobs by stage group, Clients, and the client, job and item pages with appointments, job lines, timelines and files (camera in one tap, server-side checks, `storageBytes`, a daily orphan cleanup);
   - milestone 6 built (#7), in review: payments from a job and from a client with an editable split, refunds, write-offs, using credit on request, costs on a job and general, and the Money screen by month;
+  - milestone 7 built (#8), in review: every Settings section (business with logo, names with gender, modules, stages, fields, services, reminders), "+ поле" on the forms, blocked actions that explain why, and a grammar test over the translation files;
 - **Open:**
   - Q22 (merging deploys production, needed before Vercel is linked);
   - Q23–Q26.

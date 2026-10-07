@@ -13,7 +13,11 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   'payment.signMismatch': m.error_payment_signMismatch,
   'credit.notEnough': m.error_credit_notEnough,
   'job.otherClient': m.error_job_otherClient,
+  'stage.hasJobs': m.error_stage_hasJobs,
+  'stage.lastInGroup': m.error_stage_lastInGroup,
   'file.rejected': m.files_rejected,
+  'field.typeChange': m.error_field_typeChange,
+  'field.value': m.error_field_value,
 }
 
 /** The error code Convex threw on purpose (D16), if any. */
