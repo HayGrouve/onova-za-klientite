@@ -653,5 +653,6 @@
   "offline_retry": "Опитай пак",
   "offline_today": "Днес",
   "offline_open": "Отворени",
-  "offline_back": "Назад"
+  "offline_back": "Назад",
+  "setup_heading": "Настройка"
 }

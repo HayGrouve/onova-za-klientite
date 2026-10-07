@@ -14,7 +14,7 @@ import {
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
-import { formatPhone } from '../../../shared/phone'
+import { formatPhone } from '../../../shared/phone-format'
 import { searchClients } from '../../../shared/search'
 
 export const Route = createFileRoute('/_app/clients/')({

@@ -14,7 +14,7 @@ import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import { IMPORT_BATCH, foldName, rowStatuses } from '../../../shared/import'
 import type { ImportRow, RowStatus } from '../../../shared/import'
-import { formatPhone } from '../../../shared/phone'
+import { formatPhone } from '../../../shared/phone-format'
 
 // The first rows, then every row that repeats or has no name, up to a cap.
 const PREVIEW_FIRST = 5

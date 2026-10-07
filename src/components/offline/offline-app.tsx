@@ -16,7 +16,7 @@ import type { SavedSnapshot, Snapshot } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia, isOverdue, todayInSofia } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
-import { formatPhone, telHref, viberHref } from '../../../shared/phone'
+import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
 
 type Job = Snapshot['jobs'][number]
 type Client = Snapshot['clients'][number]

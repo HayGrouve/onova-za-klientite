@@ -116,10 +116,14 @@ export function SetupWizard({
   const Body = key ? STEP_BODY[key] : null
 
   return (
-    <div className="flex h-dvh flex-col bg-muted">
+    <main className="flex h-dvh flex-col bg-muted">
+      <h1 className="sr-only">{m.setup_heading()}</h1>
       <Stopwatch startedAt={startedAt} stoppedAt={reviewedAt} />
       <div
         ref={previewRef}
+        tabIndex={0}
+        role="region"
+        aria-label={m.preview_label()}
         className="min-h-0 flex-1 overflow-y-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-6"
       >
         <p className="mb-2 text-sm text-muted-foreground">
@@ -206,6 +210,6 @@ export function SetupWizard({
           </div>
         )}
       </section>
-    </div>
+    </main>
   )
 }

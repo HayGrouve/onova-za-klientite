@@ -7,7 +7,6 @@ import {
 import type { ErrorComponentProps } from '@tanstack/react-router'
 import { ArrowClockwiseIcon } from '@phosphor-icons/react'
 import { AppProviders } from '#/integrations/providers'
-import { OfflineApp } from '#/components/offline/offline-app'
 import { loadLastSnapshot } from '#/lib/offline-store'
 import type { SavedSnapshot } from '#/lib/offline-store'
 import { CenteredMessage } from '#/components/centered-message'
@@ -16,9 +15,16 @@ import { Button } from '#/components/ui/button'
 import { Toaster } from '#/components/ui/sonner'
 import { errorMessage } from '#/lib/errors'
 import { applyTimingFlag } from '#/lib/timing'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { m } from '#/paraglide/messages.js'
 import appCss from '../styles.css?url'
+
+// Only a cold start without signal needs it, so it stays out of the main bundle.
+const OfflineApp = lazy(() =>
+  import('#/components/offline/offline-app').then((module) => ({
+    default: module.OfflineApp,
+  })),
+)
 
 export const Route = createRootRoute({
   head: () => ({
@@ -48,25 +54,32 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
-  // A cold start with no signal shows the last snapshot read-only (ADR 0010).
-  const [offlineStart] = useState(
-    () => typeof navigator !== 'undefined' && !navigator.onLine,
-  )
+  // The SPA shell is prerendered without a browser, so nothing renders until
+  // mounted: the first client render then matches it (no hydration error).
+  const [mode, setMode] = useState<'pending' | 'online' | 'offline'>('pending')
   const [saved, setSaved] = useState<SavedSnapshot | null | undefined>(
     undefined,
   )
   useEffect(() => {
     applyTimingFlag(window.location.search)
-  }, [])
-  useEffect(() => {
-    if (!offlineStart) return
+    // A cold start with no signal shows the last snapshot read-only (ADR 0010).
+    if (navigator.onLine) {
+      setMode('online')
+      return
+    }
+    setMode('offline')
     void loadLastSnapshot().then(setSaved)
     const reload = () => window.location.reload()
     window.addEventListener('online', reload)
     return () => window.removeEventListener('online', reload)
-  }, [offlineStart])
-  if (offlineStart) {
-    return saved === undefined ? null : <OfflineApp saved={saved} />
+  }, [])
+  if (mode === 'pending') return null
+  if (mode === 'offline') {
+    return saved === undefined ? null : (
+      <Suspense fallback={null}>
+        <OfflineApp saved={saved} />
+      </Suspense>
+    )
   }
   return (
     <AppProviders>
