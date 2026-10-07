@@ -27,13 +27,14 @@ export async function clientSearchText(
   ctx: QueryCtx,
   client: Pick<
     Doc<'clients'>,
-    'businessId' | 'name' | 'email' | 'phones' | 'extra'
+    'businessId' | 'name' | 'email' | 'phones' | 'address' | 'extra'
   >,
 ) {
   return buildSearchText([
     client.name,
     client.email,
     ...client.phones.map((phone) => phone.e164),
+    client.address ? { plain: client.address } : undefined,
     ...(await extraSearchValues(
       ctx,
       client.businessId,
@@ -55,12 +56,16 @@ export async function itemSearchText(
 
 export async function jobSearchText(
   ctx: QueryCtx,
-  job: Pick<Doc<'jobs'>, 'businessId' | 'title' | 'clientId' | 'extra'>,
+  job: Pick<
+    Doc<'jobs'>,
+    'businessId' | 'title' | 'clientId' | 'address' | 'extra'
+  >,
 ) {
   const client = await ctx.db.get('clients', job.clientId)
   return buildSearchText([
     job.title,
     client?.isNoClient ? undefined : client?.name,
+    job.address ? { plain: job.address } : undefined,
     ...(await extraSearchValues(ctx, job.businessId, 'job', job.extra)),
   ])
 }
