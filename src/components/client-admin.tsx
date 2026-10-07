@@ -22,6 +22,7 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
+import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { m } from '#/paraglide/messages.js'
 import { searchClients } from '../../shared/search'
 
@@ -126,6 +127,8 @@ function MergePicker({
   const shown = query.trim()
     ? searchClients(candidates, query, 20)
     : candidates.slice(0, 20)
+  // Only a client in view can be merged into: what is chosen is what is seen.
+  const chosen = shown.find((item) => item._id === intoId)
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
@@ -140,30 +143,39 @@ function MergePicker({
           onChange={(event) => setQuery(event.target.value)}
         />
       </InputGroup>
-      <div className="flex flex-col">
+      <ToggleGroup
+        aria-label={m.client_merge_title()}
+        value={intoId ? [intoId] : []}
+        onValueChange={(next: string[]) => {
+          // Tapping the chosen one again keeps it chosen.
+          if (next[0]) setIntoId(next[0] as Id<'clients'>)
+        }}
+        variant="outline"
+        size="xl"
+        orientation="vertical"
+        className="w-full"
+      >
         {shown.map((item) => (
-          <Button
+          <ToggleGroupItem
             key={item._id}
-            variant={intoId === item._id ? 'secondary' : 'ghost'}
-            aria-pressed={intoId === item._id}
-            className="h-12 justify-start rounded-xl text-base"
-            onClick={() => setIntoId(item._id)}
+            value={item._id}
+            className="justify-start"
           >
             {item.name}
-          </Button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
       <Button
         size="xl"
         variant="destructive"
-        disabled={busy || !intoId}
+        disabled={busy || !chosen}
         onClick={() =>
-          intoId &&
+          chosen &&
           void run(async () => {
-            await merge({ businessId, fromId: client._id, intoId })
+            await merge({ businessId, fromId: client._id, intoId: chosen._id })
             await navigate({
               to: '/clients/$clientId',
-              params: { clientId: intoId },
+              params: { clientId: chosen._id },
               replace: true,
             })
           })

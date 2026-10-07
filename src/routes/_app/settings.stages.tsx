@@ -72,11 +72,7 @@ function Choice<T extends string>({
       className="w-full flex-wrap"
     >
       {options.map((option) => (
-        <ToggleGroupItem
-          key={option.value}
-          value={option.value}
-          className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-        >
+        <ToggleGroupItem key={option.value} value={option.value}>
           {option.label}
         </ToggleGroupItem>
       ))}

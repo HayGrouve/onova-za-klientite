@@ -115,11 +115,7 @@ function RemindersSettings() {
                 disabled={!owner}
               >
                 {MONTHS.map((months) => (
-                  <ToggleGroupItem
-                    key={months}
-                    value={String(months)}
-                    className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-                  >
+                  <ToggleGroupItem key={months} value={String(months)}>
                     {monthsLabel(months)}
                   </ToggleGroupItem>
                 ))}

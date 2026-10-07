@@ -26,11 +26,7 @@ export function MethodPicker({
       className="w-full flex-wrap"
     >
       {METHODS.map((method) => (
-        <ToggleGroupItem
-          key={method}
-          value={method}
-          className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-        >
+        <ToggleGroupItem key={method} value={method}>
           {METHOD_LABEL[method]()}
         </ToggleGroupItem>
       ))}

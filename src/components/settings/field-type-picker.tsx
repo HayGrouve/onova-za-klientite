@@ -36,12 +36,7 @@ export function FieldTypePicker({
       className="w-full flex-wrap"
     >
       {FIELD_TYPES.map((type) => (
-        <ToggleGroupItem
-          key={type}
-          value={type}
-          disabled={isDisabled?.(type)}
-          className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-        >
+        <ToggleGroupItem key={type} value={type} disabled={isDisabled?.(type)}>
           {FIELD_TYPE_LABEL[type]()}
         </ToggleGroupItem>
       ))}
