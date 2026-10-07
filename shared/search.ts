@@ -1,5 +1,5 @@
-// Search keys (implementation plan → Search). Milestone 8 extends the fold;
-// the stored shape stays one space-separated string per record.
+// Search keys (implementation plan → Search, D8, D40). The stored shape is one
+// space-separated string per record; a query is folded the same way.
 
 const CYRILLIC = /\p{Script=Cyrillic}/u
 
@@ -59,6 +59,39 @@ function words(text: string): string[] {
     .filter(Boolean)
 }
 
+/**
+ * One spelling for the Latin forms of a name, applied to a transliterated
+ * word on both sides: the stored keys and the query. Cyrillic gives one
+ * transliteration but people type several (Maria, Mariya, Mariia), so the
+ * spellings are folded together and each word still makes one key. It is
+ * lossy on purpose and never shown. It reads left to right, so a half-typed
+ * word folds like the start of the whole one, except where the ending
+ * decides (Peter → Petar).
+ */
+function spelling(word: string): string {
+  return (
+    word
+      // Christo, Xristo, Khristo → Hristo
+      .replace(/^chr/, 'hr')
+      .replace(/^x/, 'h')
+      // Alexander → Aleksander
+      .replace(/x/g, 'ks')
+      .replace(/kh/g, 'h')
+      // Tsvetan, Tzvetan → Cvetan
+      .replace(/t[sz]/g, 'c')
+      .replace(/w/g, 'v')
+      // The vowel Cyrillic writes as ъ: Peter, Petur, Petyr → Petar
+      .replace(/[eyu]r$/, 'ar')
+      // Jivko → Zhivko, but Jordan, Julia and Jana start with Y
+      .replace(/j(?=[ie])/g, 'zh')
+      // Y, J and I are one sound: Nikolay, Stoian, Mariia, Iordan
+      .replace(/[yj]/g, 'i')
+      .replace(/i{2,}/g, 'i')
+      // Lyubomir → Lubomir, Yulia → Ulia
+      .replace(/iu/g, 'u')
+  )
+}
+
 // The 12 letters Bulgarian plates share with Latin (А В Е К М Н О Р С Т У Х).
 const PLATE_LOOKALIKES: Partial<Record<string, string>> = {
   а: 'a',
@@ -84,26 +117,57 @@ export function plateFold(text: string): string {
 
 /** Convex search silently drops terms over 32 bytes; keys are Latin, so 32 characters. */
 const MAX_KEY = 32
+/** A guard, so one very long note can't flood a record's keys. */
+const MAX_KEYS = 512
 /** Values this short also get a copy without spaces: plates, model numbers. */
 const SPACELESS_UP_TO = 20
+/** A phone is found by any run of its digits this long or longer. */
+const MIN_PHONE_RUN = 4
+
+/** A value read as words only, even with digits in it: an address. */
+export type PlainValue = { plain: string }
+export type SearchValue = string | PlainValue | undefined
+
+/**
+ * The keys of a phone in international form (+359899314159), besides its
+ * digits as one word: the local 0… form of a Bulgarian number, and every
+ * ending of the number without its country code that is 4 digits or more
+ * (899314159, 99314159, … 4159). Convex search matches whole words but takes
+ * the last query word as a prefix, so a prefix of an ending is any run of
+ * digits from the middle, while the last digits and the number without its 0
+ * are endings themselves. A Bulgarian mobile gets 7 keys this way, a
+ * landline 6. Other countries' codes are 1 to 3 digits, so their endings
+ * start after the first digit and a key or two may begin inside the code.
+ */
+function phoneKeys(phone: string): string[] {
+  const digits = phone.slice(1)
+  const bulgarian = /^\+359\d{8,9}$/.test(phone)
+  const keys = bulgarian ? [`0${digits.slice(3)}`] : []
+  const first = bulgarian ? 3 : 1
+  for (let from = first; from <= digits.length - MIN_PHONE_RUN; from++)
+    keys.push(digits.slice(from))
+  return keys
+}
 
 /** One folded key string for a record, built from its searchable values. */
-export function buildSearchText(values: Array<string | undefined>): string {
+export function buildSearchText(values: SearchValue[]): string {
   const keys = new Set<string>()
   const add = (key: string) => {
-    if (key) keys.add(key.slice(0, MAX_KEY))
+    if (key && keys.size < MAX_KEYS) keys.add(key.slice(0, MAX_KEY))
   }
   for (const value of values) {
     if (!value) continue
+    const text = typeof value === 'string' ? value : value.plain
     // Plates and model numbers have digits: they also get the look-alike
-    // fold and a copy without spaces. Plain names stay plain.
-    const codeLike = /\d/.test(value)
+    // fold and a copy without spaces. Plain names stay plain, and so does an
+    // address, whatever digits it holds.
+    const codeLike = typeof value === 'string' && /\d/.test(value)
     const folds = new Set([
-      transliterate(value),
-      ...(codeLike ? [plateFold(value)] : []),
+      transliterate(text),
+      ...(codeLike ? [plateFold(text)] : []),
     ])
     for (const fold of folds) {
-      for (const word of words(fold)) add(word)
+      for (const word of words(fold)) add(spelling(word))
       const compact = fold.replace(/[^\p{L}\p{N}]+/gu, '')
       if (
         codeLike &&
@@ -112,20 +176,26 @@ export function buildSearchText(values: Array<string | undefined>): string {
       )
         add(compact)
     }
-    // A phone in international form is also typed the local way: +359888… → 0888…
-    const phone = value.replace(/[\s()-]/g, '')
-    if (/^\+359\d{8,9}$/.test(phone)) add(`0${phone.slice(4)}`)
+    // A phone in international form is also typed the local way
+    // (+359888… → 0888…), without its 0, and by its last digits.
+    const phone = text.replace(/[\s()-]/g, '')
+    if (/^\+\d{8,15}$/.test(phone)) {
+      for (const key of phoneKeys(phone)) add(key)
+    }
   }
   return [...keys].join(' ')
 }
 
 /**
  * A search box query, folded like the stored keys. A query with digits also
- * gets a compact look-alike form, so "СА 1234 ВР" finds "CA1234BP". Search
- * runs each variant and merges the results.
+ * gets a compact look-alike form, so "СА 1234 ВР" finds "CA1234BP" and a
+ * phone typed in groups finds its digits. Search runs each variant and
+ * merges the results.
  */
 export function foldQuery(query: string): string[] {
-  const plain = words(transliterate(query)).join(' ')
+  const plain = words(transliterate(query))
+    .map((word) => spelling(word).slice(0, MAX_KEY))
+    .join(' ')
   if (!/\d/.test(query)) return plain ? [plain] : []
   const compact = plateFold(query)
     .replace(/[^\p{L}\p{N}]+/gu, '')
@@ -134,17 +204,11 @@ export function foldQuery(query: string): string[] {
 }
 
 /**
- * A query-side fold for matching names: transliterated, with the Latin
- * spellings people mix up made equal (x/h, w/v, c/ts).
+ * A fold for matching names: transliterated, with the Latin spellings people
+ * mix up made equal (x/h, w/v, c/ts, y/i, Maria/Mariya). Words only.
  */
 export function foldName(text: string): string {
-  return transliterate(text)
-    .replace(/x/g, 'h')
-    .replace(/w/g, 'v')
-    .replace(/c(?!h)/g, 'ts')
-    .replace(/[^a-z0-9 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return words(transliterate(text)).map(spelling).join(' ')
 }
 
 /** Every query word starts a word of the name. "iv pet" finds "Иван Петров". */
