@@ -56,6 +56,7 @@ function NewJobPage() {
             }
           : undefined
       }
+      items={context.items}
     />
   )
 }

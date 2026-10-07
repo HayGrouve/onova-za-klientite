@@ -1,7 +1,9 @@
 import {
   CalendarBlankIcon,
+  CheckCircleIcon,
   ClipboardTextIcon,
   CoinsIcon,
+  CubeIcon,
   FlagIcon,
   NotePencilIcon,
   RepeatIcon,
@@ -11,15 +13,20 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { useNavigate } from '@tanstack/react-router'
+import { useBlocker, useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { cn } from 'cn'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ClientPicker } from '#/components/new-job/client-picker'
-import type { ClientChoice, PaymentMethod } from '#/components/new-job/types'
+import { DiscardSheet } from '#/components/new-job/discard-sheet'
+import type {
+  ClientChoice,
+  ItemRef,
+  PaymentMethod,
+} from '#/components/new-job/types'
 import { Stopwatch } from '#/components/stopwatch'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -44,8 +51,10 @@ import { recordTiming } from '#/lib/timing'
 import { m } from '#/paraglide/messages.js'
 import { todayInSofia } from '../../../shared/dates'
 import { formatMoney, parseMoney } from '../../../shared/money'
+import { matchItem } from '../../../shared/line-items'
 import { exampleLine, parseLine } from '../../../shared/parse-line'
 import type { ParsedDate, ServiceRef } from '../../../shared/parse-line'
+import { formatPhone } from '../../../shared/phone-format'
 import type { ClientCandidate } from '../../../shared/search'
 
 type Fixable = 'client' | 'title' | 'price' | 'deposit' | 'date'
@@ -84,14 +93,14 @@ function ReadRow({
   value,
   missing,
   onFix,
-  fixing,
+  fixing = false,
   children,
 }: {
   label: string
   icon: Icon
   value: React.ReactNode
   missing?: string | false
-  /** Left out for a row that can't be fixed here. */
+  /** Left out for a row that is changed by tapping what it shows. */
   onFix?: () => void
   fixing?: boolean
   children?: React.ReactNode
@@ -119,7 +128,7 @@ function ReadRow({
         >
           {value || '-'}
         </span>
-        {!fixing && onFix && (
+        {onFix && !fixing && (
           <Button variant="link" className="h-11 shrink-0 px-1" onClick={onFix}>
             {m.new_fix()}
           </Button>
@@ -140,6 +149,7 @@ export function NewJobForm({
   clients,
   services,
   start,
+  items,
 }: {
   business: ActiveBusiness
   clients: ClientCandidate[]
@@ -149,6 +159,7 @@ export function NewJobForm({
     client: { id: string; name: string }
     item?: { id: Id<'items'>; name: string }
   }
+  items: ItemRef[]
 }) {
   const navigate = useNavigate()
   const save = useMutation(api.newJob.save)
@@ -174,6 +185,7 @@ export function NewJobForm({
   const [priceFix, setPriceFix] = useState<Fix<string>>()
   const [depositFix, setDepositFix] = useState<Fix<string>>()
   const [dateFix, setDateFix] = useState<Fix<ParsedDate | null>>()
+  const [itemFix, setItemFix] = useState<Fix<string[]>>()
   const [depositMethod, setDepositMethod] = useState<PaymentMethod>('cash')
   const [depositDate, setDepositDate] = useState(today)
 
@@ -183,6 +195,16 @@ export function NewJobForm({
     () => new Map(clients.map((item) => [item.id, item])),
     [clients],
   )
+  const itemsByClient = useMemo(() => {
+    const byClient = new Map<string, ItemRef[]>()
+    for (const item of items) {
+      byClient.set(item.clientId, [
+        ...(byClient.get(item.clientId) ?? []),
+        item,
+      ])
+    }
+    return byClient
+  }, [items])
   const parsed = parseLine(text, {
     today,
     clients,
@@ -203,15 +225,23 @@ export function NewJobForm({
   const client = held(clientFix, parsed.client)
   const title = held(titleFix, parsed.title)
   const price = held(priceFix, priceFromLine)
-  const deposit = held(depositFix, parsed.depositCents)
   const date = held(dateFix, parsed.date)
   const chosenClient = client === undefined ? parsedClient : client
-  const chosenTitle = title ?? parsed.title
   const chosenPrice = price === undefined ? priceFromLine : parseMoney(price)
+  // Money received now is a deposit (labelled) or a plain payment (no label).
+  const isPayment = parsed.depositCents === null && parsed.paid !== null
+  const paymentFromLine =
+    parsed.depositCents ??
+    (parsed.paid ? (parsed.paid.cents ?? chosenPrice) : null)
+  const deposit = held(depositFix, [parsed.depositCents, parsed.paid])
   const chosenDeposit =
-    deposit === undefined ? parsed.depositCents : parseMoney(deposit)
+    deposit === undefined ? paymentFromLine : parseMoney(deposit)
   const chosenDate = date === undefined ? parsed.date : date
-  const showDeposit = business.depositsOnNewJob || chosenDeposit !== null
+  const showDeposit =
+    business.depositsOnNewJob ||
+    parsed.depositCents !== null ||
+    parsed.paid !== null ||
+    chosenDeposit !== null
   // An item belongs to one client, so fixing the client to another unlinks it.
   const linkedItem =
     start &&
@@ -219,6 +249,38 @@ export function NewJobForm({
     chosenClient.id === start.client.id
       ? start.item
       : undefined
+  // A payment that covers the whole price can save the job as done.
+  const coversPrice =
+    isPayment &&
+    chosenDeposit !== null &&
+    chosenDeposit > 0 &&
+    chosenPrice !== null &&
+    chosenPrice > 0 &&
+    chosenDeposit >= chosenPrice
+
+  // The client's items: one a word of the line names is picked, the rest are one tap away.
+  const clientItems =
+    chosenClient?.kind === 'existing'
+      ? (itemsByClient.get(chosenClient.id) ?? [])
+      : []
+  const itemMatch = clientItems.length
+    ? matchItem(parsed.title, clientItems)
+    : null
+  const itemBasis = [
+    chosenClient?.kind === 'existing' ? chosenClient.id : null,
+    itemMatch?.id ?? null,
+  ]
+  // Started from an item, that item is picked until the line names another.
+  const startItems = linkedItem ? [linkedItem.id] : []
+  const pickedItems = clientItems.length
+    ? (held(itemFix, itemBasis) ?? (itemMatch ? [itemMatch.id] : startItems))
+    : startItems
+  // The item's word leaves the title only while its item is picked.
+  const chosenTitle =
+    title ??
+    (itemMatch && pickedItems.includes(itemMatch.id)
+      ? itemMatch.title
+      : parsed.title)
   // A business set up for fixed-schedule work repeats new jobs by default (setup step 6).
   const [repeat, setRepeat] = useState(business.repeatDefault !== undefined)
 
@@ -227,7 +289,16 @@ export function NewJobForm({
   const setTitle = (value: string) => setTitleFix(fix(value, parsed.title))
   const setPrice = (value: string) => setPriceFix(fix(value, priceFromLine))
   const setDeposit = (value: string) =>
-    setDepositFix(fix(value, parsed.depositCents))
+    setDepositFix(fix(value, [parsed.depositCents, parsed.paid]))
+  const toggleItem = (itemId: string) =>
+    setItemFix(
+      fix(
+        pickedItems.includes(itemId)
+          ? pickedItems.filter((id) => id !== itemId)
+          : [...pickedItems, itemId],
+        itemBasis,
+      ),
+    )
   const setDate = (value: ParsedDate | null) =>
     setDateFix(fix(value, parsed.date))
   const onText = (value: string) => setText(value)
@@ -237,7 +308,16 @@ export function NewJobForm({
       ? navigate({ to: '/items/$itemId', params: { itemId: start.item.id } })
       : navigate({ to: '/' })
 
-  const submit = async () => {
+  // Leaving with a line typed asks first, whether by the close button or the back button.
+  const leaving = useRef(false)
+  const dirty = text.trim() !== ''
+  const blocker = useBlocker({
+    shouldBlockFn: useCallback(() => dirty && !leaving.current, [dirty]),
+    enableBeforeUnload: dirty,
+    withResolver: true,
+  })
+
+  const submit = async (markDone = false) => {
     setTried(true)
     if (!chosenClient || !chosenTitle.trim()) return
     if (!navigator.onLine) {
@@ -246,7 +326,8 @@ export function NewJobForm({
     }
     setSaving(true)
     try {
-      await save({
+      const jobTitle = capitalize(chosenTitle.trim())
+      const { jobId } = await save({
         businessId: business._id,
         client:
           chosenClient.kind === 'existing'
@@ -258,7 +339,7 @@ export function NewJobForm({
                   name: chosenClient.name,
                   phone: chosenClient.phone,
                 },
-        title: capitalize(chosenTitle.trim()),
+        title: jobTitle,
         typedPriceCents: chosenPrice ?? undefined,
         deposit:
           chosenDeposit && chosenDeposit > 0
@@ -266,27 +347,46 @@ export function NewJobForm({
                 amountCents: chosenDeposit,
                 date: depositDate,
                 method: depositMethod,
-                label: m.deposit_label(),
+                // A payment is money received like a deposit, without the label.
+                label: isPayment ? undefined : m.deposit_label(),
               }
             : undefined,
         when: single && chosenDate ? chosenDate : undefined,
         dueDate: !single && chosenDate ? chosenDate.date : undefined,
-        itemIds: linkedItem ? [linkedItem.id] : undefined,
+        itemIds: pickedItems.length
+          ? (pickedItems as Id<'items'>[])
+          : undefined,
+        done: markDone || undefined,
         repeat:
           repeat && business.repeatDefault ? business.repeatDefault : undefined,
       })
       recordTiming('newJob', Date.now() - startedAt)
-      toast.success(m.new_saved())
+      // Today may not list a far-off job, so the toast names it and opens it.
+      toast.success(m.new_saved_job({ title: jobTitle }), {
+        duration: 8000,
+        action: {
+          label: m.new_open(),
+          onClick: () =>
+            void navigate({ to: '/jobs/$jobId', params: { jobId } }),
+        },
+      })
+      leaving.current = true
       await leave()
     } catch (error) {
+      leaving.current = false
       toast.error(errorMessage(error))
       setSaving(false)
     }
   }
 
+  const byPhone =
+    chosenClient?.kind === 'existing' &&
+    parsed.phoneOwner?.id === chosenClient.id
   const sourceLabel =
     chosenClient?.kind === 'existing'
-      ? m.new_source_existing()
+      ? byPhone
+        ? m.new_source_phone()
+        : m.new_source_existing()
       : chosenClient?.kind === 'contact'
         ? m.new_source_contact()
         : chosenClient?.kind === 'new'
@@ -295,6 +395,61 @@ export function NewJobForm({
   const clientName =
     chosenClient &&
     (chosenClient.kind === 'none' ? m.no_client() : chosenClient.name)
+  // The phone under the name: the stored one for a client in the list, the typed one for a new client.
+  const phone =
+    chosenClient?.kind === 'existing'
+      ? clientsById.get(chosenClient.id)?.phones.at(0)
+      : chosenClient?.kind === 'new' || chosenClient?.kind === 'contact'
+        ? chosenClient.phone
+        : undefined
+  // Other clients the line could mean, one tap away: several matches, a phone that is
+  // somebody else's, or a new name a typo from a client.
+  const existingChoice = (candidate: ClientCandidate): ClientChoice => ({
+    kind: 'existing',
+    id: candidate.id,
+    name: candidate.name,
+  })
+  const alternatives: Array<{ choice: ClientChoice; label: string }> =
+    parsed.candidates.length > 1
+      ? parsed.candidates.map((candidate) => ({
+          choice: existingChoice(candidate),
+          label: candidate.name,
+        }))
+      : parsed.typedName && parsed.phoneOwner
+        ? [
+            {
+              choice: existingChoice(parsed.phoneOwner),
+              label: parsed.phoneOwner.name,
+            },
+            {
+              choice: {
+                kind: 'new',
+                name: parsed.typedName,
+                phone: parsed.phone ?? undefined,
+              },
+              label: m.new_create_client({ name: parsed.typedName }),
+            },
+          ]
+        : parsed.client?.kind === 'new' && parsed.similar.length
+          ? [
+              ...parsed.similar.map((candidate) => ({
+                choice: existingChoice(candidate),
+                label: m.new_similar({ name: candidate.name }),
+              })),
+              {
+                choice: {
+                  kind: 'new' as const,
+                  name: parsed.client.name,
+                  phone: parsed.client.phone,
+                },
+                label: m.new_create_client({ name: parsed.client.name }),
+              },
+            ]
+          : []
+  const isChosen = (choice: ClientChoice) =>
+    chosenClient?.kind === choice.kind &&
+    (choice.kind !== 'existing' ||
+      (chosenClient.kind === 'existing' && chosenClient.id === choice.id))
   const dateText =
     chosenDate &&
     `${formatDay(chosenDate.date, today)}${
@@ -378,10 +533,17 @@ export function NewJobForm({
             onFix={() => setFixing('client')}
             value={
               clientName && (
-                <span className="flex flex-wrap items-center gap-2">
-                  {clientName}
-                  {sourceLabel && (
-                    <Badge variant="secondary">{sourceLabel}</Badge>
+                <span className="flex flex-col">
+                  <span className="flex flex-wrap items-center gap-2">
+                    {clientName}
+                    {sourceLabel && (
+                      <Badge variant="secondary">{sourceLabel}</Badge>
+                    )}
+                  </span>
+                  {phone && (
+                    <span className="text-sm text-muted-foreground">
+                      {formatPhone(phone)}
+                    </span>
                   )}
                 </span>
               )
@@ -400,39 +562,34 @@ export function NewJobForm({
                 }}
               />
             ) : (
-              parsed.candidates.length > 1 && (
-                <ToggleGroup
-                  aria-label={words.client.singular}
-                  value={
-                    chosenClient?.kind === 'existing' ? [chosenClient.id] : []
-                  }
-                  onValueChange={(next: string[]) => {
-                    const candidate = parsed.candidates.find(
-                      (item) => item.id === next[0],
-                    )
-                    if (candidate) {
-                      setClient({
-                        kind: 'existing',
-                        id: candidate.id,
-                        name: candidate.name,
-                      })
-                    }
-                  }}
-                  variant="outline"
-                  size="xl"
-                  className="w-full flex-wrap"
-                >
-                  {parsed.candidates.map((candidate) => (
-                    <ToggleGroupItem key={candidate.id} value={candidate.id}>
-                      {candidate.name}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
+              alternatives.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {parsed.phoneOwner && (
+                    <p className="text-sm text-muted-foreground">
+                      {m.duplicate_warning({ name: parsed.phoneOwner.name })}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {alternatives.map(({ choice, label }) => (
+                      <Button
+                        key={
+                          choice.kind === 'existing' ? choice.id : choice.kind
+                        }
+                        variant={isChosen(choice) ? 'secondary' : 'outline'}
+                        aria-pressed={isChosen(choice)}
+                        className="h-11 rounded-xl"
+                        onClick={() => setClient(choice)}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               )
             )}
           </ReadRow>
 
-          {linkedItem && (
+          {linkedItem && clientItems.length === 0 && (
             <ReadRow
               label={words.item.singular}
               icon={StackIcon}
@@ -461,6 +618,33 @@ export function NewJobForm({
               </div>
             )}
           </ReadRow>
+
+          {clientItems.length > 0 && (
+            <ReadRow
+              label={words.item.singular}
+              icon={CubeIcon}
+              value={clientItems
+                .filter((item) => pickedItems.includes(item.id))
+                .map((item) => item.name)
+                .join(', ')}
+            >
+              <div className="flex flex-wrap gap-2">
+                {clientItems.map((item) => (
+                  <Button
+                    key={item.id}
+                    variant={
+                      pickedItems.includes(item.id) ? 'secondary' : 'outline'
+                    }
+                    aria-pressed={pickedItems.includes(item.id)}
+                    className="h-11 rounded-xl aria-pressed:border-primary"
+                    onClick={() => toggleItem(item.id)}
+                  >
+                    {item.name}
+                  </Button>
+                ))}
+              </div>
+            </ReadRow>
+          )}
 
           <ReadRow
             label={m.new_price()}
@@ -501,7 +685,7 @@ export function NewJobForm({
 
           {showDeposit && (
             <ReadRow
-              label={m.new_deposit()}
+              label={isPayment ? m.new_paid() : m.new_deposit()}
               icon={CoinsIcon}
               fixing={fixing === 'deposit'}
               onFix={() => setFixing('deposit')}
@@ -514,12 +698,12 @@ export function NewJobForm({
               {fixing === 'deposit' && (
                 <div className="flex flex-col gap-3">
                   <MoneyInput
-                    label={m.new_deposit()}
+                    label={isPayment ? m.new_paid() : m.new_deposit()}
                     value={
                       deposit ??
-                      (parsed.depositCents === null
+                      (paymentFromLine === null
                         ? ''
-                        : formatMoney(parsed.depositCents).replace(/\s?€/, ''))
+                        : formatMoney(paymentFromLine).replace(/\s?€/, ''))
                     }
                     onChange={setDeposit}
                   />
@@ -666,7 +850,19 @@ export function NewJobForm({
         </section>
       </div>
 
-      <div className="border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div className="flex flex-col gap-2 border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        {coversPrice && (
+          <Button
+            size="xl"
+            variant="outline"
+            className="w-full"
+            disabled={saving}
+            onClick={() => void submit(true)}
+          >
+            <CheckCircleIcon data-icon="inline-start" />
+            {m.new_save_done()}
+          </Button>
+        )}
         <Button
           size="xl"
           className="w-full"
@@ -677,6 +873,11 @@ export function NewJobForm({
           {m.new_save()}
         </Button>
       </div>
+      <DiscardSheet
+        open={blocker.status === 'blocked'}
+        onKeep={() => blocker.reset?.()}
+        onDiscard={() => blocker.proceed?.()}
+      />
     </main>
   )
 }

@@ -5,6 +5,7 @@ import {
   canRegroupStage,
   canRemoveStage,
   defaultStage,
+  firstStageOf,
   groupedOrder,
   stagesFor,
 } from './stages'
@@ -63,6 +64,29 @@ describe('defaultStage', () => {
         order,
       }))
       expect(defaultStage(stages)?.group).toBe('new')
+    }
+  })
+})
+
+describe('firstStageOf', () => {
+  it('is the first stage of the group by order, not by position in the list', () => {
+    const stages = [
+      { _id: 'late', group: 'done' as const, order: 5 },
+      { _id: 'new', group: 'new' as const, order: 0 },
+      { _id: 'early', group: 'done' as const, order: 3 },
+    ]
+    expect(firstStageOf(stages, 'done')?._id).toBe('early')
+    expect(firstStageOf(stages, 'cancelled')).toBeUndefined()
+  })
+
+  it('every starting stage list has a Done stage', () => {
+    for (const flow of ['single', 'multi'] as const) {
+      const stages = stagesFor(flow).map((stage, order) => ({
+        ...stage,
+        _id: String(order),
+        order,
+      }))
+      expect(firstStageOf(stages, 'done')?.group).toBe('done')
     }
   })
 })

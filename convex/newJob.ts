@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { sofiaTimeToUtc, stampMoment } from '../shared/dates'
+import { firstStageOf } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import {
   businessMutation,
@@ -9,7 +10,7 @@ import {
 } from './lib/auth'
 import { createClient } from './lib/clientWrite'
 import { fail } from './lib/errors'
-import { createJob } from './lib/jobWrite'
+import { businessStages, createJob } from './lib/jobWrite'
 import { recomputeMoney } from './lib/recompute'
 import { refreshRepeat } from './lib/repeat'
 import { calendarDate, cents, optionalText } from './lib/validate'
@@ -17,8 +18,13 @@ import { vPaymentMethod } from './validators'
 
 /** Most clients a Level 1 business has; the picker searches them in the browser. */
 const MAX_PICKER_CLIENTS = 2000
+const MAX_PICKER_ITEMS = 4000
 
-/** What "+" needs to read a line: the clients to match and the service list. */
+/**
+ * What "+" needs to read a line: the clients to match, the service list and,
+ * with the Items module on, each client's items (name, and the folded words
+ * that include a model or plate) so a word of the line can name one.
+ */
 export const context = businessQuery({
   args: {},
   returns: v.object({
@@ -34,6 +40,14 @@ export const context = businessQuery({
         id: v.id('services'),
         name: v.string(),
         priceCents: v.number(),
+      }),
+    ),
+    items: v.array(
+      v.object({
+        id: v.id('items'),
+        clientId: v.id('clients'),
+        name: v.string(),
+        keys: v.string(),
       }),
     ),
   }),
@@ -52,18 +66,32 @@ export const context = businessQuery({
           )
           .collect()
       : []
+    const listed = clients.filter(
+      (client) =>
+        !client.isNoClient &&
+        client.anonymizedAt === undefined &&
+        client.mergedIntoId === undefined,
+    )
+    const listedIds = new Set<string>(listed.map((client) => client._id))
+    const items = ctx.business.modules.items
+      ? await ctx.db
+          .query('items')
+          .withIndex('by_business', (q) => q.eq('businessId', ctx.business._id))
+          .take(MAX_PICKER_ITEMS)
+      : []
     return {
-      clients: clients
-        .filter(
-          (client) =>
-            !client.isNoClient &&
-            client.anonymizedAt === undefined &&
-            client.mergedIntoId === undefined,
-        )
-        .map((client) => ({
-          id: client._id,
-          name: client.name,
-          phones: client.phones.map((phone) => phone.e164),
+      clients: listed.map((client) => ({
+        id: client._id,
+        name: client.name,
+        phones: client.phones.map((phone) => phone.e164),
+      })),
+      items: items
+        .filter((item) => listedIds.has(item.clientId))
+        .map((item) => ({
+          id: item._id,
+          clientId: item.clientId,
+          name: item.name,
+          keys: item.searchText,
         })),
       services: services
         .filter((service) => service.archivedAt === undefined)
@@ -90,6 +118,10 @@ const vClientChoice = v.union(
  * Saves the "+" line in one mutation: the client if new, the job, the
  * deposit allocated to it, and the appointment or due date. At most two
  * required fields: client (or "No client") and title.
+ *
+ * `deposit` is any payment received now. With a `label` it is a deposit;
+ * without one it is an ordinary payment, as for a walk-in who paid in full.
+ * `done` saves the job straight into the first Done-group stage.
  */
 export const save = businessMutation({
   args: {
@@ -113,6 +145,7 @@ export const save = businessMutation({
     dueDate: v.optional(v.string()),
     /** Items the job is for, when "+" is started from an item. They must be the client's own. */
     itemIds: v.optional(v.array(v.id('items'))),
+    done: v.optional(v.boolean()),
     repeat: v.optional(
       v.object({
         every: v.number(),
@@ -138,9 +171,15 @@ export const save = businessMutation({
       })
     }
 
+    const doneStage = args.done
+      ? firstStageOf(await businessStages(ctx), 'done')
+      : undefined
+    if (args.done && !doneStage) fail('notFound', { table: 'stages' })
+
     const jobId = await createJob(ctx, {
       clientId,
       title: args.title,
+      stageId: doneStage?._id,
       typedPriceCents: args.typedPriceCents,
       dueDate: args.dueDate,
       itemIds: args.itemIds,

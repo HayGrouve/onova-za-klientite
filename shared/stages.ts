@@ -81,13 +81,21 @@ export function canRegroupStage<TId>(
   return isLastInGroup(stages, stage) ? 'lastInGroup' : 'ok'
 }
 
+/** The first stage of a group, in the business's stage order. */
+export function firstStageOf<T extends StageLike<unknown>>(
+  stages: T[],
+  group: StageGroup,
+): T | undefined {
+  return [...stages]
+    .sort((a, b) => a.order - b.order)
+    .find((stage) => stage.group === group)
+}
+
 /** Where new jobs start: the first stage of the New group. */
 export function defaultStage<T extends StageLike<unknown>>(
   stages: T[],
 ): T | undefined {
-  return [...stages]
-    .sort((a, b) => a.order - b.order)
-    .find((stage) => stage.group === 'new')
+  return firstStageOf(stages, 'new')
 }
 
 /**

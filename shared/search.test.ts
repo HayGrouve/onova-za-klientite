@@ -6,6 +6,7 @@ import {
   foldQuery,
   nameMatches,
   searchClients,
+  similarClients,
   transliterate,
 } from './search'
 import type { SearchValue } from './search'
@@ -368,5 +369,42 @@ describe('key limits', () => {
     expect(keys.length).toBeLessThanOrEqual(512)
     expect(keys).toContain('ivan')
     expect(keys).toContain('4159')
+  })
+})
+
+describe('similarClients', () => {
+  const clients = [
+    { id: 'ivan', name: 'Иван Петров', phones: [] },
+    { id: 'maria', name: 'Мария Георгиева', phones: [] },
+  ]
+
+  it('finds a name a typo or two away', () => {
+    expect(similarClients(clients, 'Иван Петрв').map((c) => c.id)).toEqual([
+      'ivan',
+    ])
+    expect(similarClients(clients, 'Мраия Георгиева').map((c) => c.id)).toEqual(
+      ['maria'],
+    )
+  })
+
+  it('reads a single word against each word of a name', () => {
+    expect(similarClients(clients, 'Петрв').map((c) => c.id)).toEqual(['ivan'])
+  })
+
+  it('finds nobody for a short name or a different one', () => {
+    expect(similarClients(clients, 'Ана')).toEqual([])
+    expect(similarClients(clients, 'Петър Колев')).toEqual([])
+  })
+
+  it('lists the closest first, at most three', () => {
+    const many = [
+      { id: 'd', name: 'Георги Иванова', phones: [] },
+      { id: 'c', name: 'Георги Иванво', phones: [] },
+      { id: 'b', name: 'Георги Иваноув', phones: [] },
+      { id: 'a', name: 'Георги Иванов', phones: [] },
+    ]
+    const found = similarClients(many, 'Георги Иванво').map((c) => c.id)
+    expect(found).toHaveLength(3)
+    expect(found[0]).toBe('c')
   })
 })
