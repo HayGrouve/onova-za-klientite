@@ -10,11 +10,23 @@ export type ErrorCode =
   | 'auth.notMember'
   | 'auth.forbidden'
   | 'notFound'
+  | 'invalid'
   | 'seed.notAllowed'
+  | 'stage.hasJobs'
+  | 'stage.lastInGroup'
+  | 'field.typeChange'
+  | 'field.value'
+  | 'client.noClient'
+  | 'job.otherClient'
+  | 'job.cancelled'
+  | 'payment.signMismatch'
+  | 'payment.exceeds'
+  | 'payment.zero'
+  | 'credit.notEnough'
 
 export function fail(
   code: ErrorCode,
-  data: Record<string, unknown> = {},
+  data: Record<string, string | number | boolean> = {},
 ): never {
   throw new ConvexError({ code, ...data })
 }

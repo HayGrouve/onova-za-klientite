@@ -15,8 +15,56 @@ type SeedClient = {
   items?: Array<{ name: string; extra: Record<string, string> }>
 }
 
+/** Days are relative to today in Sofia, so Today always has something to show. */
+type SeedPayment = {
+  amountCents: number
+  daysAgo: number
+  method: 'cash' | 'bank' | 'card' | 'other'
+  label?: string
+}
+
+type SeedJob = {
+  client: string
+  title: string
+  stage: string
+  typedPriceCents?: number
+  lines?: Array<{
+    description: string
+    quantity: number
+    unitPriceCents: number
+    service?: string
+  }>
+  dueInDays?: number
+  doneDaysAgo?: number
+  createdDaysAgo: number
+  items?: string[]
+  payments?: SeedPayment[]
+  costs?: Array<{ label: string; amountCents: number; daysAgo: number }>
+  appointment?: {
+    inDays: number
+    hour: number
+    minute: number
+    hours: number
+    label: string
+  }
+  cancelReason?: string
+  notes?: string
+}
+
 export type SeedBusiness = {
   key: string
+  jobs: SeedJob[]
+  /** Payments not tied to a job: client credit. */
+  credit?: Array<{ client: string } & SeedPayment>
+  generalCosts?: Array<{ label: string; amountCents: number; daysAgo: number }>
+  reminders?: Array<{
+    client: string
+    item?: string
+    note: string
+    inDays: number
+    source: 'manual' | 'rule'
+    status?: 'open' | 'done'
+  }>
   settings: BusinessDefaults & { reminderRule?: { months: number } }
   stages: StageDraft[]
   services: Array<{ name: string; priceCents: number }>
@@ -79,6 +127,111 @@ export const SEED_BUSINESSES: SeedBusiness[] = [
         note: 'Плащат по банка, до 10 дни след монтажа.',
       },
       { name: 'Петър Николов', phones: ['+359899111222'] },
+    ],
+    jobs: [
+      {
+        client: 'Иван Петров',
+        title: 'Гардероб в спалнята',
+        stage: 'Изработка',
+        typedPriceCents: 95000,
+        dueInDays: 2,
+        createdDaysAgo: 20,
+        payments: [
+          { amountCents: 30000, daysAgo: 20, method: 'cash', label: 'Капаро' },
+        ],
+        costs: [{ label: 'ПДЧ и обков', amountCents: 22000, daysAgo: 15 }],
+        notes: 'Плъзгащи врати, огледало отляво.',
+      },
+      {
+        client: 'Мария Георгиева',
+        title: 'Кухня',
+        stage: 'Монтаж',
+        lines: [
+          {
+            description: 'Кухня, на линеен метър',
+            quantity: 3.2,
+            unitPriceCents: 42000,
+            service: 'Кухня, на линеен метър',
+          },
+          {
+            description: 'Монтаж',
+            quantity: 1,
+            unitPriceCents: 4000,
+            service: 'Монтаж',
+          },
+        ],
+        dueInDays: -3,
+        createdDaysAgo: 35,
+        payments: [
+          { amountCents: 70000, daysAgo: 30, method: 'bank', label: 'Капаро' },
+        ],
+        costs: [
+          { label: 'Плот и мивка', amountCents: 38000, daysAgo: 25 },
+          { label: 'Транспорт', amountCents: 6000, daysAgo: 1 },
+        ],
+        appointment: {
+          inDays: 0,
+          hour: 14,
+          minute: 0,
+          hours: 3,
+          label: 'Монтаж',
+        },
+      },
+      {
+        client: 'Офис Строй ООД',
+        title: 'Офис бюра, 6 броя',
+        stage: 'Готово',
+        typedPriceCents: 180000,
+        createdDaysAgo: 40,
+        doneDaysAgo: 10,
+        payments: [
+          { amountCents: 100000, daysAgo: 40, method: 'bank', label: 'Капаро' },
+        ],
+        costs: [{ label: 'Материали', amountCents: 60000, daysAgo: 35 }],
+      },
+      {
+        client: 'Петър Николов',
+        title: 'Библиотека в хола',
+        stage: 'Оглед',
+        createdDaysAgo: 2,
+        appointment: {
+          inDays: 1,
+          hour: 10,
+          minute: 0,
+          hours: 1,
+          label: 'Оглед',
+        },
+      },
+      {
+        client: 'Иван Петров',
+        title: 'Нощни шкафчета',
+        stage: 'Готово',
+        typedPriceCents: 24000,
+        createdDaysAgo: 60,
+        doneDaysAgo: 45,
+        payments: [{ amountCents: 24000, daysAgo: 45, method: 'cash' }],
+      },
+      {
+        client: 'Петър Николов',
+        title: 'Етажерка',
+        stage: 'Отказано',
+        typedPriceCents: 32000,
+        createdDaysAgo: 30,
+        cancelReason: 'Отказа офертата',
+      },
+    ],
+    credit: [
+      {
+        client: 'Петър Николов',
+        amountCents: 10000,
+        daysAgo: 2,
+        method: 'bank',
+        label: 'Капаро',
+      },
+    ],
+    generalCosts: [
+      { label: 'Наем на цеха', amountCents: 40000, daysAgo: 4 },
+      { label: 'Гориво', amountCents: 8000, daysAgo: 1 },
     ],
   },
   {
@@ -164,6 +317,120 @@ export const SEED_BUSINESSES: SeedBusiness[] = [
             extra: { Модел: 'Toshiba Seiya', Помещение: 'Рецепция' },
           },
         ],
+      },
+    ],
+    jobs: [
+      {
+        client: 'Георги Димитров',
+        title: 'Профилактика на 2 климатика',
+        stage: 'Насрочено',
+        lines: [
+          {
+            description: 'Профилактика',
+            quantity: 2,
+            unitPriceCents: 5000,
+            service: 'Профилактика',
+          },
+        ],
+        createdDaysAgo: 5,
+        items: ['Daikin FTXM35, хол', 'Mitsubishi MSZ-LN25, спалня'],
+        appointment: {
+          inDays: 0,
+          hour: 10,
+          minute: 30,
+          hours: 2,
+          label: 'Профилактика',
+        },
+      },
+      {
+        client: 'Хотел Морско око',
+        title: 'Монтаж на нов климатик',
+        stage: 'В работа',
+        lines: [
+          {
+            description: 'Монтаж на климатик',
+            quantity: 1,
+            unitPriceCents: 15000,
+            service: 'Монтаж на климатик',
+          },
+          {
+            description: 'Зареждане с фреон',
+            quantity: 1,
+            unitPriceCents: 8000,
+            service: 'Зареждане с фреон',
+          },
+        ],
+        dueInDays: 1,
+        createdDaysAgo: 3,
+        items: ['Toshiba Seiya, рецепция'],
+      },
+      {
+        client: 'Елена Иванова',
+        title: 'Зареждане с фреон',
+        stage: 'Изпълнено',
+        typedPriceCents: 8000,
+        createdDaysAgo: 4,
+        doneDaysAgo: 3,
+        items: ['Gree Fairy, кухня'],
+      },
+      {
+        client: 'Георги Димитров',
+        title: 'Профилактика',
+        stage: 'Изпълнено',
+        typedPriceCents: 5000,
+        createdDaysAgo: 335,
+        doneDaysAgo: 334,
+        items: ['Daikin FTXM35, хол'],
+        payments: [{ amountCents: 5000, daysAgo: 334, method: 'card' }],
+      },
+      {
+        client: 'Хотел Морско око',
+        title: 'Профилактика, 3 броя',
+        stage: 'Изпълнено',
+        lines: [
+          {
+            description: 'Профилактика',
+            quantity: 3,
+            unitPriceCents: 5000,
+            service: 'Профилактика',
+          },
+        ],
+        createdDaysAgo: 62,
+        doneDaysAgo: 60,
+        items: [
+          'Toshiba Seiya, стая 101',
+          'Toshiba Seiya, стая 102',
+          'Toshiba Seiya, рецепция',
+        ],
+        payments: [{ amountCents: 15000, daysAgo: 55, method: 'bank' }],
+      },
+    ],
+    reminders: [
+      {
+        client: 'Георги Димитров',
+        item: 'Daikin FTXM35, хол',
+        note: 'Годишна профилактика',
+        inDays: 31,
+        source: 'rule',
+      },
+      {
+        client: 'Елена Иванова',
+        note: 'Да се обадя за профилактика',
+        inDays: -1,
+        source: 'manual',
+      },
+      {
+        client: 'Хотел Морско око',
+        note: 'Оферта за 2 нови климатика',
+        inDays: 0,
+        source: 'manual',
+      },
+      {
+        client: 'Георги Димитров',
+        note: 'Да донеса филтри',
+        inDays: -20,
+        source: 'manual',
+        status: 'done',
       },
     ],
   },

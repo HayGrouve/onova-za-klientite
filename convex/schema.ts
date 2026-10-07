@@ -1,21 +1,27 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 import {
+  vActivityData,
+  vActivityType,
   vChannel,
   vConsent,
   vExtra,
   vFieldTarget,
   vFieldType,
   vJobFlow,
+  vJobLine,
   vModules,
+  vPaymentMethod,
+  vRepeatUnit,
   vRole,
   vStageColor,
   vStageGroup,
   vWords,
 } from './validators'
 
-// Milestone 1 holds the tables setup and the seed need. The rest of the
-// schema draft in docs/implementation-plan.md lands in milestone 2.
+// The schema draft from docs/implementation-plan.md. Amounts are integer euro
+// cents (ADR 0007). Calendar dates are "YYYY-MM-DD" in Europe/Sofia, moments
+// are epoch ms (D1). Cached values are written only by recompute (ADR 0008).
 export default defineSchema({
   // ── People and access ───────────────────────────────────────────────
   users: defineTable({
@@ -29,6 +35,7 @@ export default defineSchema({
 
   businesses: defineTable({
     name: v.string(),
+    logoFileId: v.optional(v.id('files')),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     address: v.optional(v.string()),
@@ -37,10 +44,7 @@ export default defineSchema({
     jobFlow: vJobFlow,
     depositsOnNewJob: v.boolean(),
     repeatDefault: v.optional(
-      v.object({
-        every: v.number(),
-        unit: v.union(v.literal('week'), v.literal('month')),
-      }),
+      v.object({ every: v.number(), unit: vRepeatUnit }),
     ),
     reminderRule: v.optional(v.object({ months: v.number() })),
     setup: v.object({
@@ -132,6 +136,90 @@ export default defineSchema({
     visibleToClient: v.boolean(),
   }).index('by_business_order', ['businessId', 'order']),
 
+  jobs: defineTable({
+    businessId: v.id('businesses'),
+    clientId: v.id('clients'),
+    title: v.string(),
+    stageId: v.id('stages'),
+    stageGroup: vStageGroup,
+    stageChangedAt: v.number(),
+    doneAt: v.optional(v.number()),
+    lines: v.array(vJobLine),
+    typedPriceCents: v.optional(v.number()),
+    dueDate: v.optional(v.string()),
+    address: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    itemIds: v.array(v.id('items')),
+    assigneeIds: v.array(v.id('memberships')),
+    source: v.union(
+      v.literal('manual'),
+      v.literal('phone'),
+      v.literal('online'),
+    ),
+    repeat: v.optional(
+      v.object({
+        every: v.number(),
+        unit: vRepeatUnit,
+        nextJobId: v.optional(v.id('jobs')),
+        stoppedAt: v.optional(v.number()),
+      }),
+    ),
+    nextRepeatOn: v.optional(v.string()),
+    seriesId: v.optional(v.id('jobs')),
+    writeOff: v.optional(
+      v.object({
+        amountCents: v.number(),
+        note: v.string(),
+        at: v.number(),
+        by: v.id('memberships'),
+      }),
+    ),
+    cancelReason: v.optional(v.string()),
+    extra: vExtra,
+    // Cached, ADR 0008. Only recomputeJob writes these.
+    priceCents: v.number(),
+    paidCents: v.number(),
+    costCents: v.number(),
+    balanceCents: v.number(),
+    owes: v.boolean(),
+    searchText: v.string(),
+    createdBy: v.id('memberships'),
+  })
+    .index('by_business_group_due', ['businessId', 'stageGroup', 'dueDate'])
+    .index('by_business_stage', ['businessId', 'stageId'])
+    .index('by_business_owes', ['businessId', 'owes', 'stageGroup'])
+    .index('by_client', ['clientId'])
+    .index('by_next_repeat', ['nextRepeatOn'])
+    .searchIndex('search', {
+      searchField: 'searchText',
+      filterFields: ['businessId', 'stageGroup'],
+    }),
+
+  jobItems: defineTable({
+    businessId: v.id('businesses'),
+    jobId: v.id('jobs'),
+    itemId: v.id('items'),
+  })
+    .index('by_item', ['itemId'])
+    .index('by_job', ['jobId']),
+
+  appointments: defineTable({
+    businessId: v.id('businesses'),
+    jobId: v.optional(v.id('jobs')),
+    clientId: v.optional(v.id('clients')),
+    start: v.number(),
+    end: v.optional(v.number()),
+    allDay: v.boolean(),
+    label: v.optional(v.string()),
+    assigneeIds: v.array(v.id('memberships')),
+    resourceIds: v.optional(v.array(v.string())),
+    doneAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+  })
+    .index('by_business_start', ['businessId', 'start'])
+    .index('by_job', ['jobId'])
+    .index('by_client', ['clientId']),
+
   services: defineTable({
     businessId: v.id('businesses'),
     name: v.string(),
@@ -140,6 +228,63 @@ export default defineSchema({
     archivedAt: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
   }).index('by_business_order', ['businessId', 'order']),
+
+  reminders: defineTable({
+    businessId: v.id('businesses'),
+    date: v.string(),
+    note: v.string(),
+    clientId: v.optional(v.id('clients')),
+    jobId: v.optional(v.id('jobs')),
+    itemId: v.optional(v.id('items')),
+    source: v.union(v.literal('manual'), v.literal('rule')),
+    status: v.union(
+      v.literal('open'),
+      v.literal('done'),
+      v.literal('dismissed'),
+    ),
+    closedAt: v.optional(v.number()),
+  })
+    .index('by_business_status_date', ['businessId', 'status', 'date'])
+    .index('by_client', ['clientId'])
+    .index('by_job', ['jobId'])
+    .index('by_item', ['itemId']),
+
+  // ── Money ──────────────────────────────────────────────────────────
+  payments: defineTable({
+    businessId: v.id('businesses'),
+    clientId: v.id('clients'),
+    amountCents: v.number(),
+    date: v.string(),
+    method: vPaymentMethod,
+    label: v.optional(v.string()),
+    note: v.optional(v.string()),
+    allocatedCents: v.number(),
+    createdBy: v.id('memberships'),
+  })
+    .index('by_business_date', ['businessId', 'date'])
+    .index('by_client', ['clientId']),
+
+  allocations: defineTable({
+    businessId: v.id('businesses'),
+    paymentId: v.id('payments'),
+    jobId: v.id('jobs'),
+    clientId: v.id('clients'),
+    amountCents: v.number(),
+  })
+    .index('by_payment', ['paymentId'])
+    .index('by_job', ['jobId'])
+    .index('by_client', ['clientId']),
+
+  costs: defineTable({
+    businessId: v.id('businesses'),
+    jobId: v.optional(v.id('jobs')),
+    amountCents: v.number(),
+    date: v.string(),
+    label: v.string(),
+    note: v.optional(v.string()),
+  })
+    .index('by_business_date', ['businessId', 'date'])
+    .index('by_job', ['jobId']),
 
   // ── Customization ──────────────────────────────────────────────────
   fields: defineTable({
@@ -161,4 +306,95 @@ export default defineSchema({
     archivedAt: v.optional(v.number()),
     visibleToClient: v.boolean(),
   }).index('by_business_target_order', ['businessId', 'target', 'order']),
+
+  // ── Files, history, messages ───────────────────────────────────────
+  files: defineTable({
+    businessId: v.id('businesses'),
+    storageId: v.id('_storage'),
+    kind: v.union(v.literal('photo'), v.literal('file')),
+    mimeType: v.string(),
+    size: v.number(),
+    name: v.optional(v.string()),
+    jobId: v.optional(v.id('jobs')),
+    clientId: v.optional(v.id('clients')),
+    itemId: v.optional(v.id('items')),
+    fieldId: v.optional(v.id('fields')),
+    visibleToClient: v.boolean(),
+    uploadedBy: v.id('memberships'),
+  })
+    .index('by_job', ['jobId'])
+    .index('by_client', ['clientId'])
+    .index('by_item', ['itemId'])
+    .index('by_business', ['businessId']),
+
+  activity: defineTable({
+    businessId: v.id('businesses'),
+    actorId: v.id('memberships'),
+    type: vActivityType,
+    jobId: v.optional(v.id('jobs')),
+    clientId: v.optional(v.id('clients')),
+    itemId: v.optional(v.id('items')),
+    paymentId: v.optional(v.id('payments')),
+    costId: v.optional(v.id('costs')),
+    data: vActivityData,
+  })
+    .index('by_job', ['jobId'])
+    .index('by_client', ['clientId'])
+    .index('by_item', ['itemId'])
+    .index('by_business', ['businessId']),
+
+  messages: defineTable({
+    businessId: v.id('businesses'),
+    clientId: v.id('clients'),
+    jobId: v.optional(v.id('jobs')),
+    channel: vChannel,
+    recipient: v.string(),
+    kind: v.union(v.literal('manual'), v.literal('automatic')),
+    template: v.optional(v.string()),
+    status: v.union(
+      v.literal('logged'),
+      v.literal('queued'),
+      v.literal('sent'),
+      v.literal('delivered'),
+      v.literal('failed'),
+    ),
+    note: v.optional(v.string()),
+    by: v.optional(v.id('memberships')),
+  })
+    .index('by_client', ['clientId'])
+    .index('by_job', ['jobId']),
+
+  shareLinks: defineTable({
+    businessId: v.id('businesses'),
+    tokenHash: v.string(),
+    target: v.object({
+      kind: v.union(v.literal('job'), v.literal('client')),
+      id: v.string(),
+    }),
+    permission: v.union(
+      v.literal('view'),
+      v.literal('approve'),
+      v.literal('book'),
+    ),
+    expiresAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    createdBy: v.id('memberships'),
+  }).index('by_token_hash', ['tokenHash']),
+
+  pushSubscriptions: defineTable({
+    userId: v.id('users'),
+    endpoint: v.string(),
+    keys: v.object({ p256dh: v.string(), auth: v.string() }),
+    userAgent: v.optional(v.string()),
+    lastSuccessAt: v.optional(v.number()),
+  })
+    .index('by_user', ['userId'])
+    .index('by_endpoint', ['endpoint']),
+
+  deletionJobs: defineTable({
+    userId: v.id('users'),
+    businessIds: v.array(v.id('businesses')),
+    table: v.string(),
+    status: v.union(v.literal('running'), v.literal('done')),
+  }),
 })

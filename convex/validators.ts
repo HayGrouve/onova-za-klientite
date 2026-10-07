@@ -68,3 +68,66 @@ export const vChannel = v.union(
   v.literal('sms'),
   v.literal('email'),
 )
+
+export const vPaymentMethod = v.union(
+  v.literal('cash'),
+  v.literal('bank'),
+  v.literal('card'),
+  v.literal('other'),
+)
+
+export const vJobLine = v.object({
+  id: v.string(),
+  description: v.string(),
+  quantity: v.number(),
+  unitPriceCents: v.number(),
+  serviceId: v.optional(v.id('services')),
+})
+
+export const vRepeatUnit = v.union(v.literal('week'), v.literal('month'))
+
+/** Closed list of activity events. Add a literal here before logging a new kind. */
+export const ACTIVITY_TYPES = [
+  'job.created',
+  'job.edited',
+  'job.stageChanged',
+  'job.linesChanged',
+  'job.itemsChanged',
+  'job.writtenOff',
+  'job.writeOffRemoved',
+  'job.cancelled',
+  'payment.added',
+  'payment.removed',
+  'credit.used',
+  'cost.added',
+  'cost.edited',
+  'cost.removed',
+  'client.created',
+  'client.edited',
+  'item.created',
+  'item.edited',
+  'item.moved',
+  'stage.added',
+  'stage.edited',
+  'stage.removed',
+  'stages.reordered',
+  'field.added',
+  'field.edited',
+  'field.archived',
+  'field.restored',
+] as const
+
+export const vActivityType = v.union(
+  ...ACTIVITY_TYPES.map((type) => v.literal(type)),
+)
+
+/** Small, typed details of an event: what changed from what to what. */
+export const vActivityData = v.object({
+  from: v.optional(v.string()),
+  to: v.optional(v.string()),
+  amountCents: v.optional(v.number()),
+  note: v.optional(v.string()),
+  name: v.optional(v.string()),
+  fromId: v.optional(v.string()),
+  toId: v.optional(v.string()),
+})

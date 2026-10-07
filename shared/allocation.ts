@@ -1,0 +1,60 @@
+import { lineTotalCents, sumCents } from './money'
+
+export type Line = { quantity: number; unitPriceCents: number }
+
+type JobGroup = 'new' | 'in_progress' | 'done' | 'cancelled'
+
+export function jobPriceCents(lines: Line[], typedPriceCents?: number): number {
+  if (lines.length === 0) return typedPriceCents ?? 0
+  return sumCents(
+    lines.map((line) => lineTotalCents(line.quantity, line.unitPriceCents)),
+  )
+}
+
+export function jobBalanceCents(a: {
+  priceCents: number
+  paidCents: number
+  writeOffCents: number
+}): number {
+  return a.priceCents - a.paidCents - a.writeOffCents
+}
+
+export function jobOwes(balanceCents: number, group: JobGroup): boolean {
+  return balanceCents > 0 && group !== 'cancelled'
+}
+
+/** Fills the open jobs in the given order (oldest first). The rest is credit. */
+export function splitPayment<TId extends string>(
+  amountCents: number,
+  openJobs: Array<{ jobId: TId; balanceCents: number }>,
+): {
+  allocations: Array<{ jobId: TId; amountCents: number }>
+  creditCents: number
+} {
+  if (!(amountCents > 0)) {
+    throw new Error('splitPayment needs a positive amount')
+  }
+  const allocations: Array<{ jobId: TId; amountCents: number }> = []
+  let left = amountCents
+  for (const job of openJobs) {
+    if (left === 0) break
+    if (job.balanceCents <= 0) continue
+    const take = Math.min(left, job.balanceCents)
+    allocations.push({ jobId: job.jobId, amountCents: take })
+    left -= take
+  }
+  return { allocations, creditCents: left }
+}
+
+export function checkAllocations(
+  paymentCents: number,
+  allocations: Array<{ amountCents: number }>,
+): 'ok' | 'signMismatch' | 'exceedsPayment' | 'zero' {
+  if (allocations.some((a) => a.amountCents === 0)) return 'zero'
+  const sign = Math.sign(paymentCents)
+  if (allocations.some((a) => Math.sign(a.amountCents) !== sign)) {
+    return 'signMismatch'
+  }
+  const total = sumCents(allocations.map((a) => Math.abs(a.amountCents)))
+  return total > Math.abs(paymentCents) ? 'exceedsPayment' : 'ok'
+}
