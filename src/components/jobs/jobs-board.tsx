@@ -13,7 +13,7 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
@@ -73,17 +73,27 @@ export function JobsBoard({
   const canMove = role === 'owner' || role === 'manager'
   const board = useQuery(api.jobs.board, { businessId: business._id })
   const move = useMoveJob()
-  const [dragging, setDragging] = useState<Card | null>(null)
   const [ruleFor, setRuleFor] = useState<Card | null>(null)
 
-  if (!board) return <BoardSkeleton />
-
   const stagesOf = (group: StageGroup) =>
-    board.stages.filter((stage) => stage.group === group)
+    board?.stages.filter((stage) => stage.group === group) ?? []
   const moveTo = (card: Card, target: Target) => {
     if (target !== 'cancelled' && target._id === card.stageId) return
     void move(card, target).then((offer) => offer && setRuleFor(card))
   }
+  const { drag, press, wasDragged } = useCardDrag((card, key) => {
+    const [kind, id] = key.split(':')
+    if (kind === 'zone') {
+      const stage = board?.stages.find((item) => item._id === id)
+      if (stage) moveTo(card, stage)
+      return
+    }
+    const target = columnTarget(id as StageGroup, stagesOf(id as StageGroup))
+    if (target && id !== card.stageGroup) moveTo(card, target)
+  })
+
+  if (!board) return <BoardSkeleton />
+
   const matches = (card: Card) =>
     !filter.trim() ||
     nameMatches(
@@ -103,17 +113,170 @@ export function JobsBoard({
             stages={stagesOf(column.group)}
             allStages={board.stages}
             canMove={canMove}
-            dragging={dragging}
+            drag={drag}
             today={today}
-            onDragStart={setDragging}
-            onDragEnd={() => setDragging(null)}
+            onPress={press}
+            wasDragged={wasDragged}
             onMove={moveTo}
           />
         ))}
       </div>
+      {/* The card under the pointer while it is dragged. */}
+      {drag && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed z-50 rotate-2 overflow-hidden surface shadow-xl ring-2 ring-primary/40"
+          style={{
+            left: drag.x - drag.offsetX,
+            top: drag.y - drag.offsetY,
+            width: drag.width,
+          }}
+        >
+          <CardFace card={drag.card} today={today} />
+        </div>
+      )}
       <RuleReminderSheet job={ruleFor} onClose={() => setRuleFor(null)} />
     </>
   )
+}
+
+/**
+ * Where a drop on a column lands: its first stage. A column with no stage
+ * takes none, except Cancelled: cancelling brings its stage back (jobs.cancel).
+ */
+function columnTarget(group: StageGroup, stages: Stage[]): Target | null {
+  return stages.at(0) ?? (group === 'cancelled' ? 'cancelled' : null)
+}
+
+type Drag = {
+  card: Card
+  /** The pointer, and where on the card it took hold. */
+  x: number
+  y: number
+  offsetX: number
+  offsetY: number
+  width: number
+  /** The drop target under the pointer: `column:<group>` or `zone:<stageId>`. */
+  over: string | null
+}
+
+// How far a mouse moves before a press becomes a drag, and how long a finger
+// holds still first, so a swipe still scrolls the page.
+const DRAG_DISTANCE = 5
+const TOUCH_HOLD_MS = 300
+const EDGE = 64
+
+/**
+ * Dragging cards with pointer events, so it works the same with a mouse, a
+ * pen or a finger, and in any browser. Drop targets are elements with a
+ * `data-drop` key. Near the top or bottom of the window the page scrolls.
+ */
+function useCardDrag(onDrop: (card: Card, key: string) => void) {
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const dropRef = useRef(onDrop)
+  dropRef.current = onDrop
+  const dragged = useRef(false)
+  const cleanupRef = useRef<() => void>(undefined)
+  useEffect(() => () => cleanupRef.current?.(), [])
+
+  const press = (event: React.PointerEvent<HTMLElement>, card: Card) => {
+    if (event.button !== 0) return
+    if ((event.target as HTMLElement).closest('[data-no-drag]')) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const { pointerId } = event
+    const start = { x: event.clientX, y: event.clientY }
+    const touch = event.pointerType === 'touch'
+    let pointer = start
+    let held = !touch
+    let active = false
+    let current: Drag | null = null
+    let frame = 0
+
+    const update = () => {
+      const target = document
+        .elementFromPoint(pointer.x, pointer.y)
+        ?.closest<HTMLElement>('[data-drop]')
+      current = {
+        card,
+        x: pointer.x,
+        y: pointer.y,
+        offsetX: start.x - rect.left,
+        offsetY: start.y - rect.top,
+        width: rect.width,
+        over: target?.dataset.drop ?? null,
+      }
+      setDrag(current)
+    }
+    const scroll = () => {
+      const step =
+        pointer.y < EDGE ? -12 : pointer.y > window.innerHeight - EDGE ? 12 : 0
+      if (step) {
+        window.scrollBy(0, step)
+        update()
+      }
+      frame = requestAnimationFrame(scroll)
+    }
+    const begin = () => {
+      active = true
+      document.body.style.userSelect = 'none'
+      update()
+      frame = requestAnimationFrame(scroll)
+    }
+    const hold = touch
+      ? window.setTimeout(() => {
+          held = true
+          begin()
+        }, TOUCH_HOLD_MS)
+      : 0
+
+    const onMove = (moved: PointerEvent) => {
+      if (moved.pointerId !== pointerId) return
+      pointer = { x: moved.clientX, y: moved.clientY }
+      const distance = Math.hypot(pointer.x - start.x, pointer.y - start.y)
+      if (!active) {
+        // A finger that moves before the hold is scrolling, not dragging.
+        if (!held) {
+          if (distance > DRAG_DISTANCE * 2) end()
+        } else if (distance > DRAG_DISTANCE) begin()
+        return
+      }
+      update()
+    }
+    const onUp = (released: PointerEvent) => {
+      if (released.pointerId !== pointerId) return
+      if (active) {
+        // The click that follows a drag must not open the job.
+        dragged.current = true
+        window.setTimeout(() => (dragged.current = false))
+        if (current?.over) dropRef.current(card, current.over)
+      }
+      end()
+    }
+    const onKey = (key: KeyboardEvent) => key.key === 'Escape' && end()
+    // While dragging, a finger moves the card instead of the page.
+    const onTouchMove = (moved: TouchEvent) => active && moved.preventDefault()
+    const end = () => {
+      window.clearTimeout(hold)
+      cancelAnimationFrame(frame)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', end)
+      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.body.style.userSelect = ''
+      active = false
+      cleanupRef.current = undefined
+      setDrag(null)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', end)
+    window.addEventListener('keydown', onKey)
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    cleanupRef.current = end
+  }
+
+  return { drag, press, wasDragged: () => dragged.current }
 }
 
 function Column({
@@ -123,10 +286,10 @@ function Column({
   stages,
   allStages,
   canMove,
-  dragging,
+  drag,
   today,
-  onDragStart,
-  onDragEnd,
+  onPress,
+  wasDragged,
   onMove,
 }: {
   column: Board['columns'][number]
@@ -135,50 +298,31 @@ function Column({
   stages: Stage[]
   allStages: Stage[]
   canMove: boolean
-  dragging: Card | null
+  drag: Drag | null
   today: string
-  onDragStart: (card: Card) => void
-  onDragEnd: () => void
+  onPress: (event: React.PointerEvent<HTMLElement>, card: Card) => void
+  wasDragged: () => boolean
   onMove: (card: Card, target: Target) => void
 }) {
   const { words } = useViewer().business
-  const [over, setOver] = useState(false)
   const { group } = column
-  // A drop on another column lands in its first stage. A column with no
-  // stage takes none, except Cancelled: cancelling brings its stage back
-  // (jobs.cancel). In its own column a card can only move to another stage.
-  const columnTarget: Target | null =
-    stages.at(0) ?? (group === 'cancelled' ? 'cancelled' : null)
+  const dragging = drag?.card ?? null
+  // In its own column a card can only move to another of the column's stages.
   const accepts =
-    dragging !== null && columnTarget !== null && dragging.stageGroup !== group
+    dragging !== null &&
+    columnTarget(group, stages) !== null &&
+    dragging.stageGroup !== group
   const zones =
     dragging !== null &&
     stages.length > 1 &&
     stages.some((stage) => stage._id !== dragging.stageId)
-  const dropOn = (target: Target | null) => (event: React.DragEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setOver(false)
-    if (dragging && target) onMove(dragging, target)
-    onDragEnd()
-  }
+  const over = drag?.over === `column:${group}`
   const hidden = column.total - column.jobs.length
 
   return (
     <section
       aria-label={GROUP_LABEL[group]()}
-      onDragOver={(event) => {
-        if (!accepts) return
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
-        setOver(true)
-      }}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node)) {
-          setOver(false)
-        }
-      }}
-      onDrop={dropOn(columnTarget)}
+      data-drop={accepts ? `column:${group}` : undefined}
       className={cn(
         'relative flex flex-col gap-2 rounded-2xl bg-board p-2 pt-0 transition-shadow duration-150',
         (accepts || zones) && 'ring-2 ring-primary/25 ring-inset',
@@ -219,18 +363,31 @@ function Column({
       {/* While dragging, a column with several stages offers each one. */}
       {zones && (
         <ul className="flex flex-col gap-1.5">
-          {stages.map((stage) => (
-            <StageDropZone
-              key={stage._id}
-              stage={stage}
-              current={stage._id === dragging.stageId}
-              onDrop={dropOn(stage)}
-            />
-          ))}
+          {stages.map(
+            (stage) =>
+              stage._id !== dragging.stageId && (
+                <li
+                  key={stage._id}
+                  data-drop={`zone:${stage._id}`}
+                  className={cn(
+                    'flex h-11 items-center justify-center rounded-xl border-2 border-dashed border-primary/40 px-2 text-center text-sm font-medium text-primary transition-colors',
+                    drag?.over === `zone:${stage._id}` &&
+                      'border-primary bg-primary/10',
+                  )}
+                >
+                  {m.board_drop_stage({ stage: stage.name })}
+                </li>
+              ),
+          )}
         </ul>
       )}
       {accepts && stages.length < 2 && (
-        <div className="flex h-12 items-center justify-center rounded-xl border-2 border-dashed border-primary/40 text-sm font-medium text-primary">
+        <div
+          className={cn(
+            'flex h-12 items-center justify-center rounded-xl border-2 border-dashed border-primary/40 text-sm font-medium text-primary transition-colors',
+            over && 'border-primary bg-primary/10',
+          )}
+        >
           {m.board_drop_here()}
         </div>
       )}
@@ -240,13 +397,12 @@ function Column({
           <BoardCard
             key={card._id}
             card={card}
-            showStage={stages.length > 1}
             stages={allStages}
             canMove={canMove}
             today={today}
             dragged={dragging?._id === card._id}
-            onDragStart={() => onDragStart(card)}
-            onDragEnd={onDragEnd}
+            onPress={(event) => onPress(event, card)}
+            wasDragged={wasDragged}
             onMove={(target) => onMove(card, target)}
           />
         ))}
@@ -275,62 +431,58 @@ function Column({
   )
 }
 
-function StageDropZone({
-  stage,
-  current,
-  onDrop,
-}: {
-  stage: Stage
-  current: boolean
-  onDrop: (event: React.DragEvent) => void
-}) {
-  const [over, setOver] = useState(false)
-  if (current) return null
-  return (
-    <li
-      onDragOver={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        event.dataTransfer.dropEffect = 'move'
-        setOver(true)
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(event) => {
-        setOver(false)
-        onDrop(event)
-      }}
-      className={cn(
-        'flex h-11 items-center justify-center rounded-xl border-2 border-dashed border-primary/40 px-2 text-center text-sm font-medium text-primary transition-colors',
-        over && 'border-primary bg-primary/10',
-      )}
-    >
-      {m.board_drop_stage({ stage: stage.name })}
-    </li>
-  )
-}
-
-/** One job on the board: title, client, when, what is owed, and a move menu. */
+/** One job on the board: the card face, a link to the job, and a move menu. */
 function BoardCard({
   card,
-  showStage,
   stages,
   canMove,
   today,
   dragged,
-  onDragStart,
-  onDragEnd,
+  onPress,
+  wasDragged,
   onMove,
 }: {
   card: Card
-  showStage: boolean
   stages: Stage[]
   canMove: boolean
   today: string
   dragged: boolean
-  onDragStart: () => void
-  onDragEnd: () => void
+  onPress: (event: React.PointerEvent<HTMLElement>) => void
+  wasDragged: () => boolean
   onMove: (target: Target) => void
 }) {
+  const late =
+    (card.stageGroup === 'new' || card.stageGroup === 'in_progress') &&
+    isOverdue(card.dueDate, today)
+  return (
+    <li
+      onPointerDown={canMove ? onPress : undefined}
+      className={cn(
+        'group/card relative overflow-hidden surface transition-[opacity,box-shadow] duration-150 hover:shadow-md',
+        canMove && 'cursor-grab touch-manipulation select-none',
+        dragged && 'opacity-40',
+        late && 'shadow-[inset_3px_0_0_var(--destructive)]',
+      )}
+    >
+      <Link
+        to="/jobs/$jobId"
+        params={{ jobId: card._id }}
+        draggable={false}
+        onClick={(event) => wasDragged() && event.preventDefault()}
+        className="block rounded-[inherit] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      >
+        <CardFace card={card} today={today} />
+      </Link>
+      {canMove && <MoveMenu card={card} stages={stages} onMove={onMove} />}
+    </li>
+  )
+}
+
+/**
+ * What a card shows: the title with its stage joined to the top-right corner
+ * (as on the phone's rows), the client, when, and what is still owed.
+ */
+function CardFace({ card, today }: { card: Card; today: string }) {
   const late =
     (card.stageGroup === 'new' || card.stageGroup === 'in_progress') &&
     isOverdue(card.dueDate, today)
@@ -358,66 +510,40 @@ function BoardCard({
   const owes = card.owes && card.balanceCents > 0
 
   return (
-    <li
-      draggable={canMove}
-      onDragStart={(event) => {
-        event.dataTransfer.effectAllowed = 'move'
-        event.dataTransfer.setData('text/plain', card.title)
-        onDragStart()
-      }}
-      onDragEnd={onDragEnd}
-      className={cn(
-        'group/card relative surface transition-[opacity,box-shadow] duration-150 hover:shadow-md',
-        canMove && 'cursor-grab active:cursor-grabbing',
-        dragged && 'opacity-40',
-        late && 'shadow-[inset_3px_0_0_var(--destructive)]',
-      )}
-    >
-      <Link
-        to="/jobs/$jobId"
-        params={{ jobId: card._id }}
-        draggable={false}
-        className="flex flex-col gap-1.5 rounded-[inherit] p-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <span className="line-clamp-2 pr-7 text-sm leading-snug font-medium">
+    <span className="flex flex-col gap-1.5 p-3">
+      <span className="flex items-start justify-between gap-2">
+        <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium">
           {card.title}
         </span>
-        <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {!card.isNoClient && (
-            <Meta icon={UserIcon}>
-              <span className="truncate">{card.clientName}</span>
-            </Meta>
-          )}
-          {timing && (
-            <Meta
-              icon={timing.icon}
-              className={cn(late && 'font-medium text-destructive')}
-            >
-              {timing.text}
-            </Meta>
-          )}
-        </span>
-        {(showStage || owes) && (
-          <span className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-            {showStage ? (
-              <StageBadge
-                name={card.stageName}
-                group={card.stageGroup}
-                className="h-5 px-2 text-[0.6875rem]"
-              />
-            ) : (
-              <span />
-            )}
-            {owes && (
-              <Meta icon={CoinsIcon} className="text-xs text-foreground/80">
-                {formatMoney(card.balanceCents)}
-              </Meta>
-            )}
-          </span>
+        {/* Pulled over the card's padding onto its top and right edges. */}
+        <StageBadge
+          name={card.stageName}
+          group={card.stageGroup}
+          corner
+          className="-mt-3 -mr-3 h-6 px-2.5 text-[0.6875rem]"
+        />
+      </span>
+      <span className="flex flex-col gap-1 pr-7 text-xs text-muted-foreground">
+        {!card.isNoClient && (
+          <Meta icon={UserIcon}>
+            <span className="truncate">{card.clientName}</span>
+          </Meta>
         )}
-      </Link>
-      {canMove && <MoveMenu card={card} stages={stages} onMove={onMove} />}
-    </li>
+        {timing && (
+          <Meta
+            icon={timing.icon}
+            className={cn(late && 'font-medium text-destructive')}
+          >
+            {timing.text}
+          </Meta>
+        )}
+        {owes && (
+          <Meta icon={CoinsIcon} className="text-foreground/80">
+            {m.balance_short({ amount: formatMoney(card.balanceCents) })}
+          </Meta>
+        )}
+      </span>
+    </span>
   )
 }
 
@@ -438,7 +564,8 @@ function MoveMenu({
       <Tip label={m.board_move_to()}>
         <DropdownMenuTrigger
           aria-label={label}
-          className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,background-color] outline-none group-hover/card:opacity-100 hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:opacity-100"
+          data-no-drag
+          className="absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,background-color] outline-none group-hover/card:opacity-100 hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:opacity-100"
         >
           <ArrowsLeftRightIcon className="size-4" />
         </DropdownMenuTrigger>
