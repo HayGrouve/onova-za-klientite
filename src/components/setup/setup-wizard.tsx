@@ -6,12 +6,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { BusinessSwitcher } from '#/components/app-shell'
 import { JobFormPreview } from '#/components/setup/job-form-preview'
 import { SetupChanges } from '#/components/setup/setup-changes'
 import { STEP_BODY } from '#/components/setup/steps'
 import { Stopwatch } from '#/components/stopwatch'
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
+import { useViewer } from '#/hooks/use-viewer'
 import { errorMessage } from '#/lib/errors'
 import { recordTiming } from '#/lib/timing'
 import { m } from '#/paraglide/messages.js'
@@ -44,6 +46,7 @@ export function SetupWizard({
   initialAnswers: SetupAnswers
 }) {
   const navigate = useNavigate()
+  const { businesses } = useViewer()
   const apply = useMutation(api.setup.apply)
   const [answers, setAnswers] = useState(initialAnswers)
   const [step, setStep] = useState(0)
@@ -122,28 +125,54 @@ export function SetupWizard({
   }
 
   const Body = key ? STEP_BODY[key] : null
+  // Ways out of the questions: a quiet "skip all" to the review, and the
+  // business switcher when there are several businesses to go to.
+  const showHeader = businesses.length > 1 || step !== DONE
+
   return (
     // A wide screen puts the live form and the questions side by side.
     <main className="flex h-dvh flex-col bg-muted lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:p-8">
       <h1 className="sr-only">{m.setup_heading()}</h1>
       <Stopwatch startedAt={startedAt} stoppedAt={reviewedAt} />
-      <div
-        ref={previewRef}
-        tabIndex={0}
-        role="region"
-        aria-label={m.preview_label()}
-        className="min-h-0 flex-1 overflow-y-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-6 lg:max-h-full lg:max-w-2xl lg:p-1"
-      >
-        <p className="mb-2 text-sm text-muted-foreground">
-          {step === DONE ? m.setup_preview_done() : m.setup_preview_title()}
-        </p>
-        <div className="rounded-2xl border bg-card p-4 shadow-sm shadow-zinc-900/5">
-          <JobFormPreview
-            settings={formSettings}
-            highlight={key ?? null}
-            pulse={pulse}
-            onEdit={step === DONE ? edit : undefined}
-          />
+      <div className="flex min-h-0 flex-1 flex-col lg:max-h-full lg:max-w-2xl">
+        {showHeader && (
+          <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 px-4 pt-[env(safe-area-inset-top)] lg:px-1 lg:pt-0">
+            <div className="min-w-0">
+              {businesses.length > 1 && <BusinessSwitcher />}
+            </div>
+            {step !== DONE && (
+              <Button
+                variant="ghost"
+                size="xl"
+                className="px-3 text-sm text-muted-foreground"
+                onClick={finish}
+              >
+                {m.setup_skip_all()}
+              </Button>
+            )}
+          </div>
+        )}
+        <div
+          ref={previewRef}
+          tabIndex={0}
+          role="region"
+          aria-label={m.preview_label()}
+          className={cn(
+            'min-h-0 flex-1 overflow-y-auto px-4 pb-6 lg:p-1',
+            showHeader ? 'pt-1' : 'pt-[calc(1rem+env(safe-area-inset-top))]',
+          )}
+        >
+          <p className="mb-2 text-sm text-muted-foreground">
+            {step === DONE ? m.setup_preview_done() : m.setup_preview_title()}
+          </p>
+          <div className="rounded-2xl border bg-card p-4 shadow-sm shadow-zinc-900/5">
+            <JobFormPreview
+              settings={formSettings}
+              highlight={key ?? null}
+              pulse={pulse}
+              onEdit={step === DONE ? edit : undefined}
+            />
+          </div>
         </div>
       </div>
 
@@ -197,7 +226,11 @@ export function SetupWizard({
                 {m.setup_skip()}
               </Button>
               <Button size="xl" className="px-4" onClick={next}>
-                {fromReview ? m.setup_done() : m.setup_next()}
+                {fromReview
+                  ? m.setup_done()
+                  : step === DONE - 1
+                    ? m.setup_to_review()
+                    : m.setup_next()}
               </Button>
             </div>
           </>

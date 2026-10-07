@@ -34,7 +34,9 @@ async function choose(page: Page, title: string, option: string) {
 }
 
 const next = (page: Page) => page.getByRole('button', { name: 'Напред' })
-const skip = (page: Page) => page.getByRole('button', { name: 'Пропусни' })
+// "Пропусни всичко" skips the rest of the wizard, so match this one exactly.
+const skip = (page: Page) =>
+  page.getByRole('button', { name: 'Пропусни', exact: true })
 
 /** Waits for the setup screen of a business that was just created. */
 export async function expectSetup(page: Page) {
