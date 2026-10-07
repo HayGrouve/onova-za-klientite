@@ -1,0 +1,93 @@
+import { useMutation } from 'convex/react'
+import { toast } from 'sonner'
+import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
+import { useViewer } from '#/hooks/use-viewer'
+import { errorMessage } from '#/lib/errors'
+import { boardColumn } from '../../shared/board'
+import type { StageGroup } from '../../shared/stages'
+
+type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
+
+/**
+ * Moves a job to another stage, from the job page or the board. The board
+ * shows the move at once and settles when the server answers. Resolves to
+ * true when the move reached Done and the reminder rule should be offered
+ * (Q5); a failure shows a toast and resolves to false.
+ */
+export function useMoveJob() {
+  const { business } = useViewer()
+  const changeStage = useMutation(api.jobs.changeStage).withOptimisticUpdate(
+    (store, { businessId, jobId, stageId }) => {
+      const board = store.getQuery(api.jobs.board, { businessId })
+      const stage = board?.stages.find((item) => item._id === stageId)
+      const moving = board?.columns
+        .flatMap((column) => column.jobs)
+        .find((job) => job._id === jobId)
+      if (!board || !stage || !moving) return
+      const moved = {
+        ...moving,
+        stageId: stage._id,
+        stageName: stage.name,
+        stageGroup: stage.group,
+        // Cancelled never owes; Done records when it was reached.
+        owes: stage.group === 'cancelled' ? false : moving.owes,
+        doneAt:
+          stage.group === 'done' && moving.stageGroup !== 'done'
+            ? Date.now()
+            : moving.doneAt,
+      }
+      const owed = (job: typeof moving) => (job.owes ? job.balanceCents : 0)
+      store.setQuery(
+        api.jobs.board,
+        { businessId },
+        {
+          ...board,
+          columns: board.columns.map((column) => {
+            const rest = column.jobs.filter((job) => job._id !== jobId)
+            const left = rest.length < column.jobs.length
+            const arrives = column.group === stage.group
+            const jobs = arrives ? [...rest, moved] : rest
+            return {
+              ...column,
+              jobs: boardColumn(column.group, jobs, jobs.length).jobs,
+              total: column.total - (left ? 1 : 0) + (arrives ? 1 : 0),
+              owedCents:
+                column.owedCents -
+                (left ? owed(moving) : 0) +
+                (arrives ? owed(moved) : 0),
+            }
+          }),
+        },
+      )
+    },
+  )
+  const cancel = useMutation(api.jobs.cancel)
+
+  return async (
+    job: { _id: Id<'jobs'>; stageGroup: StageGroup },
+    /** The stage, or Cancelled when the business has no Cancelled stage left. */
+    target: Stage | 'cancelled',
+  ) => {
+    try {
+      if (target === 'cancelled') {
+        await cancel({ businessId: business._id, jobId: job._id })
+        return false
+      }
+      await changeStage({
+        businessId: business._id,
+        jobId: job._id,
+        stageId: target._id,
+      })
+      return (
+        target.group === 'done' &&
+        job.stageGroup !== 'done' &&
+        business.modules.reminders &&
+        Boolean(business.reminderRule)
+      )
+    } catch (error) {
+      toast.error(errorMessage(error))
+      return false
+    }
+  }
+}

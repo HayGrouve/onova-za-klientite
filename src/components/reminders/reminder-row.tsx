@@ -42,7 +42,7 @@ export function ReminderRow({
           variant="ghost"
           size="icon-xl"
           aria-label={m.reminder_done()}
-          className="hover:bg-green-100 hover:text-green-800"
+          className="hover:bg-green-100 hover:text-green-800 dark:hover:bg-green-950 dark:hover:text-green-300"
           onClick={() => act('done')}
         >
           <CheckIcon weight="bold" />

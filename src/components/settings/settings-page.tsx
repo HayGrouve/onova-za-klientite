@@ -14,10 +14,10 @@ export function SettingsPage({
 }) {
   return (
     <div className="flex flex-col gap-4 pb-8">
-      <div className="flex flex-col gap-1 px-4 pt-1">
+      <div className="flex flex-col gap-1 px-4 pt-1 lg:pt-3.5">
         <Link
           to="/settings"
-          className="-ml-1 flex min-h-11 w-fit items-center gap-1 rounded-xl text-sm text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="-ml-1 flex min-h-11 w-fit items-center gap-1 rounded-xl text-sm text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden"
         >
           <CaretLeftIcon className="size-4" />
           {m.settings_back()}

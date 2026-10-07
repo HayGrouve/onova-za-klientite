@@ -116,7 +116,7 @@ export function OfflineApp({ saved }: { saved: SavedSnapshot | null }) {
         <span className="text-sm font-medium">{data.businessName}</span>
         <div
           role="status"
-          className="flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-sm text-amber-900"
+          className="flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
         >
           <WifiSlashIcon className="size-5 shrink-0" />
           <span>

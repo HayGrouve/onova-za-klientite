@@ -46,7 +46,10 @@ import { m } from '#/paraglide/messages.js'
 import { addMonths, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 
-export const Route = createFileRoute('/_app/money')({ component: MoneyPage })
+export const Route = createFileRoute('/_app/money')({
+  staticData: { layout: 'wide' },
+  component: MoneyPage,
+})
 
 const MONTH = new Intl.DateTimeFormat('bg-BG', {
   month: 'long',
@@ -84,225 +87,239 @@ function MoneyPage() {
   return (
     <>
       <PageTitle>{m.money_title()}</PageTitle>
-      <div className="flex flex-col gap-4 pb-6">
-        {/* The month and what happened in it. */}
-        <section className="mx-4 flex flex-col overflow-hidden surface">
-          <div className="flex items-center justify-between gap-2 p-1">
-            <Tip label={m.money_prev_month()}>
-              <Button
-                variant="ghost"
-                size="icon-xl"
-                aria-label={m.money_prev_month()}
-                onClick={() => shift(-1)}
-              >
-                <CaretLeftIcon />
-              </Button>
-            </Tip>
-            {/* Keyed by the month, so the label fades in when it changes. */}
-            <h2 key={month} className="animate-page text-base font-semibold">
-              {monthLabel(month)}
-            </h2>
-            <Tip label={m.money_next_month()}>
-              <Button
-                variant="ghost"
-                size="icon-xl"
-                aria-label={m.money_next_month()}
-                disabled={month >= monthOf(today)}
-                onClick={() => shift(1)}
-              >
-                <CaretRightIcon />
-              </Button>
-            </Tip>
-          </div>
-          {!data ? (
-            <div className="flex flex-col gap-2 border-t border-border/70 p-4">
-              <Skeleton className="h-4 w-1/3 rounded-full" />
-              <Skeleton className="h-7 w-1/2 rounded-full" />
+      {/* A wide screen: the month beside the balances, then who owes me
+          beside the month's payments and costs. The phone keeps one column in
+          the same order. */}
+      <div className="flex flex-col gap-4 pb-6 lg:grid lg:grid-cols-2 lg:items-start">
+        <div className="contents lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-stretch">
+          {/* The month and what happened in it. */}
+          <section className="mx-4 flex flex-col overflow-hidden surface">
+            <div className="flex items-center justify-between gap-2 p-1">
+              <Tip label={m.money_prev_month()}>
+                <Button
+                  variant="ghost"
+                  size="icon-xl"
+                  aria-label={m.money_prev_month()}
+                  onClick={() => shift(-1)}
+                >
+                  <CaretLeftIcon />
+                </Button>
+              </Tip>
+              {/* Keyed by the month, so the label fades in when it changes. */}
+              <h2 key={month} className="animate-page text-base font-semibold">
+                {monthLabel(month)}
+              </h2>
+              <Tip label={m.money_next_month()}>
+                <Button
+                  variant="ghost"
+                  size="icon-xl"
+                  aria-label={m.money_next_month()}
+                  disabled={month >= monthOf(today)}
+                  onClick={() => shift(1)}
+                >
+                  <CaretRightIcon />
+                </Button>
+              </Tip>
             </div>
-          ) : (
-            <>
-              <div
-                className={cn(
-                  'grid divide-x divide-border/70 border-t border-border/70',
-                  costsOn ? 'grid-cols-2' : 'grid-cols-1',
-                )}
-              >
-                <MoneyFigure
-                  label={m.money_received()}
-                  cents={data.receivedCents}
-                  icon={ArrowDownLeftIcon}
-                  hint={m.hint_received()}
-                />
-                {costsOn && (
-                  <MoneyFigure
-                    label={m.money_costs()}
-                    cents={data.costCents}
-                    icon={ArrowUpRightIcon}
-                    hint={m.hint_costs()}
-                  />
-                )}
+            {!data ? (
+              <div className="flex flex-col gap-2 border-t border-border/70 p-4">
+                <Skeleton className="h-4 w-1/3 rounded-full" />
+                <Skeleton className="h-7 w-1/2 rounded-full" />
               </div>
-              {costsOn && (
-                <div className="border-t border-border/70 bg-muted/30">
+            ) : (
+              <>
+                <div
+                  className={cn(
+                    'grid divide-x divide-border/70 border-t border-border/70',
+                    costsOn ? 'grid-cols-2' : 'grid-cols-1',
+                  )}
+                >
                   <MoneyFigure
-                    label={m.money_profit()}
-                    cents={data.profitCents}
-                    icon={data.profitCents < 0 ? TrendDownIcon : TrendUpIcon}
-                    hint={m.hint_monthly_profit()}
-                    emphasis={
-                      data.profitCents < 0
-                        ? 'negative'
-                        : data.profitCents > 0
-                          ? 'positive'
-                          : undefined
-                    }
+                    label={m.money_received()}
+                    cents={data.receivedCents}
+                    icon={ArrowDownLeftIcon}
+                    hint={m.hint_received()}
                   />
+                  {costsOn && (
+                    <MoneyFigure
+                      label={m.money_costs()}
+                      cents={data.costCents}
+                      icon={ArrowUpRightIcon}
+                      hint={m.hint_costs()}
+                    />
+                  )}
                 </div>
-              )}
+                {costsOn && (
+                  <div className="border-t border-border/70 bg-muted/30">
+                    <MoneyFigure
+                      label={m.money_profit()}
+                      cents={data.profitCents}
+                      icon={data.profitCents < 0 ? TrendDownIcon : TrendUpIcon}
+                      hint={m.hint_monthly_profit()}
+                      emphasis={
+                        data.profitCents < 0
+                          ? 'negative'
+                          : data.profitCents > 0
+                            ? 'positive'
+                            : undefined
+                      }
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+          {data && (
+            <>
+              {/* Balances as of today, whatever the month. */}
+              <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface lg:grid-cols-1 lg:grid-rows-2 lg:divide-x-0 lg:divide-y">
+                <MoneyFigure
+                  label={m.money_still_owed()}
+                  cents={data.stillOwedCents}
+                  icon={HourglassMediumIcon}
+                  hint={m.hint_still_owed()}
+                  emphasis={data.stillOwedCents > 0 ? 'primary' : undefined}
+                />
+                <MoneyFigure
+                  label={m.money_credit_held()}
+                  cents={data.creditHeldCents}
+                  icon={PiggyBankIcon}
+                  hint={m.hint_credit()}
+                />
+              </section>
             </>
           )}
-        </section>
+        </div>
 
         {!data ? (
           <ListSkeleton />
         ) : (
           <>
-            {/* Balances as of today, whatever the month. */}
-            <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface">
-              <MoneyFigure
-                label={m.money_still_owed()}
-                cents={data.stillOwedCents}
-                icon={HourglassMediumIcon}
-                hint={m.hint_still_owed()}
-                emphasis={data.stillOwedCents > 0 ? 'primary' : undefined}
-              />
-              <MoneyFigure
-                label={m.money_credit_held()}
-                cents={data.creditHeldCents}
-                icon={PiggyBankIcon}
-                hint={m.hint_credit()}
-              />
-            </section>
-
-            <Panel
-              title={m.money_who_owes()}
-              icon={HandCoinsIcon}
-              count={data.whoOwesMe.length || undefined}
-            >
-              <PanelList>
-                {data.whoOwesMe.length === 0 ? (
-                  <ListNote>{m.money_who_owes_none()}</ListNote>
-                ) : (
-                  data.whoOwesMe.map((row) => (
-                    <li key={row.clientId}>
-                      <Link
-                        to="/clients/$clientId"
-                        params={{ clientId: row.clientId }}
-                        className="flex items-center gap-3 pressable px-4 py-3"
-                      >
-                        <InitialsAvatar
-                          name={row.isNoClient ? m.no_client() : row.name}
-                          className="size-9 text-xs"
-                        />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate font-medium">
-                            {row.isNoClient ? m.no_client() : row.name}
-                          </span>
-                          <span className="text-sm text-muted-foreground">
-                            {m.money_jobs_count({
-                              jobs: business.words.job.plural,
-                              count: row.jobs,
-                            })}
-                            {row.doneJobs > 0 && ` · ${m.money_done_marker()}`}
-                          </span>
-                        </span>
-                        <span className="font-semibold tabular-nums">
-                          {formatMoney(row.owedCents)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))
-                )}
-              </PanelList>
-            </Panel>
-
-            <Panel title={m.money_payments()} icon={ArrowDownLeftIcon}>
-              <PanelList>
-                {data.payments.length === 0 ? (
-                  <ListNote>{m.money_none()}</ListNote>
-                ) : (
-                  data.payments.map((payment) => (
-                    <li key={payment._id}>
-                      <Link
-                        to="/clients/$clientId"
-                        params={{ clientId: payment.clientId }}
-                        className="flex items-center gap-3 pressable px-4 py-2.5"
-                      >
-                        <MethodBadge method={payment.method} />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate">{payment.clientName}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDay(payment.date, today)} ·{' '}
-                            {payment.label ?? METHOD_LABEL[payment.method]()}
-                          </span>
-                        </span>
-                        <span className="tabular-nums">
-                          {formatMoney(payment.amountCents)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))
-                )}
-              </PanelList>
-            </Panel>
-
-            {costsOn && (
+            <div className="contents lg:flex lg:flex-col lg:gap-4">
               <Panel
-                title={m.money_costs_list()}
-                icon={ReceiptIcon}
-                action={
-                  <Button
-                    variant="ghost"
-                    className="h-9 text-primary"
-                    onClick={() => setCostPanel({})}
-                  >
-                    <PlusIcon data-icon="inline-start" />
-                    {m.cost_add()}
-                  </Button>
-                }
+                title={m.money_who_owes()}
+                icon={HandCoinsIcon}
+                count={data.whoOwesMe.length || undefined}
               >
                 <PanelList>
-                  {data.costs.length === 0 ? (
-                    <ListNote>{m.money_none()}</ListNote>
+                  {data.whoOwesMe.length === 0 ? (
+                    <ListNote>{m.money_who_owes_none()}</ListNote>
                   ) : (
-                    data.costs.map((cost) => (
-                      <li key={cost._id}>
-                        {cost.jobId ? (
-                          <Link
-                            to="/jobs/$jobId"
-                            params={{ jobId: cost.jobId }}
-                            className="flex items-baseline justify-between gap-3 pressable px-4 py-2.5"
-                          >
-                            <CostLine cost={cost} today={today} />
-                          </Link>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setCostPanel({ cost })}
-                            className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
-                          >
-                            <CostLine cost={cost} today={today} />
-                          </button>
-                        )}
+                    data.whoOwesMe.map((row) => (
+                      <li key={row.clientId}>
+                        <Link
+                          to="/clients/$clientId"
+                          params={{ clientId: row.clientId }}
+                          className="flex items-center gap-3 pressable px-4 py-3"
+                        >
+                          <InitialsAvatar
+                            name={row.isNoClient ? m.no_client() : row.name}
+                            className="size-9 text-xs"
+                          />
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate font-medium">
+                              {row.isNoClient ? m.no_client() : row.name}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {m.money_jobs_count({
+                                jobs: business.words.job.plural,
+                                count: row.jobs,
+                              })}
+                              {row.doneJobs > 0 &&
+                                ` · ${m.money_done_marker()}`}
+                            </span>
+                          </span>
+                          <span className="font-semibold tabular-nums">
+                            {formatMoney(row.owedCents)}
+                          </span>
+                        </Link>
                       </li>
                     ))
                   )}
                 </PanelList>
               </Panel>
-            )}
-            <p className="px-4 text-xs text-muted-foreground">
-              {m.money_workers_hidden()}
-            </p>
+            </div>
+            <div className="contents lg:flex lg:flex-col lg:gap-4">
+              <Panel title={m.money_payments()} icon={ArrowDownLeftIcon}>
+                <PanelList>
+                  {data.payments.length === 0 ? (
+                    <ListNote>{m.money_none()}</ListNote>
+                  ) : (
+                    data.payments.map((payment) => (
+                      <li key={payment._id}>
+                        <Link
+                          to="/clients/$clientId"
+                          params={{ clientId: payment.clientId }}
+                          className="flex items-center gap-3 pressable px-4 py-2.5"
+                        >
+                          <MethodBadge method={payment.method} />
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate">
+                              {payment.clientName}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {formatDay(payment.date, today)} ·{' '}
+                              {payment.label ?? METHOD_LABEL[payment.method]()}
+                            </span>
+                          </span>
+                          <span className="tabular-nums">
+                            {formatMoney(payment.amountCents)}
+                          </span>
+                        </Link>
+                      </li>
+                    ))
+                  )}
+                </PanelList>
+              </Panel>
+
+              {costsOn && (
+                <Panel
+                  title={m.money_costs_list()}
+                  icon={ReceiptIcon}
+                  action={
+                    <Button
+                      variant="ghost"
+                      className="h-9 text-primary"
+                      onClick={() => setCostPanel({})}
+                    >
+                      <PlusIcon data-icon="inline-start" />
+                      {m.cost_add()}
+                    </Button>
+                  }
+                >
+                  <PanelList>
+                    {data.costs.length === 0 ? (
+                      <ListNote>{m.money_none()}</ListNote>
+                    ) : (
+                      data.costs.map((cost) => (
+                        <li key={cost._id}>
+                          {cost.jobId ? (
+                            <Link
+                              to="/jobs/$jobId"
+                              params={{ jobId: cost.jobId }}
+                              className="flex items-baseline justify-between gap-3 pressable px-4 py-2.5"
+                            >
+                              <CostLine cost={cost} today={today} />
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setCostPanel({ cost })}
+                              className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
+                            >
+                              <CostLine cost={cost} today={today} />
+                            </button>
+                          )}
+                        </li>
+                      ))
+                    )}
+                  </PanelList>
+                </Panel>
+              )}
+              <p className="px-4 text-xs text-muted-foreground">
+                {m.money_workers_hidden()}
+              </p>
+            </div>
           </>
         )}
       </div>

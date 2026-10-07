@@ -220,7 +220,7 @@ Level 1 serves one person on a phone. Level 2 adds what changes when several peo
 | Data | Import from phone or Excel (unknown columns become extra fields); export anytime; merge duplicate clients; anonymize a client on request | Same |
 | Notifications | Push to the owner: morning summary, reminders due, overdue jobs | Same, for each person's own jobs |
 
-Level 1 is designed phone-first. Level 2 must also work well on a desktop, for the person running the schedule.
+Level 1 is designed phone-first. Level 2 must also work well on a desktop, for the person running the schedule. Level 1 already opens well on a computer, for the longer work done at a desk (looking back over jobs, money, planning): the same screens spread out, with a sidebar, the Jobs board and Today's headline figures. That layer is what Level 2's Calendar and Team build on.
 
 **Plans.** Level 1 starts free; Level 2 is paid only. Prices are not set yet.
 

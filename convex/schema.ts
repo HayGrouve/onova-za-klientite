@@ -186,6 +186,7 @@ export default defineSchema({
     createdBy: v.id('memberships'),
   })
     .index('by_business_group_due', ['businessId', 'stageGroup', 'dueDate'])
+    .index('by_business_group_done', ['businessId', 'stageGroup', 'doneAt'])
     .index('by_business_stage', ['businessId', 'stageId'])
     .index('by_business_owes', ['businessId', 'owes', 'stageGroup'])
     .index('by_client', ['clientId'])

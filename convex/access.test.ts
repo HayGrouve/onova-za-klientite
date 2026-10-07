@@ -217,6 +217,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   'items:update': (ids) => ({ itemId: ids.itemId, name: 'Маса' }),
   'jobs:get': (ids) => ({ jobId: ids.jobId }),
   'jobs:list': () => ({ group: 'new' }),
+  'jobs:board': () => ({}),
   'jobs:cancel': (ids) => ({ jobId: ids.jobId }),
   'jobs:changeStage': (ids) => ({
     jobId: ids.jobId,
@@ -309,6 +310,7 @@ const NO_RECORD_IDS = new Set([
   'clients:list',
   'fields:list',
   'jobs:list',
+  'jobs:board',
   'services:list',
   'today:list',
   'clients:create',

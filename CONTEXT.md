@@ -68,6 +68,10 @@ _Avoid_: status, state, column, step
 One of four fixed buckets every Stage belongs to: New, In progress, Done, Cancelled. Lists and money read the group, never the stage name.
 _Avoid_: status, category
 
+**Board** · UI: _Табло_
+The Jobs screen on a wide screen: one column per Stage group, a card per Job. Moving a card changes its Stage. The other Jobs view there is the table, one Stage group at a time.
+_Avoid_: kanban, pipeline, column (for a Stage)
+
 **Due date** · UI: _Срок_
 The date promised to the client for a Job. Optional, and separate from Appointments.
 _Avoid_: deadline, end date
@@ -191,7 +195,7 @@ The log of every change as an event (job created, stage changed, payment added).
 _Avoid_: audit log, changelog, feed
 
 **Today** · UI: _Днес_
-The home list of what to act on: today's appointments, overdue and soon-due Jobs, Reminders due and done-but-unpaid Jobs.
+The home list of what to act on: today's appointments, overdue and soon-due Jobs, Reminders due and done-but-unpaid Jobs. A wide screen adds a row of headline figures and puts the schedule beside the rest.
 _Avoid_: dashboard, home, inbox
 
 **Overdue** · UI: _Закъснели_

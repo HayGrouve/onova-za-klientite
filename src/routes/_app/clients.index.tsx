@@ -12,6 +12,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
+import { ClientsTable } from '#/components/clients-table'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
@@ -23,12 +24,14 @@ import {
   InputGroupInput,
 } from '#/components/ui/input-group'
 import { useViewer } from '#/hooks/use-viewer'
+import { useWide } from '#/hooks/use-wide'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
 import { formatPhone } from '../../../shared/phone-format'
 import { searchClients } from '../../../shared/search'
 
 export const Route = createFileRoute('/_app/clients/')({
+  staticData: { layout: 'wide' },
   component: ClientsPage,
 })
 
@@ -36,6 +39,7 @@ function ClientsPage() {
   const { business } = useViewer()
   const clients = useQuery(api.clients.list, { businessId: business._id })
   const [query, setQuery] = useState('')
+  const wide = useWide()
   const { words } = business
 
   const shown = !clients
@@ -81,8 +85,8 @@ function ClientsPage() {
         />
       ) : (
         <>
-          <div className="px-4 pb-2">
-            <InputGroup>
+          <div className="px-4 pb-2 lg:max-w-md lg:pb-3">
+            <InputGroup className="lg:bg-card">
               <InputGroupAddon>
                 <MagnifyingGlassIcon />
               </InputGroupAddon>
@@ -104,6 +108,8 @@ function ClientsPage() {
             <p className="animate-rise px-4 py-6 text-center text-muted-foreground">
               {m.clients_no_match()}
             </p>
+          ) : wide ? (
+            <ClientsTable clients={shown} />
           ) : (
             <ListCard>
               {shown.map((client) => (

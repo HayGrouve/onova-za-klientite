@@ -1,46 +1,24 @@
-import {
-  ArrowsClockwiseIcon,
-  BellIcon,
-  BellRingingIcon,
-  CaretRightIcon,
-  DatabaseIcon,
-  FlowArrowIcon,
-  ListPlusIcon,
-  PlusCircleIcon,
-  PuzzlePieceIcon,
-  StorefrontIcon,
-  TagIcon,
-  TextAaIcon,
-} from '@phosphor-icons/react'
+import { CaretRightIcon, PlusCircleIcon } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMutation } from 'convex/react'
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { api } from '../../../convex/_generated/api'
+import { useEffect } from 'react'
+import {
+  settingsSections,
+  useAddBusiness,
+} from '#/components/settings/sections'
+import type { SettingsSection } from '#/components/settings/sections'
 import { Spinner } from '#/components/ui/spinner'
-import { errorMessage } from '#/lib/errors'
-import type { LinkProps } from '@tanstack/react-router'
 import { ListCard } from '#/components/list-section'
 import { PageTitle } from '#/components/page'
 import { useViewer } from '#/hooks/use-viewer'
+import { useWide } from '#/hooks/use-wide'
 import { m } from '#/paraglide/messages.js'
 
 export const Route = createFileRoute('/_app/settings/')({
   component: SettingsIndex,
 })
 
-function Row({
-  to,
-  icon: IconComponent,
-  title,
-  body,
-}: {
-  to: LinkProps['to']
-  icon: Icon
-  title: string
-  body: string
-}) {
+function Row({ to, icon: IconComponent, title, body }: SettingsSection) {
   return (
     <li>
       <Link
@@ -73,6 +51,12 @@ function IconTile({ icon: IconComponent }: { icon: Icon }) {
 function SettingsIndex() {
   const { business, businesses } = useViewer()
   const role = businesses.find((item) => item._id === business._id)?.role
+  const wide = useWide()
+  const navigate = useNavigate()
+  // A wide screen has the sections in the side menu, so it opens the first.
+  useEffect(() => {
+    if (wide) void navigate({ to: '/settings/business', replace: true })
+  }, [wide, navigate])
   return (
     <>
       <PageTitle>{m.settings_title()}</PageTitle>
@@ -82,91 +66,23 @@ function SettingsIndex() {
         </p>
       )}
       <ListCard>
-        <Row
-          to="/settings/business"
-          icon={StorefrontIcon}
-          title={m.settings_business()}
-          body={m.settings_business_body()}
-        />
-        <Row
-          to="/settings/names"
-          icon={TextAaIcon}
-          title={m.settings_names()}
-          body={m.settings_names_body()}
-        />
-        <Row
-          to="/settings/modules"
-          icon={PuzzlePieceIcon}
-          title={m.settings_modules()}
-          body={m.settings_modules_body()}
-        />
-        <Row
-          to="/settings/stages"
-          icon={FlowArrowIcon}
-          title={m.settings_stages()}
-          body={m.settings_stages_body()}
-        />
-        <Row
-          to="/settings/fields"
-          icon={ListPlusIcon}
-          title={m.settings_fields()}
-          body={m.settings_fields_body()}
-        />
-        <Row
-          to="/settings/services"
-          icon={TagIcon}
-          title={m.settings_services()}
-          body={m.settings_services_body()}
-        />
-        <Row
-          to="/settings/notifications"
-          icon={BellRingingIcon}
-          title={m.push_title()}
-          body={m.push_help()}
-        />
-        <Row
-          to="/settings/reminders"
-          icon={BellIcon}
-          title={m.settings_reminders()}
-          body={m.settings_reminders_body()}
-        />
-        <Row
-          to="/settings/data"
-          icon={DatabaseIcon}
-          title={m.settings_data()}
-          body={m.settings_data_body()}
-        />
-        <Row
-          to="/setup"
-          icon={ArrowsClockwiseIcon}
-          title={m.settings_run_setup()}
-          body={m.settings_run_setup_body()}
-        />
+        {settingsSections().map((section) => (
+          <Row key={String(section.to)} {...section} />
+        ))}
         <AddBusinessRow />
       </ListCard>
     </>
   )
 }
 
-/** Q13: a second business opens setup for itself; the switcher then appears. */
 function AddBusinessRow() {
-  const createAnother = useMutation(api.businesses.createAnother)
-  const navigate = useNavigate()
-  const [busy, setBusy] = useState(false)
+  const { add, busy } = useAddBusiness()
   return (
     <li>
       <button
         type="button"
         disabled={busy}
-        onClick={() => {
-          setBusy(true)
-          void createAnother({})
-            .then(() => navigate({ to: '/setup' }))
-            .catch((error: unknown) => {
-              toast.error(errorMessage(error))
-              setBusy(false)
-            })
-        }}
+        onClick={add}
         className="flex min-h-16 w-full items-center gap-3 pressable px-4 py-3 text-left"
       >
         {busy ? (

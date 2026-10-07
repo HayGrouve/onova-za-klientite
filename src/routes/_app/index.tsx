@@ -15,12 +15,17 @@ import { ListSkeleton } from '#/components/list-skeleton'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { ListSection } from '#/components/list-section'
 import { EmptyState, PageTitle } from '#/components/page'
+import { TodayWide } from '#/components/today/today-wide'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
+import { useWide } from '#/hooks/use-wide'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 
-export const Route = createFileRoute('/_app/')({ component: TodayPage })
+export const Route = createFileRoute('/_app/')({
+  staticData: { layout: 'wide' },
+  component: TodayPage,
+})
 
 const LONG_DATE = new Intl.DateTimeFormat('bg-BG', {
   weekday: 'long',
@@ -33,6 +38,7 @@ function TodayPage() {
   const { business } = useViewer()
   const today = useToday()
   const data = useQuery(api.today.list, { businessId: business._id, today })
+  const wide = useWide()
   const { words } = business
 
   const empty =
@@ -55,6 +61,8 @@ function TodayPage() {
       <PageTitle>{m.today_title()}</PageTitle>
       {!data ? (
         <ListSkeleton />
+      ) : wide ? (
+        <TodayWide data={data} today={today} />
       ) : empty ? (
         <EmptyState
           icon={SunIcon}
