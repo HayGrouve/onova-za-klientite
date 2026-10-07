@@ -15,7 +15,8 @@ const TONE = {
 
 /**
  * One headline figure above a list, such as on Today: an icon, a label and a value, opening
- * the place that explains it. A row of these sits above the lists.
+ * the place that explains it. A row of these sits above the lists. Below xl
+ * the tile is compact (no icon, a smaller value), so four fit in one row.
  */
 export function StatTile({
   label,
@@ -39,12 +40,12 @@ export function StatTile({
     <Link
       to={to}
       hash={hash}
-      className="group flex animate-rise items-start gap-3 surface p-4 transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="group flex animate-rise items-start gap-3 surface p-3 transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 xl:p-4"
     >
       <span
         aria-hidden
         className={cn(
-          'flex size-10 shrink-0 items-center justify-center rounded-xl',
+          'hidden size-10 shrink-0 items-center justify-center rounded-xl xl:flex',
           TONE[tone].icon,
         )}
       >
@@ -54,7 +55,7 @@ export function StatTile({
         <span className="truncate text-sm text-muted-foreground">{label}</span>
         <span
           className={cn(
-            'text-2xl leading-tight font-semibold tracking-tight',
+            'text-xl leading-tight font-semibold tracking-tight xl:text-2xl',
             TONE[tone].value,
           )}
         >
