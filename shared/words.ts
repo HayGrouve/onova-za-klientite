@@ -23,7 +23,9 @@ export function guessPlural(singular: string): string {
   const word = singular.trim()
   if (!word) return ''
   if (/ие$/i.test(word)) return word.slice(0, -1) + 'я'
-  if (/е$/i.test(word)) return word.slice(0, -1) + 'ия'
+  // Verbal nouns: почистване → почиствания. Other neuters: куче → кучета.
+  if (/не$/i.test(word)) return word.slice(0, -1) + 'ия'
+  if (/е$/i.test(word)) return word + 'та'
   if (/ия$/i.test(word)) return word.slice(0, -1) + 'и'
   if (/[ая]$/i.test(word)) return word.slice(0, -1) + 'и'
   if (/о$/i.test(word)) return word.slice(0, -1) + 'а'

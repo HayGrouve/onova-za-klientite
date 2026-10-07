@@ -2,7 +2,7 @@
 
 How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
-**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 9 are built and in review as stacked PRs. Vercel is linked after milestone 1 merges.
+**Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 10 are built and in review as stacked PRs. Nothing is deployed to production. Vercel is linked after milestone 1 merges.
 
 ## Contents
 
@@ -618,6 +618,9 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D44 | Merge | Merging moves jobs, payments, allocations, items, reminders, appointments, files, messages and phones to the kept client. Missing contact details are filled in, and notes are joined. The merged record stays, hidden from lists, with `mergedIntoId` | Nothing is lost, and old links to the merged client still lead somewhere |
 | D45 | Account deletion | Businesses where the user is the only active member are deleted table by table in batches of 200 (blobs included). In shared businesses only the membership goes. Then the user, push subscriptions and the Clerk user (Backend API, `CLERK_SECRET_KEY` in Convex env) | Batches stay inside Convex's per-mutation limits, and a shared business isn't destroyed by one leaver |
 | D46 | Export | One owner-only query returns every business-scoped table. The browser zips `data.json` plus a UTF-8 CSV with BOM per table (`fflate`, about 8 KB) | Level 1 data fits one query. Excel opens the CSVs with Cyrillic intact |
+| D47 | Offline | A cold start without signal renders a read-only app from the last IndexedDB snapshot of the last signed-in user (today, open and done-but-unpaid jobs with details, client contacts), and reloads when the signal returns. While signed in, a mid-session drop shows the banner, and forms refuse to send. Direct taps such as a stage change are still queued by Convex and sent on reconnect | ADR 0010's view offline, edit online, without a sync engine |
+| D48 | Accessibility | `--muted-foreground` is darker than the prototype's (oklch 0.49) for AA contrast on muted cards. Full-screen flows use `<main>` and an `<h1>` (screen-reader only where the design has none) | axe-core showed no violations on every screen after these, except the Clerk dev badge |
+| D49 | Bundle | Phone display uses the small `libphonenumber-js/min` metadata (`shared/phone-format.ts`). The full metadata is only loaded with the client form. The offline app is lazy-loaded | The main chunk went from 497 KB to 297 KB |
 
 ## Spikes
 
@@ -633,21 +636,26 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
 
 ## Done, next, open
 
-- **Done:**
-  - milestone 0 (#13);
-  - milestone 1 built (#2), in review: TanStack Start SPA with the service worker shell, shadcn `base-nova`, Paraglide, Clerk (Google and email code, Bulgarian), Convex dev deployment in `aws-eu-west-1`, the signed-in shell with the business switcher, the dev seed, PWA manifest and icons, CI;
-  - the design doc picks for prototypes 1 and 2 (#1);
-  - Q19 and Q21: Free plan while developing, with production created in EU at launch.
-  - Q20: dependencies approved, with `read-excel-file` + `papaparse` instead of SheetJS.
-- **Next:** merge milestone 1, then link Vercel (Q22) and the first production deploy, with the owner's OK. Milestones 2 onwards are stacked on the milestone 1 branch meanwhile.
-  - milestone 2 built (#3), in review: the full schema, the pure rules in `shared/` (money, allocation, stages, fields, words, phone, dates), the money and settings mutations, the activity log, recompute with a cache check, a stranger test over every public function, and a seed with jobs, money and reminders;
-  - milestone 3 built (#4), in review: setup with the live job-form preview, applied in one mutation through the safe-change rules, "Run setup again" from Settings with a list of what will change, and the `?timing` stopwatch (Q15);
-  - milestone 4 built (#5), in review: the one-line "+" with a fixable read-back, saved in one mutation with the deposit and the appointment or due date;
-  - milestone 5 built (#6), in review: Today, Jobs by stage group, Clients, and the client, job and item pages with appointments, job lines, timelines and files (camera in one tap, server-side checks, `storageBytes`, a daily orphan cleanup);
-  - milestone 6 built (#7), in review: payments from a job and from a client with an editable split, refunds, write-offs, using credit on request, costs on a job and general, and the Money screen by month;
-  - milestone 7 built (#8), in review: every Settings section (business with logo, names with gender, modules, stages, fields, services, reminders), "+ поле" on the forms, blocked actions that explain why, and a grammar test over the translation files;
-  - milestone 8 built (#9), in review: one search box (Latin/Cyrillic, plates, phones, extra fields), reminders with the rule's pre-filled offer on Done, repeating jobs with a daily idempotent cron, and Web Push (subscribe, morning summary at 07:30 Sofia, settings, iPhone guide);
-  - milestone 9 built (#10), in review: the job summary image with share fallbacks, import from contacts, Excel and CSV, duplicate warning and merge, data export as a zip, anonymize, and batched account deletion;
+- **Done (built, in review as stacked PRs; nothing is merged yet):**
+  - milestone 0 (#13), the design doc picks for prototypes 1 and 2 (#1), Q19–Q21;
+  - milestone 1 (#16): TanStack Start SPA with the service worker shell, shadcn `base-nova`, Paraglide, Clerk (Google and email code, Bulgarian), Convex dev deployment in `aws-eu-west-1`, the signed-in shell, the dev seed, PWA manifest and icons, CI;
+  - milestone 2 (#17): the full schema, the pure rules in `shared/`, the money and settings mutations, the activity log, recompute with a cache check, a stranger test over every public function;
+  - milestone 3 (#18): setup with the live job-form preview, applied through the safe-change rules, "Run setup again", the `?timing` stopwatch (Q15);
+  - milestone 4 (#19): the one-line "+" with a fixable read-back, saved in one mutation;
+  - milestone 5 (#20): Today, Jobs, Clients, and the client, job and item pages, with files;
+  - milestone 6 (#21): payments, splits, refunds, write-offs, credit, costs and the Money screen;
+  - milestone 7 (#22): every Settings section, "+ поле", blocked actions that explain why, the grammar test;
+  - milestone 8 (#23): search, reminders and the reminder rule, repeating jobs, Web Push;
+  - milestone 9 (#24): the job summary image, import, duplicates and merge, export, anonymize, account deletion;
+  - milestone 10 (this PR): the offline snapshot and banner, "Добави бизнес" (Q13), the accessibility pass, a smaller main bundle, Playwright journeys and the genericity check (12 tests, green locally).
+- **Next, with the owner:**
+  1. Review and merge #16 → #24 and the milestone 10 PR, bottom up.
+  2. Answer Q22, then link Vercel (build command and both `CONVEX_DEPLOY_KEY`s, ADR 0004) and set its env (`VITE_CLERK_PUBLISHABLE_KEY`, `VITE_VAPID_PUBLIC_KEY`).
+  3. Check the first preview: `curl -I` on `/sw.js`, `/_shell.html` and the manifest (spike 2), the preview deployment's region, Lighthouse on the preview.
+  4. The real-device spikes: push on Android and an installed iPhone app (spike 3), sharing the summary to Viber and contact import (spike 4), an airplane-mode cold start (spike 5).
+  5. Production: Clerk production instance on the owner's domain (Q24) with Google OAuth (Q25), a fresh Convex production deployment in EU (Q19, Q21), real `VAPID_SUBJECT`, `CLERK_SECRET_KEY` and `APP_URL` on it, and the production deploy, with the owner's OK.
+  6. GitHub secrets for the CI `e2e` job: `E2E_VITE_CONVEX_URL`, `E2E_VITE_CLERK_PUBLISHABLE_KEY`, `E2E_CLERK_SECRET_KEY`.
 - **Open:**
   - Q22 (merging deploys production, needed before Vercel is linked);
-  - Q23–Q26.
+  - Q23–Q26;
+  - the free-tier limits and prices (design doc), and the written СУПТО answer before public launch.

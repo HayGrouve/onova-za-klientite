@@ -4,7 +4,7 @@ Simple client, job and money tracking for any small service business, from one p
 
 ## Status
 
-The product design is final, and prototypes 1 and 2 picked their variants. The v1 build plan is merged (milestone 0). Milestone 1, the foundation (app shell, Convex, Clerk, CI), is built and in review.
+The product design is final. All v1 milestones (1–10) are built and in review as stacked pull requests, starting with #16. Next: merge, link Vercel, real-device checks, then the production launch with the owner.
 
 ## Docs
 

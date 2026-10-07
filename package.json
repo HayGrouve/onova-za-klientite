@@ -13,6 +13,8 @@
     "postinstall": "pnpm run i18n",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
     "typecheck": "pnpm run i18n && tsc --noEmit && tsc --noEmit -p convex",
     "lint": "eslint",
     "knip": "knip",
@@ -53,9 +55,11 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.2.43",
     "@convex-dev/eslint-plugin": "^5.0.0",
     "@edge-runtime/vm": "^5.0.0",
     "@inlang/paraglide-js": "^2.26.0",
+    "@playwright/test": "^1.63.0",
     "@tanstack/eslint-config": "0.4.0",
     "@types/node": "^22.10.2",
     "@types/papaparse": "^5.5.2",

@@ -2,7 +2,7 @@
 
 How to run, test and verify this repo. The product rules are in `docs/product-design.md` and win over everything else here.
 
-> **Status:** milestone 1 (foundation) is built: the signed-in shell, Convex, Clerk and CI. Update this file in the same PR that changes a command.
+> **Status:** milestones 1–10 are built and in review as stacked PRs (#16 onwards). Nothing is in production yet. Update this file in the same PR that changes a command.
 
 ## Before you change code
 
@@ -58,7 +58,7 @@ pnpm build && pnpm preview  # production build on :3000, with the service worker
 pnpm generate-icons       # PNG icons and favicon from public/icon.svg and icon-maskable.svg
 ```
 
-A Convex test file starts with `// @vitest-environment edge-runtime` and uses `setupConvex()` from `convex/test.setup.ts`. Playwright (`pnpm test:e2e`) arrives in milestone 10.
+A Convex test file starts with `// @vitest-environment edge-runtime` and uses `setupConvex()` from `convex/test.setup.ts`. Playwright (`pnpm test:e2e`, once `pnpm test:e2e:install` has fetched Chromium) drives `e2e/` in a 390×844 browser against the dev server on :3000 (started or reused) and the dev deployment in `.env.local`, which needs `ALLOW_SEED=true` and `CLERK_SECRET_KEY` in its Convex env. Each spec file creates its own `+clerk_test` user through the Clerk Backend API and deletes the account in the app (Settings → Data) at the end. In CI the `e2e` job runs only when the repo secret `E2E_VITE_CONVEX_URL` is set; it also needs `E2E_VITE_CLERK_PUBLISHABLE_KEY` and `E2E_CLERK_SECRET_KEY`, all three from that dev deployment and its Clerk dev instance.
 
 UI changes are verified in a real browser before a task counts as done:
 - Use `agent-browser` at 390×844, signed in as a Clerk test user (`+clerk_test` email) or with `clerk impersonate`.
