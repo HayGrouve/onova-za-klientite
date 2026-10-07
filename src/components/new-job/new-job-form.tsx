@@ -284,7 +284,8 @@ export function NewJobForm({
   )
 
   return (
-    <main className="flex min-h-dvh flex-col bg-background">
+    // A wide screen shows the flow as a card in the middle of the page.
+    <main className="flex min-h-dvh flex-col bg-background lg:mx-auto lg:my-8 lg:h-[calc(100dvh-4rem)] lg:min-h-0 lg:w-full lg:max-w-2xl lg:overflow-hidden lg:rounded-3xl lg:border lg:shadow-xl lg:shadow-zinc-900/10">
       <Stopwatch startedAt={startedAt} />
       <header className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-2">
         <h1 className="text-xl font-semibold">

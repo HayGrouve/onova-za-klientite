@@ -22,7 +22,10 @@ import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 import { formatPhone } from '../../../shared/phone-format'
 
-export const Route = createFileRoute('/_app/search')({ component: SearchPage })
+export const Route = createFileRoute('/_app/search')({
+  staticData: { layout: 'wide' },
+  component: SearchPage,
+})
 
 /** Waits until typing pauses, so each keystroke doesn't run a search. */
 function useDebounced(value: string, ms = 250) {
@@ -51,8 +54,8 @@ function SearchPage() {
   return (
     <div className="flex flex-col gap-4 pt-2">
       <h1 className="sr-only">{m.search_open()}</h1>
-      <div className="px-4">
-        <InputGroup>
+      <div className="px-4 lg:max-w-2xl">
+        <InputGroup className="lg:h-12 lg:bg-card lg:text-base">
           <InputGroupAddon>
             <MagnifyingGlassIcon />
           </InputGroupAddon>
@@ -77,70 +80,73 @@ function SearchPage() {
           {m.search_none()}
         </p>
       )}
-      {results && results.clients.length > 0 && (
-        <ListSection
-          title={words.client.plural}
-          icon={UsersIcon}
-          count={results.clients.length}
-        >
-          {results.clients.map((client) => (
-            <li key={client._id}>
-              <Link
-                to="/clients/$clientId"
-                params={{ clientId: client._id }}
-                className="flex items-center gap-3 pressable px-4 py-3"
-              >
-                <InitialsAvatar
-                  name={client.isNoClient ? m.no_client() : client.name}
-                />
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate font-medium">
-                    {client.isNoClient ? m.no_client() : client.name}
-                  </span>
-                  {client.phone && (
-                    <span className="text-sm text-muted-foreground">
-                      {formatPhone(client.phone)}
+      {/* A wide screen shows the kinds of result side by side. */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(22rem,1fr))] lg:items-start">
+        {results && results.clients.length > 0 && (
+          <ListSection
+            title={words.client.plural}
+            icon={UsersIcon}
+            count={results.clients.length}
+          >
+            {results.clients.map((client) => (
+              <li key={client._id}>
+                <Link
+                  to="/clients/$clientId"
+                  params={{ clientId: client._id }}
+                  className="flex items-center gap-3 pressable px-4 py-3"
+                >
+                  <InitialsAvatar
+                    name={client.isNoClient ? m.no_client() : client.name}
+                  />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">
+                      {client.isNoClient ? m.no_client() : client.name}
                     </span>
-                  )}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ListSection>
-      )}
-      {results && results.jobs.length > 0 && (
-        <ListSection
-          title={words.job.plural}
-          icon={ClipboardTextIcon}
-          count={results.jobs.length}
-        >
-          {results.jobs.map((job) => (
-            <JobRow key={job._id} job={job} today={today} />
-          ))}
-        </ListSection>
-      )}
-      {results && results.items.length > 0 && (
-        <ListSection
-          title={words.item.plural}
-          icon={StackIcon}
-          count={results.items.length}
-        >
-          {results.items.map((item) => (
-            <li key={item._id}>
-              <Link
-                to="/items/$itemId"
-                params={{ itemId: item._id }}
-                className="flex flex-col pressable px-4 py-3"
-              >
-                <span className="font-medium">{item.name}</span>
-                <span className="text-sm text-muted-foreground">
-                  {item.clientName}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ListSection>
-      )}
+                    {client.phone && (
+                      <span className="text-sm text-muted-foreground">
+                        {formatPhone(client.phone)}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ListSection>
+        )}
+        {results && results.jobs.length > 0 && (
+          <ListSection
+            title={words.job.plural}
+            icon={ClipboardTextIcon}
+            count={results.jobs.length}
+          >
+            {results.jobs.map((job) => (
+              <JobRow key={job._id} job={job} today={today} />
+            ))}
+          </ListSection>
+        )}
+        {results && results.items.length > 0 && (
+          <ListSection
+            title={words.item.plural}
+            icon={StackIcon}
+            count={results.items.length}
+          >
+            {results.items.map((item) => (
+              <li key={item._id}>
+                <Link
+                  to="/items/$itemId"
+                  params={{ itemId: item._id }}
+                  className="flex flex-col pressable px-4 py-3"
+                >
+                  <span className="font-medium">{item.name}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {item.clientName}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ListSection>
+        )}
+      </div>
     </div>
   )
 }

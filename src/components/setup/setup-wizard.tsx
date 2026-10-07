@@ -116,7 +116,8 @@ export function SetupWizard({
   const Body = key ? STEP_BODY[key] : null
 
   return (
-    <main className="flex h-dvh flex-col bg-muted">
+    // A wide screen puts the live form and the questions side by side.
+    <main className="flex h-dvh flex-col bg-muted lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:p-8">
       <h1 className="sr-only">{m.setup_heading()}</h1>
       <Stopwatch startedAt={startedAt} stoppedAt={reviewedAt} />
       <div
@@ -124,7 +125,7 @@ export function SetupWizard({
         tabIndex={0}
         role="region"
         aria-label={m.preview_label()}
-        className="min-h-0 flex-1 overflow-y-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-6"
+        className="min-h-0 flex-1 overflow-y-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-6 lg:max-h-full lg:max-w-2xl lg:p-1"
       >
         <p className="mb-2 text-sm text-muted-foreground">
           {step === DONE ? m.setup_preview_done() : m.setup_preview_title()}
@@ -139,7 +140,7 @@ export function SetupWizard({
         </div>
       </div>
 
-      <section className="flex max-h-[58%] flex-col rounded-t-3xl border-t bg-background pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-12px] shadow-zinc-900/15">
+      <section className="flex max-h-[58%] flex-col rounded-t-3xl border-t bg-background pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-12px] shadow-zinc-900/15 lg:max-h-[min(44rem,100%)] lg:w-md lg:shrink-0 lg:rounded-3xl lg:border lg:shadow-xl">
         {Body ? (
           <>
             <div
