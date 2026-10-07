@@ -303,6 +303,8 @@
   "job_line_description": "Описание",
   "job_line_quantity": "Количество",
   "job_line_price": "Ед. цена",
+  "job_line_quantity_short": "Кол.",
+  "job_line_sum": "Сума",
   "job_lines_total": "Общо: {amount}",
   "job_typed_price": "Цена без позиции",
   "job_notes": "Бележки",

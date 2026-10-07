@@ -35,6 +35,15 @@ function parseQuantity(text: string) {
   return Number.isFinite(value) && value > 0 ? value : null
 }
 
+/** What a row comes to, or a dash while its numbers aren't readable yet. */
+function lineSum(row: Row) {
+  const quantity = parseQuantity(row.quantity)
+  const unitPriceCents = parseMoney(row.price)
+  return quantity !== null && unitPriceCents !== null && unitPriceCents >= 0
+    ? formatMoney(lineTotalCents(quantity, unitPriceCents))
+    : '-'
+}
+
 /** Job lines: from the service list or typed. The price becomes their sum. */
 export function LinesEditor({
   businessId,
@@ -161,25 +170,56 @@ export function LinesEditor({
                 <XIcon />
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                aria-label={m.job_line_quantity()}
-                placeholder={m.job_line_quantity()}
-                inputMode="decimal"
-                value={row.quantity}
-                onChange={(event) =>
-                  change(row.id, { quantity: event.target.value })
-                }
-              />
-              <Input
-                aria-label={m.job_line_price()}
-                placeholder={m.job_line_price()}
-                inputMode="decimal"
-                value={row.price}
-                onChange={(event) =>
-                  change(row.id, { price: event.target.value })
-                }
-              />
+            {/* Quantity × unit price, and what the line comes to. */}
+            <div className="flex items-end gap-2">
+              <div className="flex w-20 shrink-0 flex-col gap-1">
+                <label
+                  htmlFor={`line-quantity-${row.id}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {m.job_line_quantity_short()}
+                </label>
+                <Input
+                  id={`line-quantity-${row.id}`}
+                  aria-label={m.job_line_quantity()}
+                  inputMode="decimal"
+                  value={row.quantity}
+                  onChange={(event) =>
+                    change(row.id, { quantity: event.target.value })
+                  }
+                />
+              </div>
+              <span
+                aria-hidden
+                className="flex h-11 items-center text-muted-foreground"
+              >
+                ×
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <label
+                  htmlFor={`line-price-${row.id}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {m.job_line_price()}
+                </label>
+                <Input
+                  id={`line-price-${row.id}`}
+                  aria-label={m.job_line_price()}
+                  inputMode="decimal"
+                  value={row.price}
+                  onChange={(event) =>
+                    change(row.id, { price: event.target.value })
+                  }
+                />
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className="text-xs text-muted-foreground">
+                  {m.job_line_sum()}
+                </span>
+                <span className="flex h-11 min-w-16 items-center justify-end font-medium tabular-nums">
+                  {lineSum(row)}
+                </span>
+              </div>
             </div>
           </div>
         ))}
