@@ -253,6 +253,7 @@
   "client_history": "История",
   "client_owes_total": "Дължи общо",
   "client_credit": "Предплатено",
+  "clients_open_jobs": "{jobs} в работа",
   "client_note": "Бележка",
   "client_address": "Адрес",
   "client_email": "Имейл",

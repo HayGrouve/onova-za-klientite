@@ -1,16 +1,14 @@
-import { CaretDownIcon, CaretUpIcon } from '@phosphor-icons/react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { cn } from 'cn'
-import { useState } from 'react'
 import type { JobRowData } from '#/components/job-row'
 import { formatMoment } from '#/components/job-row'
+import { SortableHead, sortRows, useSort } from '#/components/sortable-head'
 import { StageBadge } from '#/components/stage-badge'
 import {
   Table,
   TableBody,
   TableCell,
   TableFooter,
-  TableHead,
   TableHeader,
   TableRow,
 } from '#/components/ui/table'
@@ -52,46 +50,17 @@ export function JobsTable({
 }) {
   const { words } = useViewer().business
   const navigate = useNavigate()
-  const [sort, setSort] = useState<{ key: SortKey; desc: boolean } | null>(null)
-  const rows = sort
-    ? [...jobs].sort((a, b) =>
-        sort.desc ? SORT[sort.key](b, a) : SORT[sort.key](a, b),
-      )
-    : jobs
-
-  const head = (key: SortKey, label: string, numeric = false) => {
-    const active = sort?.key === key
-    const Caret = active && sort.desc ? CaretDownIcon : CaretUpIcon
-    return (
-      <TableHead
-        aria-sort={active ? (sort.desc ? 'descending' : 'ascending') : 'none'}
-        className={cn('h-11 px-2', numeric && 'text-right')}
-      >
-        <button
-          type="button"
-          onClick={() =>
-            setSort(
-              active
-                ? { key, desc: !sort.desc }
-                : // Money reads biggest first; words and dates A to Z.
-                  { key, desc: numeric },
-            )
-          }
-          className={cn(
-            'inline-flex h-8 items-center gap-1 rounded-md px-2 font-semibold text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50',
-            active && 'text-foreground',
-          )}
-        >
-          {label}
-          <Caret
-            aria-hidden
-            className={cn('size-3.5', !active && 'opacity-0')}
-            weight="bold"
-          />
-        </button>
-      </TableHead>
-    )
-  }
+  const [sort, onSort] = useSort<SortKey>()
+  const rows = sortRows(jobs, sort, SORT)
+  const head = (key: SortKey, label: string, numeric = false) => (
+    <SortableHead
+      column={key}
+      label={label}
+      sort={sort}
+      onSort={onSort}
+      numeric={numeric}
+    />
+  )
 
   return (
     <div className="mx-4 animate-rise overflow-hidden surface">

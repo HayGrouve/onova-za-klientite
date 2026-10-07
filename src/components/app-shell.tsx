@@ -87,6 +87,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         'reading',
       ),
   })
+  // A frame route keeps its page while its children change (`staticData.frame`).
+  const pageKey = useMatches({
+    select: (matches) =>
+      matches.find((match) => match.staticData.frame)?.pathname,
+  })
   const offline = useOffline()
   const nav = useNavEntries()
   useSearchShortcut()
@@ -105,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main className="flex flex-1 flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] lg:px-4 lg:pt-6 lg:pb-12">
             {/* Keyed by the address, so each page fades in when it opens. */}
             <div
-              key={pathname}
+              key={pageKey ?? pathname}
               className={cn(
                 'flex w-full flex-1 animate-page flex-col lg:mx-auto',
                 PAGE_WIDTH[layout],

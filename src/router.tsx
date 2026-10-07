@@ -22,5 +22,11 @@ declare module '@tanstack/react-router' {
      * without one keep a reading width; a phone always gets one column.
      */
     layout?: 'wide' | 'full'
+    /**
+     * A layout route that stays put while its child pages change (the
+     * settings menu): the shell fades the page in only when this route
+     * opens, and the route fades its own children.
+     */
+    frame?: boolean
   }
 }

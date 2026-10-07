@@ -24,7 +24,7 @@ function FieldsPage() {
     <>
       <Link
         to="/settings"
-        className="flex min-h-11 w-fit items-center gap-1 px-3 pt-2 text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="flex min-h-11 w-fit items-center gap-1 px-3 pt-2 text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden"
       >
         <CaretLeftIcon className="size-5" />
         {m.settings_title()}
