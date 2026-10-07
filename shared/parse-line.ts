@@ -310,20 +310,20 @@ export function parseLine(text: string, ctx: ParseContext): ParsedLine {
       segment.match(
         new RegExp(`^${MONEY}\\s*${DEPOSIT_WORD}(?:\\s+${CASH})?$`, 'i'),
       )
-    if (depositMatch && paid === null) {
-      depositCents = money(depositMatch[1])
+    const wholePaid = findPaid(segment)
+    const isPaid =
+      (wholePaid !== null && !wholePaid.rest) ||
+      new RegExp(`^${CASH}$`, 'i').test(segment)
+    if (depositMatch || isPaid) {
+      // One payment per line: a second one stays in the title to be seen, not half-read.
+      if (depositMatch ? paid !== null : depositCents !== null) {
+        rest.push(segment)
+      } else if (depositMatch) {
+        depositCents = money(depositMatch[1])
+      } else {
+        paid = { cents: wholePaid?.cents ?? null }
+      }
       continue
-    }
-    if (depositCents === null) {
-      const whole = findPaid(segment)
-      if (whole && !whole.rest) {
-        paid = { cents: whole.cents }
-        continue
-      }
-      if (new RegExp(`^${CASH}$`, 'i').test(segment)) {
-        paid = { cents: null }
-        continue
-      }
     }
     if (isPhone(segment)) {
       phone = segment

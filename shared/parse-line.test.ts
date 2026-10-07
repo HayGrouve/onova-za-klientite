@@ -487,6 +487,18 @@ describe('parseLine: money already received', () => {
     expect(both.paid).toBeNull()
   })
 
+  it('a second payment stays in the title, where it can be seen, and is not read as the price', () => {
+    const parsed = parse('Иван Петров, ремонт, капаро 20, платено 20')
+    expect(parsed.depositCents).toBe(2000)
+    expect(parsed.paid).toBeNull()
+    expect(parsed.priceCents).toBeNull()
+    expect(parsed.title).toBe('ремонт, платено 20')
+    const reverse = parse('Иван Петров, ремонт, платено 20, капаро 20')
+    expect(reverse.paid).toEqual({ cents: 2000 })
+    expect(reverse.depositCents).toBeNull()
+    expect(reverse.title).toBe('ремонт, капаро 20')
+  })
+
   it('a deposit paid in cash keeps "в брой" out of the title', () => {
     for (const text of [
       'Иван Петров, гардероб, 950, капаро 300 в брой',
