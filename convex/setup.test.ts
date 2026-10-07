@@ -4,7 +4,8 @@ import { api } from './_generated/api'
 import { getDoc, lastActivity, setupBusiness, setupConvex } from './test.setup'
 import type { TestConvex } from './test.setup'
 import type { Id } from './_generated/dataModel'
-import { ITEM_KINDS, JOB_WORDS } from '../shared/setup'
+import { REPEAT_CHOICES } from '../shared/repeat'
+import { ITEM_KINDS, JOB_WORDS, REMINDER_MONTHS } from '../shared/setup'
 
 async function stagesOf(t: TestConvex, businessId: Id<'businesses'>) {
   return await t.run((ctx) =>
@@ -68,6 +69,34 @@ describe('setup.apply', () => {
     expect(
       services.map((service) => [service.name, service.priceCents]),
     ).toEqual([['Профилактика', 5000]])
+  })
+
+  it('every repeat interval setup offers is stored', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    for (const { key, every, unit } of REPEAT_CHOICES) {
+      await owner.mutation(api.setup.apply, {
+        businessId,
+        answers: { repeat: 'schedule', repeatEvery: key },
+      })
+      expect((await getDoc(t, 'businesses', businessId)).repeatDefault).toEqual(
+        { every, unit },
+      )
+    }
+  })
+
+  it('every reminder delay setup offers is stored', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    for (const months of REMINDER_MONTHS) {
+      await owner.mutation(api.setup.apply, {
+        businessId,
+        answers: { repeat: 'months', reminderMonths: months },
+      })
+      const business = await getDoc(t, 'businesses', businessId)
+      expect(business.reminderRule).toEqual({ months })
+      expect(business.repeatDefault).toBeUndefined()
+    }
   })
 
   it('a first run on an empty business swaps in the stages of the chosen flow', async () => {

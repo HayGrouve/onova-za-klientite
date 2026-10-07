@@ -14,6 +14,7 @@ import { Switch } from '#/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
+import { formatLongDay } from '#/i18n/dates'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import { addMonths } from '../../../shared/dates'
@@ -24,14 +25,6 @@ export const Route = createFileRoute('/_app/settings/reminders')({
 })
 
 const MONTHS = [3, 6, 12, 24]
-
-// A reminder a year or two ahead needs its year.
-const LONG_DAY = new Intl.DateTimeFormat('bg-BG', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
 
 function RemindersSettings() {
   const { business } = useViewer()
@@ -168,9 +161,7 @@ function RulePreview({
             <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-2">
               <span className="text-muted-foreground">{m.reminder_date()}</span>
               <span className="font-medium tabular-nums">
-                {LONG_DAY.format(
-                  new Date(`${addMonths(today, months)}T12:00:00Z`),
-                )}
+                {formatLongDay(addMonths(today, months))}
               </span>
             </div>
             <div className="flex gap-2 pt-1">

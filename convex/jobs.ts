@@ -86,6 +86,8 @@ export const update = businessMutation({
     patch.searchText = await jobSearchText(ctx, next)
     await ctx.db.patch('jobs', job._id, patch)
     await recomputeJob(ctx, job._id)
+    // A repeating job without appointments takes its date from the due date.
+    if (args.dueDate !== undefined) await refreshRepeat(ctx, job._id)
     await logActivity(ctx, {
       type: 'job.edited',
       jobId: job._id,

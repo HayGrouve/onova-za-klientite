@@ -1,4 +1,6 @@
 import { parseMoney } from './money'
+import { REPEAT_CHOICES } from './repeat'
+import type { RepeatKey } from './repeat'
 import { stagesFor } from './stages'
 import type { JobFlow, StageDraft, StageGroup } from './stages'
 import { DEFAULT_WORDS, guessPlural } from './words'
@@ -98,10 +100,12 @@ export const ITEM_KINDS: ItemKind[] = [
 /** Fields suggested for an item the person names themselves. */
 export const OWN_ITEM_FIELDS = ['Модел', 'Бележка']
 
-export const REPEAT_EVERY = ['week', '2weeks', 'month'] as const
-export type RepeatEvery = (typeof REPEAT_EVERY)[number]
+/** Setup step 6, "By schedule": the same intervals a Job offers (shared/repeat.ts). */
+export const REPEAT_EVERY = REPEAT_CHOICES.map((choice) => choice.key)
+export type RepeatEvery = RepeatKey
 
-export const REMINDER_MONTHS = [3, 6, 12] as const
+/** Setup step 6, "Every few months": a groomer's reminder is about 2 months, a service's a year. */
+export const REMINDER_MONTHS = [1, 2, 3, 6, 12] as const
 
 export const MAX_SERVICES = 8
 
@@ -172,11 +176,9 @@ function completeWord(word: Word): Word | null {
   }
 }
 
-const REPEAT_DEFAULTS: Record<RepeatEvery, RepeatDefault> = {
-  week: { every: 1, unit: 'week' },
-  '2weeks': { every: 2, unit: 'week' },
-  month: { every: 1, unit: 'month' },
-}
+const REPEAT_DEFAULTS = Object.fromEntries(
+  REPEAT_CHOICES.map(({ key, every, unit }) => [key, { every, unit }]),
+) as Record<RepeatEvery, RepeatDefault>
 
 /**
  * What the answers set. Skipped answers keep `base`: the defaults on a first

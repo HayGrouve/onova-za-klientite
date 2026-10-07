@@ -4,6 +4,7 @@ import {
   RepeatIcon,
 } from '@phosphor-icons/react'
 import { cn } from 'cn'
+import { repeatLabel } from '#/components/job/repeat-section'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
@@ -12,7 +13,6 @@ import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
 import { jobFormFields } from '../../../shared/setup'
 import type { FormField, SetupSettings, SetupStep } from '../../../shared/setup'
-import { REPEAT_LABEL } from '#/components/setup/steps'
 
 const FIELD_STEP: Record<FormField, SetupStep> = {
   client: 'import',
@@ -167,13 +167,9 @@ export function JobFormPreview({
               </Row>
             )
           case 'repeat': {
-            const every = settings.repeatDefault
-            const label =
-              every?.unit === 'month'
-                ? REPEAT_LABEL.month()
-                : every?.every === 2
-                  ? REPEAT_LABEL['2weeks']()
-                  : REPEAT_LABEL.week()
+            const label = repeatLabel(
+              settings.repeatDefault ?? { every: 1, unit: 'week' },
+            )
             return (
               <Row key={field} {...props} label={m.preview_repeat()}>
                 <div className="flex items-center gap-2 text-sm">

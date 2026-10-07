@@ -627,7 +627,7 @@ function JobPage() {
           {
             key: 'repeat',
             side: true,
-            node: <RepeatSection job={job} />,
+            node: <RepeatSection job={job} appointments={data.appointments} />,
           },
           {
             key: 'reminders',

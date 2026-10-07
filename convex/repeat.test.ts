@@ -1,7 +1,8 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it } from 'vitest'
 import { api, internal } from './_generated/api'
-import { sofiaTimeToUtc } from '../shared/dates'
+import { dateInSofia, sofiaTimeToUtc } from '../shared/dates'
+import { REPEAT_CHOICES, nextJobDate } from '../shared/repeat'
 import {
   expectCachesFresh,
   getDoc,
@@ -129,5 +130,149 @@ describe('repeat (Q6)', () => {
     await t.mutation(internal.repeat.run, { today: '2026-02-01' })
     const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId!
     expect((await getDoc(t, 'jobs', nextId)).dueDate).toBe('2026-02-28')
+  })
+
+  it.each(REPEAT_CHOICES)(
+    'a due date repeats $key: the next job gets the date the screen shows',
+    async ({ every, unit }) => {
+      const t = setupConvex()
+      const { owner, businessId, noClientId } = await setupBusiness(t)
+      const jobId = await owner.mutation(api.jobs.create, {
+        businessId,
+        clientId: noClientId,
+        title: 'Климатик',
+        dueDate: '2026-10-07',
+      })
+      await owner.mutation(api.jobs.setRepeat, {
+        businessId,
+        jobId,
+        every,
+        unit,
+      })
+      const shown = nextJobDate(
+        { appointments: [], dueDate: '2026-10-07' },
+        { every, unit },
+      )
+      expect(
+        await t.mutation(internal.repeat.run, { today: '2026-10-07' }),
+      ).toBe(1)
+      const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId!
+      expect((await getDoc(t, 'jobs', nextId)).dueDate).toBe(shown)
+    },
+  )
+
+  it.each(REPEAT_CHOICES)(
+    'an appointment repeats $key: the next appointment is on the date the screen shows',
+    async ({ every, unit }) => {
+      const { t, owner, businessId, jobId } = await weeklyJob()
+      await owner.mutation(api.jobs.setRepeat, {
+        businessId,
+        jobId,
+        every,
+        unit,
+      })
+      const appointments = await t.run((ctx) =>
+        ctx.db
+          .query('appointments')
+          .withIndex('by_job', (q) => q.eq('jobId', jobId))
+          .collect(),
+      )
+      const shown = nextJobDate({ appointments }, { every, unit })
+      await t.mutation(internal.repeat.run, { today: '2026-10-07' })
+      const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId!
+      const next = await t.run((ctx) =>
+        ctx.db
+          .query('appointments')
+          .withIndex('by_job', (q) => q.eq('jobId', nextId))
+          .collect(),
+      )
+      expect(next).toHaveLength(1)
+      expect(dateInSofia(next[0].start)).toBe(shown)
+    },
+  )
+
+  it('the date is the last appointment that is not cancelled, else the due date (D41)', async () => {
+    const { t, owner, businessId, jobId } = await weeklyJob()
+    const later = await owner.mutation(api.appointments.add, {
+      businessId,
+      jobId,
+      date: '2026-10-09',
+      time: { hour: 10, minute: 0 },
+    })
+    expect((await getDoc(t, 'jobs', jobId)).nextRepeatOn).toBe('2026-10-09')
+    await owner.mutation(api.appointments.cancel, {
+      businessId,
+      appointmentId: later,
+    })
+    expect((await getDoc(t, 'jobs', jobId)).nextRepeatOn).toBe('2026-10-07')
+  })
+
+  it('changing the due date moves the day the next job is made', async () => {
+    const t = setupConvex()
+    const { owner, businessId, noClientId } = await setupBusiness(t)
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: noClientId,
+      title: 'Абонамент',
+      dueDate: '2026-10-07',
+    })
+    await owner.mutation(api.jobs.setRepeat, {
+      businessId,
+      jobId,
+      every: 1,
+      unit: 'month',
+    })
+    await owner.mutation(api.jobs.update, {
+      businessId,
+      jobId,
+      dueDate: '2026-10-20',
+    })
+    expect((await getDoc(t, 'jobs', jobId)).nextRepeatOn).toBe('2026-10-20')
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-07' })).toBe(
+      0,
+    )
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-20' })).toBe(
+      1,
+    )
+    // Taking the due date away leaves nothing to repeat from.
+    const other = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: noClientId,
+      title: 'Друг',
+      dueDate: '2026-10-07',
+    })
+    await owner.mutation(api.jobs.setRepeat, {
+      businessId,
+      jobId: other,
+      every: 1,
+      unit: 'week',
+    })
+    await owner.mutation(api.jobs.update, {
+      businessId,
+      jobId: other,
+      dueDate: null,
+    })
+    expect((await getDoc(t, 'jobs', other)).nextRepeatOn).toBeUndefined()
+  })
+
+  it('rejects a repeat that is not a whole number of weeks or months, up to 52', async () => {
+    const t = setupConvex()
+    const { owner, businessId, noClientId } = await setupBusiness(t)
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: noClientId,
+      title: 'x',
+      dueDate: '2026-10-07',
+    })
+    for (const every of [0, 53, 1.5]) {
+      await expect(
+        owner.mutation(api.jobs.setRepeat, {
+          businessId,
+          jobId,
+          every,
+          unit: 'month',
+        }),
+      ).rejects.toThrow(/invalid/)
+    }
   })
 })
