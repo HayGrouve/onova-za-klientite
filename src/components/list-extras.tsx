@@ -8,8 +8,8 @@ import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 
 /**
- * A list row's extra fields marked "show in list" (Settings → Полета), as
- * "Порода: Пудел · Номер: СА 1234 ВР". Nothing when none is filled in.
+ * A list row's extra fields marked "show in list" (Settings → Fields), as
+ * "name: value" pairs joined by dots. Nothing when none is filled in.
  */
 export function ListExtras({
   target,

@@ -62,10 +62,14 @@ export async function jobRow(
   lookups.listFields ??= await listFieldIds(ctx, job.businessId, 'job')
   const client = await cached(ctx, lookups.clients, 'clients', job.clientId)
   const stage = await cached(ctx, lookups.stages, 'stages', job.stageId)
-  const appointments = await ctx.db
-    .query('appointments')
-    .withIndex('by_job', (q) => q.eq('jobId', job._id))
-    .collect()
+  // A finished or cancelled job has nothing coming up, whatever is left on it.
+  const closed = job.stageGroup === 'done' || job.stageGroup === 'cancelled'
+  const appointments = closed
+    ? []
+    : await ctx.db
+        .query('appointments')
+        .withIndex('by_job', (q) => q.eq('jobId', job._id))
+        .collect()
   const next = appointments
     .filter(
       (item) =>
