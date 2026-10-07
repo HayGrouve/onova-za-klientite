@@ -121,6 +121,8 @@ export const ACTIVITY_TYPES = [
   'settings.changed',
   'reminder.added',
   'reminder.closed',
+  'reminder.moved',
+  'reminder.reopened',
   'job.repeatSet',
   'job.repeatStopped',
   'job.repeated',

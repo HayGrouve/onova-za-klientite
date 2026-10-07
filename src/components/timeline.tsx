@@ -77,6 +77,10 @@ function describe(item: TimelineItem, words: Words) {
       return m.event_reminder_added({ note: data.note ?? '' })
     case 'reminder.closed':
       return m.event_reminder_closed({ note: data.note ?? '' })
+    case 'reminder.moved':
+      return m.event_reminder_moved({ note: data.note ?? '' })
+    case 'reminder.reopened':
+      return m.event_reminder_reopened({ note: data.note ?? '' })
     case 'job.repeatSet':
       return m.event_job_repeatSet()
     case 'job.repeatStopped':

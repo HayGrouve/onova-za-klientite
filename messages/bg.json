@@ -597,6 +597,8 @@
   "error_job_noDate": "Добавете дата или срок, за да се повтаря.",
   "event_reminder_added": "Напомняне: {note}",
   "event_reminder_closed": "Затворено напомняне: {note}",
+  "event_reminder_moved": "Нова дата на напомняне: {note}",
+  "event_reminder_reopened": "Върнато напомняне: {note}",
   "event_job_repeatSet": "Повтаряне",
   "event_job_repeatStopped": "Спряно повтаряне",
   "event_job_repeated": "Следващ запис: {date}",

@@ -114,6 +114,17 @@ async function ownerData(t: TestConvex, b: TestBusiness) {
     date: '2026-11-01',
     note: 'Обади се',
   })
+  const closedReminderId = await owner.mutation(api.reminders.add, {
+    businessId,
+    clientId,
+    date: '2026-10-01',
+    note: 'Готово',
+  })
+  await owner.mutation(api.reminders.close, {
+    businessId,
+    reminderId: closedReminderId,
+    status: 'done',
+  })
   const otherClientId = await owner.mutation(api.clients.create, {
     businessId,
     name: 'Иван 2',
@@ -121,6 +132,7 @@ async function ownerData(t: TestConvex, b: TestBusiness) {
   return {
     otherClientId,
     reminderId,
+    closedReminderId,
     serviceId,
     appointmentId,
     clientId,
@@ -267,6 +279,11 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'reminders:close': (ids) => ({ reminderId: ids.reminderId, status: 'done' }),
   'reminders:forClient': (ids) => ({ clientId: ids.clientId }),
+  'reminders:reopen': (ids) => ({ reminderId: ids.closedReminderId }),
+  'reminders:snooze': (ids) => ({
+    reminderId: ids.reminderId,
+    date: '2026-12-15',
+  }),
   'search:all': () => ({ query: 'ivan' }),
   'services:add': () => ({ name: 'Нова', priceCents: 100 }),
   'services:list': () => ({}),
@@ -419,6 +436,8 @@ const EVENTS: Record<string, string | null> = {
   'push:setNotify': null,
   'reminders:add': 'reminder.added',
   'reminders:close': 'reminder.closed',
+  'reminders:reopen': 'reminder.reopened',
+  'reminders:snooze': 'reminder.moved',
   'services:add': 'settings.changed',
   'services:reorder': 'settings.changed',
   'services:update': 'settings.changed',
