@@ -63,9 +63,9 @@ export function ExtraFieldsView({
     )
   if (rows.length === 0) return null
   return (
-    <dl className="flex flex-col gap-2 px-4">
+    <dl className="mx-4 flex flex-col divide-y divide-border/70 overflow-hidden surface">
       {rows.map(({ field, text }) => (
-        <div key={field._id} className="flex gap-3">
+        <div key={field._id} className="flex gap-3 px-4 py-2.5">
           <dt className="w-28 shrink-0 text-sm text-muted-foreground">
             {field.name}
           </dt>

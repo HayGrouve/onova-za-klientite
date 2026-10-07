@@ -31,7 +31,7 @@ export const Route = createFileRoute('/_app/settings/notifications')({
 
 function Notice({ title, children }: { title?: string; children: string }) {
   return (
-    <div className="mx-4 flex flex-col gap-1 rounded-2xl bg-muted/60 p-4 text-sm">
+    <div className="mx-4 flex flex-col gap-1 surface p-4 text-sm">
       {title && <p className="font-medium">{title}</p>}
       <p className="text-muted-foreground">{children}</p>
     </div>
@@ -40,7 +40,7 @@ function Notice({ title, children }: { title?: string; children: string }) {
 
 function IosGuide() {
   return (
-    <div className="mx-4 flex flex-col gap-2 rounded-2xl bg-muted/60 p-4 text-sm">
+    <div className="mx-4 flex flex-col gap-2 surface p-4 text-sm">
       <p className="font-medium">{m.push_ios_title()}</p>
       <ol className="flex list-decimal flex-col gap-1 pl-5 text-muted-foreground">
         <li>{m.push_ios_step_share()}</li>

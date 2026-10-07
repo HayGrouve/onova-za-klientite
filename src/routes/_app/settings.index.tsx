@@ -21,6 +21,7 @@ import { api } from '../../../convex/_generated/api'
 import { Spinner } from '#/components/ui/spinner'
 import { errorMessage } from '#/lib/errors'
 import type { LinkProps } from '@tanstack/react-router'
+import { ListCard } from '#/components/list-section'
 import { PageTitle } from '#/components/page'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
@@ -44,16 +45,28 @@ function Row({
     <li>
       <Link
         to={to}
-        className="flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3 outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="group flex min-h-16 items-center gap-3 pressable px-4 py-3"
       >
-        <IconComponent className="size-6 shrink-0 text-primary" />
+        <IconTile icon={IconComponent} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{title}</span>
           <span className="truncate text-sm text-muted-foreground">{body}</span>
         </span>
-        <CaretRightIcon className="size-5 shrink-0 text-muted-foreground" />
+        <CaretRightIcon className="size-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
       </Link>
     </li>
+  )
+}
+
+/** The section's icon on a soft blue square. */
+function IconTile({ icon: IconComponent }: { icon: Icon }) {
+  return (
+    <span
+      aria-hidden
+      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground/70"
+    >
+      <IconComponent className="size-5.5" />
+    </span>
   )
 }
 
@@ -68,7 +81,7 @@ function SettingsIndex() {
           {m.settings_owner_only()}
         </p>
       )}
-      <ul className="flex flex-col">
+      <ListCard>
         <Row
           to="/settings/business"
           icon={StorefrontIcon}
@@ -130,7 +143,7 @@ function SettingsIndex() {
           body={m.settings_run_setup_body()}
         />
         <AddBusinessRow />
-      </ul>
+      </ListCard>
     </>
   )
 }
@@ -154,12 +167,14 @@ function AddBusinessRow() {
               setBusy(false)
             })
         }}
-        className="flex min-h-16 w-full items-center gap-3 rounded-2xl px-4 py-3 text-left outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="flex min-h-16 w-full items-center gap-3 pressable px-4 py-3 text-left"
       >
         {busy ? (
-          <Spinner className="size-6 shrink-0" />
+          <span className="flex size-10 shrink-0 items-center justify-center">
+            <Spinner className="size-6" />
+          </span>
         ) : (
-          <PlusCircleIcon className="size-6 shrink-0 text-primary" />
+          <IconTile icon={PlusCircleIcon} />
         )}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{m.business_add()}</span>

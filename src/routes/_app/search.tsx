@@ -1,8 +1,14 @@
-import { MagnifyingGlassIcon } from '@phosphor-icons/react'
+import {
+  ClipboardTextIcon,
+  MagnifyingGlassIcon,
+  StackIcon,
+  UsersIcon,
+} from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
+import { InitialsAvatar } from '#/components/initials-avatar'
 import { JobRow } from '#/components/job-row'
 import { ListSection } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
@@ -67,47 +73,64 @@ function SearchPage() {
       </div>
       {debounced && !results && <ListSkeleton />}
       {empty && (
-        <p className="px-4 text-center text-muted-foreground">
+        <p className="animate-rise px-4 py-6 text-center text-muted-foreground">
           {m.search_none()}
         </p>
       )}
       {results && results.clients.length > 0 && (
-        <ListSection title={words.client.plural}>
+        <ListSection
+          title={words.client.plural}
+          icon={UsersIcon}
+          count={results.clients.length}
+        >
           {results.clients.map((client) => (
             <li key={client._id}>
               <Link
                 to="/clients/$clientId"
                 params={{ clientId: client._id }}
-                className="flex flex-col rounded-2xl px-4 py-3 hover:bg-muted/60"
+                className="flex items-center gap-3 pressable px-4 py-3"
               >
-                <span className="font-medium">
-                  {client.isNoClient ? m.no_client() : client.name}
-                </span>
-                {client.phone && (
-                  <span className="text-sm text-muted-foreground">
-                    {formatPhone(client.phone)}
+                <InitialsAvatar
+                  name={client.isNoClient ? m.no_client() : client.name}
+                />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate font-medium">
+                    {client.isNoClient ? m.no_client() : client.name}
                   </span>
-                )}
+                  {client.phone && (
+                    <span className="text-sm text-muted-foreground">
+                      {formatPhone(client.phone)}
+                    </span>
+                  )}
+                </span>
               </Link>
             </li>
           ))}
         </ListSection>
       )}
       {results && results.jobs.length > 0 && (
-        <ListSection title={words.job.plural}>
+        <ListSection
+          title={words.job.plural}
+          icon={ClipboardTextIcon}
+          count={results.jobs.length}
+        >
           {results.jobs.map((job) => (
             <JobRow key={job._id} job={job} today={today} />
           ))}
         </ListSection>
       )}
       {results && results.items.length > 0 && (
-        <ListSection title={words.item.plural}>
+        <ListSection
+          title={words.item.plural}
+          icon={StackIcon}
+          count={results.items.length}
+        >
           {results.items.map((item) => (
             <li key={item._id}>
               <Link
                 to="/items/$itemId"
                 params={{ itemId: item._id }}
-                className="flex flex-col rounded-2xl px-4 py-3 hover:bg-muted/60"
+                className="flex flex-col pressable px-4 py-3"
               >
                 <span className="font-medium">{item.name}</span>
                 <span className="text-sm text-muted-foreground">

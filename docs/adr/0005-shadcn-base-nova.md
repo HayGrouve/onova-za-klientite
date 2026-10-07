@@ -15,3 +15,4 @@ Prototypes 1 and 2 settled the look: shadcn's `base-nova` style on Base UI, Phos
 ## Consequences
 
 - Base UI APIs differ from Radix (`render` instead of `asChild`, `string[]` toggle values). Examples from the wider shadcn ecosystem often assume Radix.
+- Pages sit on a tinted canvas with white cards (D52), so form controls are filled white (`bg-card`) instead of transparent, and the default tabs slide one white pill to the active tab. Both are marked local changes.

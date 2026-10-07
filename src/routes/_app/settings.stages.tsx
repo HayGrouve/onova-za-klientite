@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { useSubmit } from '#/components/money/use-submit'
 import { SettingsPage } from '#/components/settings/settings-page'
@@ -31,12 +32,11 @@ import { GROUP_LABEL } from '#/i18n/groups'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import {
-  STAGE_COLORS,
   STAGE_GROUPS,
   canRegroupStage,
   canRemoveStage,
 } from '../../../shared/stages'
-import type { StageColor, StageGroup } from '../../../shared/stages'
+import type { StageGroup } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/settings/stages')({
   component: StagesSettings,
@@ -45,15 +45,6 @@ export const Route = createFileRoute('/_app/settings/stages')({
 type Stage = FunctionReturnType<
   typeof api.businesses.settings
 >['stages'][number]
-
-const COLOR_LABEL: Record<StageColor, () => string> = {
-  gray: m.color_gray,
-  blue: m.color_blue,
-  amber: m.color_amber,
-  violet: m.color_violet,
-  green: m.color_green,
-  red: m.color_red,
-}
 
 function Choice<T extends string>({
   label,
@@ -114,16 +105,16 @@ function StagesSettings() {
         <ListSkeleton />
       ) : (
         <>
-          <ul className="flex flex-col">
+          <ListCard>
             {settings.stages.map((stage, index) => (
               <li key={stage._id} className="flex items-center gap-1 pr-2">
                 <button
                   type="button"
                   disabled={!owner}
                   onClick={() => setPanel({ stage })}
-                  className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-2xl px-4 py-2 text-left hover:bg-muted/60"
+                  className="flex min-h-14 min-w-0 flex-1 items-center gap-3 pressable px-4 py-2 text-left"
                 >
-                  <StageBadge name={stage.name} color={stage.color} />
+                  <StageBadge name={stage.name} group={stage.group} />
                   <span className="flex min-w-0 flex-col text-sm text-muted-foreground">
                     <span>{GROUP_LABEL[stage.group]()}</span>
                     {stage.jobCount > 0 && (
@@ -156,10 +147,15 @@ function StagesSettings() {
                 </Button>
               </li>
             ))}
-          </ul>
+          </ListCard>
           {owner && (
             <div className="px-4">
-              <Button variant="outline" size="xl" onClick={() => setPanel({})}>
+              <Button
+                variant="outline"
+                size="xl"
+                className="shadow-xs"
+                onClick={() => setPanel({})}
+              >
                 <PlusIcon data-icon="inline-start" />
                 {m.stages_add()}
               </Button>
@@ -209,7 +205,6 @@ function StageForm({
   const { busy, run } = useSubmit(onDone)
   const [name, setName] = useState(stage?.name ?? '')
   const [group, setGroup] = useState<StageGroup>(stage?.group ?? 'in_progress')
-  const [color, setColor] = useState<StageColor>(stage?.color ?? 'gray')
   const [moveTo, setMoveTo] = useState<Id<'stages'> | null>(null)
 
   const regroupBlocked =
@@ -231,10 +226,9 @@ function StageForm({
                   businessId: business._id,
                   stageId: stage._id,
                   name,
-                  color,
                   group,
                 })
-              : add({ businessId: business._id, name, color, group }),
+              : add({ businessId: business._id, name, group }),
           )
         }}
       >
@@ -269,18 +263,6 @@ function StageForm({
                 {m.stages_last_in_group()}
               </p>
             )}
-          </Field>
-          <Field>
-            <FieldLabel>{m.stages_color()}</FieldLabel>
-            <Choice
-              label={m.stages_color()}
-              value={color}
-              options={STAGE_COLORS.map((value) => ({
-                value,
-                label: COLOR_LABEL[value](),
-              }))}
-              onChange={setColor}
-            />
           </Field>
         </FieldGroup>
         <Button
@@ -319,7 +301,7 @@ function StageForm({
                         >
                           <StageBadge
                             name={other.name}
-                            color={other.color}
+                            group={other.group}
                             className="h-9 px-3.5 text-sm"
                           />
                         </button>

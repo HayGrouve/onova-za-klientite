@@ -1,8 +1,19 @@
-import { MagnifyingGlassIcon, PlusIcon, UsersIcon } from '@phosphor-icons/react'
+import {
+  CaretRightIcon,
+  CoinsIcon,
+  MagnifyingGlassIcon,
+  PiggyBankIcon,
+  PlusIcon,
+  UserCircleDashedIcon,
+  UsersIcon,
+} from '@phosphor-icons/react'
+import { cn } from 'cn'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
+import { InitialsAvatar } from '#/components/initials-avatar'
+import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { EmptyState, PageTitle } from '#/components/page'
 import { buttonVariants } from '#/components/ui/button'
@@ -48,7 +59,13 @@ function ClientsPage() {
         <PageTitle>{words.client.plural}</PageTitle>
         <Link
           to="/clients/new"
-          className={buttonVariants({ variant: 'outline', size: 'xl' })}
+          className={cn(
+            buttonVariants({
+              variant: 'outline',
+              size: 'xl',
+              className: 'shadow-xs',
+            }),
+          )}
         >
           <PlusIcon data-icon="inline-start" />
           {m.clients_add()}
@@ -84,42 +101,68 @@ function ClientsPage() {
             </p>
           )}
           {shown.length === 0 ? (
-            <p className="px-4 py-6 text-center text-muted-foreground">
+            <p className="animate-rise px-4 py-6 text-center text-muted-foreground">
               {m.clients_no_match()}
             </p>
           ) : (
-            <ul className="flex flex-col">
+            <ListCard>
               {shown.map((client) => (
                 <li key={client._id}>
                   <Link
                     to="/clients/$clientId"
                     params={{ clientId: client._id }}
-                    className="flex flex-col gap-0.5 rounded-2xl px-4 py-3 outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
+                    className="flex items-center gap-3 pressable px-4 py-3"
                   >
-                    <span className="font-medium">
-                      {client.isNoClient ? m.no_client() : client.name}
+                    {client.isNoClient ? (
+                      <span
+                        aria-hidden
+                        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                      >
+                        <UserCircleDashedIcon className="size-6" />
+                      </span>
+                    ) : (
+                      <InitialsAvatar name={client.name} />
+                    )}
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-medium">
+                        {client.isNoClient ? m.no_client() : client.name}
+                      </span>
+                      <span className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
+                        {client.phone && (
+                          <span>{formatPhone(client.phone)}</span>
+                        )}
+                        {client.owedCents > 0 && (
+                          <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                            <CoinsIcon
+                              aria-hidden
+                              className="size-4 text-muted-foreground"
+                            />
+                            {m.clients_owes({
+                              amount: formatMoney(client.owedCents),
+                            })}
+                          </span>
+                        )}
+                        {client.creditCents > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <PiggyBankIcon
+                              aria-hidden
+                              className="size-4 text-muted-foreground"
+                            />
+                            {m.clients_credit({
+                              amount: formatMoney(client.creditCents),
+                            })}
+                          </span>
+                        )}
+                      </span>
                     </span>
-                    <span className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-                      {client.phone && <span>{formatPhone(client.phone)}</span>}
-                      {client.owedCents > 0 && (
-                        <span className="font-medium text-foreground">
-                          {m.clients_owes({
-                            amount: formatMoney(client.owedCents),
-                          })}
-                        </span>
-                      )}
-                      {client.creditCents > 0 && (
-                        <span>
-                          {m.clients_credit({
-                            amount: formatMoney(client.creditCents),
-                          })}
-                        </span>
-                      )}
-                    </span>
+                    <CaretRightIcon
+                      aria-hidden
+                      className="size-4 shrink-0 text-muted-foreground/60"
+                    />
                   </Link>
                 </li>
               ))}
-            </ul>
+            </ListCard>
           )}
         </>
       )}

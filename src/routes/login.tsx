@@ -27,7 +27,12 @@ function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center gap-6 px-4 py-10">
-      <div className="flex flex-col gap-2 text-center">
+      <div className="flex animate-rise flex-col items-center gap-2 text-center">
+        <img
+          src="/icon.svg"
+          alt=""
+          className="mb-2 size-16 rounded-2xl shadow-lg shadow-primary/25"
+        />
         <p className="text-sm font-medium text-primary">{m.app_name()}</p>
         <h1 className="text-2xl font-semibold">{m.login_title()}</h1>
         <p className="text-muted-foreground">{m.login_body()}</p>

@@ -1,3 +1,11 @@
+import {
+  CalendarBlankIcon,
+  CoinsIcon,
+  FlagIcon,
+  UserIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
 import type { FunctionReturnType } from 'convex/server'
@@ -39,46 +47,87 @@ export function JobRow({
   // Lateness comes first: an overdue job shows how late it is even with an appointment ahead.
   const timing =
     late && job.dueDate
-      ? m.late_since({ date: formatDay(job.dueDate, today) })
+      ? {
+          icon: WarningCircleIcon,
+          text: m.late_since({ date: formatDay(job.dueDate, today) }),
+        }
       : job.nextAppointment
-        ? formatMoment(
-            job.nextAppointment.start,
-            job.nextAppointment.allDay,
-            today,
-          )
+        ? {
+            icon: CalendarBlankIcon,
+            text: formatMoment(
+              job.nextAppointment.start,
+              job.nextAppointment.allDay,
+              today,
+            ),
+          }
         : job.dueDate
-          ? m.due_short({ date: formatDay(job.dueDate, today) })
+          ? {
+              icon: FlagIcon,
+              text: m.due_short({ date: formatDay(job.dueDate, today) }),
+            }
           : null
+  const owes = job.owes && job.priceCents > 0
+  const client = showClient && job.clientName
 
   return (
     <li>
       <Link
         to="/jobs/$jobId"
         params={{ jobId: job._id }}
-        className="flex flex-col gap-1 rounded-2xl px-4 py-3 outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="flex flex-col gap-1.5 pressable px-4 py-3"
       >
         <div className="flex items-start justify-between gap-3">
           <span className="min-w-0 text-base leading-snug font-medium">
             {job.title}
           </span>
-          <StageBadge name={job.stageName} color={job.stageColor} />
+          {/* Pulled over the row's padding onto its top and right edges. */}
+          <StageBadge
+            name={job.stageName}
+            group={job.stageGroup}
+            corner
+            className="-mt-3 -mr-4"
+          />
         </div>
-        <div className="flex items-baseline justify-between gap-3 text-sm text-muted-foreground">
-          <span className="truncate">{showClient ? job.clientName : ''}</span>
-          {timing && (
-            <span
-              className={cn('shrink-0', late && 'font-medium text-destructive')}
-            >
-              {timing}
-            </span>
-          )}
-        </div>
-        {job.owes && job.priceCents > 0 && (
-          <span className="text-sm text-muted-foreground">
-            {m.balance_short({ amount: formatMoney(job.balanceCents) })}
-          </span>
+        {(client || timing || owes) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            {client && (
+              <Meta icon={UserIcon} className="min-w-0">
+                <span className="truncate">{job.clientName}</span>
+              </Meta>
+            )}
+            {timing && (
+              <Meta
+                icon={timing.icon}
+                className={cn(late && 'font-medium text-destructive')}
+              >
+                {timing.text}
+              </Meta>
+            )}
+            {owes && (
+              <Meta icon={CoinsIcon} className="text-foreground/80">
+                {m.balance_short({ amount: formatMoney(job.balanceCents) })}
+              </Meta>
+            )}
+          </div>
         )}
       </Link>
     </li>
+  )
+}
+
+function Meta({
+  icon: IconComponent,
+  className,
+  children,
+}: {
+  icon: Icon
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <span className={cn('inline-flex items-center gap-1', className)}>
+      <IconComponent aria-hidden className="size-4 shrink-0 opacity-80" />
+      {children}
+    </span>
   )
 }
