@@ -14,6 +14,7 @@ import {
   vPaymentMethod,
   vRepeatUnit,
   vRole,
+  vSetupAnswers,
   vStageColor,
   vStageGroup,
   vWords,
@@ -48,8 +49,7 @@ export default defineSchema({
     ),
     reminderRule: v.optional(v.object({ months: v.number() })),
     setup: v.object({
-      // Typed by the setup wizard in milestone 3.
-      answers: v.optional(v.any()),
+      answers: v.optional(vSetupAnswers),
       completedAt: v.optional(v.number()),
     }),
     noClientId: v.optional(v.id('clients')),

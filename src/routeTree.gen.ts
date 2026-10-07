@@ -13,9 +13,13 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppClientsRouteImport } from './routes/_app/clients'
+import { Route as AppImportRouteImport } from './routes/_app/import'
 import { Route as AppJobsRouteImport } from './routes/_app/jobs'
 import { Route as AppMoneyRouteImport } from './routes/_app/money'
 import { Route as AppNewRouteImport } from './routes/_app/new'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppSetupRouteImport } from './routes/_app/setup'
+import { Route as AppTimingRouteImport } from './routes/_app/timing'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -36,6 +40,11 @@ const AppClientsRoute = AppClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => AppRoute,
 } as any)
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppJobsRoute = AppJobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -51,21 +60,44 @@ const AppNewRoute = AppNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSetupRoute = AppSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTimingRoute = AppTimingRouteImport.update({
+  id: '/timing',
+  path: '/timing',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/clients': typeof AppClientsRoute
+  '/import': typeof AppImportRoute
   '/jobs': typeof AppJobsRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
+  '/settings': typeof AppSettingsRoute
+  '/setup': typeof AppSetupRoute
+  '/timing': typeof AppTimingRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/clients': typeof AppClientsRoute
+  '/import': typeof AppImportRoute
   '/jobs': typeof AppJobsRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
+  '/settings': typeof AppSettingsRoute
+  '/setup': typeof AppSetupRoute
+  '/timing': typeof AppTimingRoute
   '/': typeof AppIndexRoute
 }
 export interface FileRoutesById {
@@ -73,24 +105,52 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/clients': typeof AppClientsRoute
+  '/_app/import': typeof AppImportRoute
   '/_app/jobs': typeof AppJobsRoute
   '/_app/money': typeof AppMoneyRoute
   '/_app/new': typeof AppNewRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/setup': typeof AppSetupRoute
+  '/_app/timing': typeof AppTimingRoute
   '/_app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/clients' | '/jobs' | '/money' | '/new'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/clients'
+    | '/import'
+    | '/jobs'
+    | '/money'
+    | '/new'
+    | '/settings'
+    | '/setup'
+    | '/timing'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/clients' | '/jobs' | '/money' | '/new' | '/'
+  to:
+    | '/login'
+    | '/clients'
+    | '/import'
+    | '/jobs'
+    | '/money'
+    | '/new'
+    | '/settings'
+    | '/setup'
+    | '/timing'
+    | '/'
   id:
     | '__root__'
     | '/_app'
     | '/login'
     | '/_app/clients'
+    | '/_app/import'
     | '/_app/jobs'
     | '/_app/money'
     | '/_app/new'
+    | '/_app/settings'
+    | '/_app/setup'
+    | '/_app/timing'
     | '/_app/'
   fileRoutesById: FileRoutesById
 }
@@ -129,6 +189,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/import': {
+      id: '/_app/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/jobs': {
       id: '/_app/jobs'
       path: '/jobs'
@@ -150,22 +217,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/setup': {
+      id: '/_app/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof AppSetupRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/timing': {
+      id: '/_app/timing'
+      path: '/timing'
+      fullPath: '/timing'
+      preLoaderRoute: typeof AppTimingRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppClientsRoute: typeof AppClientsRoute
+  AppImportRoute: typeof AppImportRoute
   AppJobsRoute: typeof AppJobsRoute
   AppMoneyRoute: typeof AppMoneyRoute
   AppNewRoute: typeof AppNewRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppSetupRoute: typeof AppSetupRoute
+  AppTimingRoute: typeof AppTimingRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppClientsRoute: AppClientsRoute,
+  AppImportRoute: AppImportRoute,
   AppJobsRoute: AppJobsRoute,
   AppMoneyRoute: AppMoneyRoute,
   AppNewRoute: AppNewRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppSetupRoute: AppSetupRoute,
+  AppTimingRoute: AppTimingRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
