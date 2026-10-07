@@ -27,7 +27,7 @@ function FieldRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex min-h-14 w-full items-center gap-3 rounded-2xl border bg-card px-4 py-2 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="flex min-h-14 w-full items-center gap-3 surface pressable px-4 py-2 text-left"
     >
       <span className="flex min-w-0 flex-1 flex-col">
         <span

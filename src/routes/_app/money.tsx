@@ -1,14 +1,34 @@
-import { CaretLeftIcon, CaretRightIcon, PlusIcon } from '@phosphor-icons/react'
+import {
+  ArrowDownLeftIcon,
+  ArrowUpRightIcon,
+  BankIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  CreditCardIcon,
+  DotsThreeCircleIcon,
+  HandCoinsIcon,
+  HourglassMediumIcon,
+  MoneyIcon,
+  PiggyBankIcon,
+  PlusIcon,
+  ReceiptIcon,
+  TrendDownIcon,
+  TrendUpIcon,
+} from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { cn } from 'cn'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
-import { ListSection } from '#/components/list-section'
+import { InitialsAvatar } from '#/components/initials-avatar'
+import { ListNote, ListSection } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { CostForm } from '#/components/money/cost-form'
+import { MoneyFigure } from '#/components/money/money-figure'
 import { PageTitle } from '#/components/page'
+import { Tip } from '#/components/tip'
 import { Button } from '#/components/ui/button'
 import {
   Sheet,
@@ -37,35 +57,11 @@ function monthLabel(month: string) {
   return text.charAt(0).toLocaleUpperCase('bg') + text.slice(1)
 }
 
-function Figure({
-  label,
-  cents,
-  strong,
-}: {
-  label: string
-  cents: number
-  strong?: boolean
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-2xl p-3',
-        strong ? 'bg-primary text-primary-foreground' : 'bg-muted',
-      )}
-    >
-      <div
-        className={cn(
-          'text-sm',
-          strong ? 'text-primary-foreground/80' : 'text-muted-foreground',
-        )}
-      >
-        {label}
-      </div>
-      <div className="text-xl font-semibold tabular-nums">
-        {formatMoney(cents)}
-      </div>
-    </div>
-  )
+const METHOD_ICON: Record<Doc<'payments'>['method'], Icon> = {
+  cash: MoneyIcon,
+  bank: BankIcon,
+  card: CreditCardIcon,
+  other: DotsThreeCircleIcon,
 }
 
 function MoneyPage() {
@@ -86,70 +82,103 @@ function MoneyPage() {
   return (
     <>
       <PageTitle>{m.money_title()}</PageTitle>
-      <div className="flex items-center justify-between gap-2 px-2 pb-3">
-        <Button
-          variant="ghost"
-          size="icon-xl"
-          aria-label={m.money_prev_month()}
-          onClick={() => shift(-1)}
-        >
-          <CaretLeftIcon />
-        </Button>
-        <span className="text-base font-medium">{monthLabel(month)}</span>
-        <Button
-          variant="ghost"
-          size="icon-xl"
-          aria-label={m.money_next_month()}
-          disabled={month >= monthOf(today)}
-          onClick={() => shift(1)}
-        >
-          <CaretRightIcon />
-        </Button>
+      <div className="mx-4 mb-4 flex items-center justify-between gap-2 surface p-1">
+        <Tip label={m.money_prev_month()}>
+          <Button
+            variant="ghost"
+            size="icon-xl"
+            aria-label={m.money_prev_month()}
+            onClick={() => shift(-1)}
+          >
+            <CaretLeftIcon />
+          </Button>
+        </Tip>
+        {/* Keyed by the month, so the label fades in when it changes. */}
+        <span key={month} className="animate-page text-base font-medium">
+          {monthLabel(month)}
+        </span>
+        <Tip label={m.money_next_month()}>
+          <Button
+            variant="ghost"
+            size="icon-xl"
+            aria-label={m.money_next_month()}
+            disabled={month >= monthOf(today)}
+            onClick={() => shift(1)}
+          >
+            <CaretRightIcon />
+          </Button>
+        </Tip>
       </div>
 
       {!data ? (
         <ListSkeleton />
       ) : (
         <div className="flex flex-col gap-5 pb-6">
-          <div className="grid grid-cols-2 gap-2 px-4">
-            <Figure
-              label={m.money_received()}
-              cents={data.receivedCents}
-              strong={!costsOn}
-            />
+          <div className="grid stagger grid-cols-2 gap-2.5 px-4">
+            {/* Without costs there is no profit, so what came in leads the row. */}
+            <div className={cn(!costsOn && 'col-span-2')}>
+              <MoneyFigure
+                label={m.money_received()}
+                cents={data.receivedCents}
+                icon={ArrowDownLeftIcon}
+                hint={m.hint_received()}
+                tone={costsOn ? 'plain' : 'strong'}
+              />
+            </div>
             {costsOn && (
-              <Figure label={m.money_costs()} cents={data.costCents} />
+              <MoneyFigure
+                label={m.money_costs()}
+                cents={data.costCents}
+                icon={ArrowUpRightIcon}
+                hint={m.hint_costs()}
+              />
             )}
             {costsOn && (
               <div className="col-span-2">
-                <Figure
+                <MoneyFigure
                   label={m.money_profit()}
                   cents={data.profitCents}
-                  strong
+                  icon={data.profitCents < 0 ? TrendDownIcon : TrendUpIcon}
+                  hint={m.hint_monthly_profit()}
+                  tone="strong"
                 />
               </div>
             )}
-            <Figure label={m.money_still_owed()} cents={data.stillOwedCents} />
-            <Figure
+            <MoneyFigure
+              label={m.money_still_owed()}
+              cents={data.stillOwedCents}
+              icon={HourglassMediumIcon}
+              hint={m.hint_still_owed()}
+            />
+            <MoneyFigure
               label={m.money_credit_held()}
               cents={data.creditHeldCents}
+              icon={PiggyBankIcon}
+              hint={m.hint_credit()}
             />
           </div>
 
-          <ListSection title={m.money_who_owes()}>
+          <ListSection
+            title={m.money_who_owes()}
+            icon={HandCoinsIcon}
+            tone="warning"
+            count={data.whoOwesMe.length || undefined}
+          >
             {data.whoOwesMe.length === 0 ? (
-              <li className="px-4 text-sm text-muted-foreground">
-                {m.money_who_owes_none()}
-              </li>
+              <ListNote>{m.money_who_owes_none()}</ListNote>
             ) : (
               data.whoOwesMe.map((row) => (
                 <li key={row.clientId}>
                   <Link
                     to="/clients/$clientId"
                     params={{ clientId: row.clientId }}
-                    className="flex items-baseline justify-between gap-3 rounded-2xl px-4 py-3 hover:bg-muted/60"
+                    className="flex items-center gap-3 pressable px-4 py-3"
                   >
-                    <span className="flex min-w-0 flex-col">
+                    <InitialsAvatar
+                      name={row.isNoClient ? m.no_client() : row.name}
+                      className="size-9 text-xs"
+                    />
+                    <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate font-medium">
                         {row.isNoClient ? m.no_client() : row.name}
                       </span>
@@ -170,20 +199,23 @@ function MoneyPage() {
             )}
           </ListSection>
 
-          <ListSection title={m.money_payments()}>
+          <ListSection
+            title={m.money_payments()}
+            icon={ArrowDownLeftIcon}
+            tone="success"
+          >
             {data.payments.length === 0 ? (
-              <li className="px-4 text-sm text-muted-foreground">
-                {m.money_none()}
-              </li>
+              <ListNote>{m.money_none()}</ListNote>
             ) : (
               data.payments.map((payment) => (
                 <li key={payment._id}>
                   <Link
                     to="/clients/$clientId"
                     params={{ clientId: payment.clientId }}
-                    className="flex items-baseline justify-between gap-3 px-4 py-2 hover:bg-muted/60"
+                    className="flex items-center gap-3 pressable px-4 py-2.5"
                   >
-                    <span className="flex min-w-0 flex-col">
+                    <MethodBadge method={payment.method} />
+                    <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{payment.clientName}</span>
                       <span className="text-sm text-muted-foreground">
                         {formatDay(payment.date, today)} ·{' '}
@@ -202,6 +234,8 @@ function MoneyPage() {
           {costsOn && (
             <ListSection
               title={m.money_costs_list()}
+              icon={ReceiptIcon}
+              tone="muted"
               action={
                 <Button
                   variant="ghost"
@@ -214,9 +248,7 @@ function MoneyPage() {
               }
             >
               {data.costs.length === 0 ? (
-                <li className="px-4 text-sm text-muted-foreground">
-                  {m.money_none()}
-                </li>
+                <ListNote>{m.money_none()}</ListNote>
               ) : (
                 data.costs.map((cost) => (
                   <li key={cost._id}>
@@ -224,7 +256,7 @@ function MoneyPage() {
                       <Link
                         to="/jobs/$jobId"
                         params={{ jobId: cost.jobId }}
-                        className="flex items-baseline justify-between gap-3 px-4 py-2 hover:bg-muted/60"
+                        className="flex items-baseline justify-between gap-3 pressable px-4 py-2.5"
                       >
                         <CostLine cost={cost} today={today} />
                       </Link>
@@ -232,7 +264,7 @@ function MoneyPage() {
                       <button
                         type="button"
                         onClick={() => setCostPanel({ cost })}
-                        className="flex w-full items-baseline justify-between gap-3 px-4 py-2 text-left hover:bg-muted/60"
+                        className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
                       >
                         <CostLine cost={cost} today={today} />
                       </button>
@@ -293,5 +325,18 @@ function CostLine({
       </span>
       <span className="tabular-nums">{formatMoney(cost.amountCents)}</span>
     </>
+  )
+}
+
+/** The payment method as a small icon, so cash and bank tell apart at a glance. */
+function MethodBadge({ method }: { method: Doc<'payments'>['method'] }) {
+  const IconComponent = METHOD_ICON[method]
+  return (
+    <span
+      aria-hidden
+      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800"
+    >
+      <IconComponent className="size-5" />
+    </span>
   )
 }

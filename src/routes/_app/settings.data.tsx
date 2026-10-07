@@ -9,6 +9,7 @@ import { useConvex, useMutation } from 'convex/react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
+import { ListCard } from '#/components/list-section'
 import { SettingsPage } from '#/components/settings/settings-page'
 import { Button } from '#/components/ui/button'
 import { Field, FieldLabel } from '#/components/ui/field'
@@ -30,24 +31,29 @@ function DataSettings() {
     businesses.find((item) => item._id === business._id)?.role === 'owner'
   return (
     <SettingsPage title={m.settings_data()}>
-      <ul className="flex flex-col">
+      <ListCard>
         <li>
           <Link
             to="/import"
-            className="flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3 hover:bg-muted/60"
+            className="flex min-h-16 items-center gap-3 pressable px-4 py-3"
           >
-            <UploadSimpleIcon className="size-6 shrink-0 text-primary" />
+            <span
+              aria-hidden
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+            >
+              <UploadSimpleIcon className="size-5.5" weight="duotone" />
+            </span>
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="font-medium">{m.data_import()}</span>
               <span className="text-sm text-muted-foreground">
                 {m.data_import_body()}
               </span>
             </span>
-            <CaretRightIcon className="size-5 shrink-0 text-muted-foreground" />
+            <CaretRightIcon className="size-5 shrink-0 text-muted-foreground/60" />
           </Link>
         </li>
         {owner && <ExportRow />}
-      </ul>
+      </ListCard>
       <DeleteAccount />
     </SettingsPage>
   )
@@ -86,13 +92,18 @@ function ExportRow() {
         type="button"
         disabled={busy}
         onClick={() => void download()}
-        className="flex min-h-16 w-full items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-muted/60"
+        className="flex min-h-16 w-full items-center gap-3 pressable px-4 py-3 text-left"
       >
-        {busy ? (
-          <Spinner className="size-6 shrink-0" />
-        ) : (
-          <DownloadSimpleIcon className="size-6 shrink-0 text-primary" />
-        )}
+        <span
+          aria-hidden
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+        >
+          {busy ? (
+            <Spinner className="size-5.5" />
+          ) : (
+            <DownloadSimpleIcon className="size-5.5" weight="duotone" />
+          )}
+        </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">
             {busy ? m.data_exporting() : m.data_export()}
@@ -114,7 +125,7 @@ function DeleteAccount() {
   const confirmed =
     typed.trim().toLocaleUpperCase('bg') === m.data_delete_word()
   return (
-    <section className="mx-4 mt-6 flex flex-col gap-3 rounded-2xl border border-destructive/30 p-4">
+    <section className="mx-4 mt-6 flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-card p-4 shadow-xs">
       <h2 className="font-semibold text-destructive">{m.data_delete()}</h2>
       <p className="text-sm">{m.data_delete_body()}</p>
       <Field>

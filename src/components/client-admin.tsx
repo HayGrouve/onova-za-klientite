@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { Tip } from '#/components/tip'
 import { useSubmit } from '#/components/money/use-submit'
 import { Button } from '#/components/ui/button'
 import {
@@ -38,12 +39,14 @@ export function ClientAdmin({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label={m.client_actions()}
-          className="flex size-11 items-center justify-center rounded-xl outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <DotsThreeVerticalIcon className="size-6" />
-        </DropdownMenuTrigger>
+        <Tip label={m.client_actions()}>
+          <DropdownMenuTrigger
+            aria-label={m.client_actions()}
+            className="flex size-11 items-center justify-center rounded-xl transition-colors outline-none hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-foreground/5"
+          >
+            <DotsThreeVerticalIcon className="size-6" />
+          </DropdownMenuTrigger>
+        </Tip>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem
             className="min-h-11"

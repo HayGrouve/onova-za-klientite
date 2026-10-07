@@ -96,11 +96,12 @@ function describe(item: TimelineItem, words: Words) {
 export function Timeline({ items }: { items: TimelineItem[] }) {
   const { business } = useViewer()
   return (
-    <ol className="flex flex-col gap-3 px-4">
+    <ol className="mr-4 ml-6 flex stagger flex-col gap-3 border-l-2 border-border/80 pl-4">
       {items.map((item) => (
         <li
           key={item._id}
-          className="flex flex-col gap-0.5 border-l-2 border-border pl-3"
+          // The dot sits on the line: 16px padding, half the 2px line, half the 10px dot.
+          className="relative flex flex-col gap-0.5 before:absolute before:top-1.5 before:-left-[22px] before:size-2.5 before:rounded-full before:bg-primary/70 before:ring-3 before:ring-canvas first:before:bg-primary"
         >
           <span className="text-sm">{describe(item, business.words)}</span>
           <span className="text-xs text-muted-foreground">

@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { JobRow } from '#/components/job-row'
+import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { EmptyState, PageTitle } from '#/components/page'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
@@ -42,7 +43,7 @@ function JobsPage() {
         }
         className="px-4 pb-3"
       >
-        <TabsList className="h-11 w-full">
+        <TabsList className="h-11 w-full bg-foreground/6">
           {STAGE_GROUPS.map((key) => (
             <TabsTrigger
               key={key}
@@ -51,7 +52,7 @@ function JobsPage() {
             >
               {GROUP_LABEL[key]()}
               {data && data.counts[key] > 0 && (
-                <span className="text-xs text-muted-foreground tabular-nums">
+                <span className="rounded-full bg-foreground/8 px-1 text-xs text-muted-foreground tabular-nums">
                   {data.counts[key]}
                 </span>
               )}
@@ -72,11 +73,11 @@ function JobsPage() {
           <p className="px-4 pb-1 text-sm text-muted-foreground">
             {m.count({ label: words.job.plural, count: data.jobs.length })}
           </p>
-          <ul className="flex flex-col">
+          <ListCard>
             {data.jobs.map((job) => (
               <JobRow key={job._id} job={job} today={today} />
             ))}
-          </ul>
+          </ListCard>
         </>
       )}
     </>

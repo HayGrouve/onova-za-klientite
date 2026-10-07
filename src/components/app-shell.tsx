@@ -6,6 +6,7 @@ import {
   GearSixIcon,
   MagnifyingGlassIcon,
   SignOutIcon,
+  StorefrontIcon,
   SunIcon,
   UsersIcon,
   WalletIcon,
@@ -32,6 +33,9 @@ import {
 import { useViewer } from '#/hooks/use-viewer'
 import { useOffline } from '#/hooks/use-connection'
 import { OfflineBanner } from '#/components/offline/offline-banner'
+import { Tip } from '#/components/tip'
+import { TooltipProvider } from '#/components/ui/tooltip'
+import { initials } from '#/lib/initials'
 import { wipeSnapshots } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
 
@@ -46,37 +50,54 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (pathname === '/setup' || pathname === '/new') return <>{children}</>
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
-      <AppHeader />
-      {offline && <OfflineBanner />}
-      <main className="flex flex-1 flex-col pb-[calc(6rem+env(safe-area-inset-bottom))]">
-        {children}
-      </main>
-      <nav
-        aria-label={m.nav_label()}
-        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80"
-      >
-        <div className="mx-auto grid max-w-lg grid-cols-5 items-end px-1 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-          <NavItem to="/" icon={SunIcon} label={m.nav_today()} />
-          <NavItem
-            to="/jobs"
-            icon={ClipboardTextIcon}
-            label={words.job.plural}
-          />
-          <div className="flex justify-center">
-            <Link
-              to="/new"
-              aria-label={m.new_job_label({ job: words.job.singular })}
-              className="-mt-7 flex size-15 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95"
-            >
-              <PlusIcon className="size-7" weight="bold" />
-            </Link>
+    <TooltipProvider delay={400}>
+      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
+        <AppHeader />
+        {offline && <OfflineBanner />}
+        <main className="flex flex-1 flex-col pb-[calc(6rem+env(safe-area-inset-bottom))]">
+          {/* Keyed by the address, so each page fades in when it opens. */}
+          <div key={pathname} className="flex flex-1 animate-page flex-col">
+            {children}
           </div>
-          <NavItem to="/clients" icon={UsersIcon} label={words.client.plural} />
-          <NavItem to="/money" icon={WalletIcon} label={m.nav_money()} />
-        </div>
-      </nav>
-    </div>
+        </main>
+        <nav
+          aria-label={m.nav_label()}
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 shadow-[0_-4px_16px_-6px_rgb(0_0_0/0.08)] backdrop-blur supports-backdrop-filter:bg-background/85"
+        >
+          <div className="mx-auto grid max-w-lg grid-cols-5 items-end px-1 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+            <NavItem to="/" icon={SunIcon} label={m.nav_today()} />
+            <NavItem
+              to="/jobs"
+              icon={ClipboardTextIcon}
+              label={words.job.plural}
+            />
+            <div className="flex justify-center">
+              <Tip
+                label={m.new_job_label({ job: words.job.singular })}
+                side="top"
+              >
+                <Link
+                  to="/new"
+                  aria-label={m.new_job_label({ job: words.job.singular })}
+                  className="group/fab -mt-8 flex size-15 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 shadow-primary/30 ring-background transition-[transform,box-shadow] duration-200 outline-none hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/40 focus-visible:ring-ring/50 active:scale-90"
+                >
+                  <PlusIcon
+                    className="size-7 transition-transform duration-300 group-hover/fab:rotate-90"
+                    weight="bold"
+                  />
+                </Link>
+              </Tip>
+            </div>
+            <NavItem
+              to="/clients"
+              icon={UsersIcon}
+              label={words.client.plural}
+            />
+            <NavItem to="/money" icon={WalletIcon} label={m.nav_money()} />
+          </div>
+        </nav>
+      </div>
+    </TooltipProvider>
   )
 }
 
@@ -93,28 +114,29 @@ function NavItem({
     <Link
       to={to}
       activeOptions={{ exact: to === '/' }}
-      className="group flex min-h-12 flex-col items-center justify-end gap-1 rounded-xl text-xs text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:font-medium data-[status=active]:text-foreground"
+      className="group flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-xl text-xs text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:font-medium data-[status=active]:text-foreground"
     >
       {({ isActive }) => (
         <>
-          <IconComponent
-            className="size-6"
-            weight={isActive ? 'fill' : 'regular'}
-          />
+          <span className="relative flex h-8 w-14 items-center justify-center">
+            {/* The pill behind the active icon grows in from the middle. */}
+            <span
+              aria-hidden
+              className="absolute inset-0 scale-x-50 rounded-full bg-primary/12 opacity-0 transition-[scale,opacity] duration-300 ease-out group-data-[status=active]:scale-x-100 group-data-[status=active]:opacity-100"
+            />
+            <IconComponent
+              className={cn(
+                'relative size-6 transition-colors',
+                isActive && 'animate-pop text-primary',
+              )}
+              weight={isActive ? 'fill' : 'regular'}
+            />
+          </span>
           <span className="max-w-full truncate px-1">{label}</span>
         </>
       )}
     </Link>
   )
-}
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('')
 }
 
 function AppHeader() {
@@ -132,15 +154,16 @@ function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 bg-background/95 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 backdrop-blur">
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 bg-canvas/90 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 backdrop-blur">
       {canSwitch ? (
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label={m.business_switch()}
-            className="-ml-2 flex min-h-11 min-w-0 items-center gap-1 rounded-xl px-2 text-left text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="group/switch -ml-2 flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-left text-sm font-medium transition-colors outline-none hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-foreground/5"
           >
+            <BusinessMark />
             <span className="truncate">{business.name}</span>
-            <CaretDownIcon className="size-4 shrink-0 text-muted-foreground" />
+            <CaretDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/switch:rotate-180" />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-64">
             <DropdownMenuGroup>
@@ -165,35 +188,38 @@ function AppHeader() {
         </DropdownMenu>
       ) : (
         <span
-          className="min-w-0 truncate text-sm font-medium"
+          className="flex min-w-0 items-center gap-2 text-sm font-medium"
           aria-label={m.business_current()}
         >
-          {business.name}
+          <BusinessMark />
+          <span className="truncate">{business.name}</span>
         </span>
       )}
 
       <div className="flex items-center gap-1">
-        <Link
-          to="/search"
-          aria-label={m.search_open()}
-          className="flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <MagnifyingGlassIcon className="size-6" />
-        </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label={m.account_menu()}
-            className={cn(
-              'flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-            )}
+        <Tip label={m.search_open()}>
+          <Link
+            to="/search"
+            aria-label={m.search_open()}
+            className="flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:bg-primary/12 data-[status=active]:text-primary"
           >
-            <Avatar>
-              {user.imageUrl && <AvatarImage src={user.imageUrl} alt="" />}
-              <AvatarFallback>
-                {initials(user.name || user.email || '?')}
-              </AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
+            <MagnifyingGlassIcon className="size-6" />
+          </Link>
+        </Tip>
+        <DropdownMenu>
+          <Tip label={m.account_menu()}>
+            <DropdownMenuTrigger
+              aria-label={m.account_menu()}
+              className="flex size-11 items-center justify-center rounded-full transition-transform outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95"
+            >
+              <Avatar className="ring-2 ring-background">
+                {user.imageUrl && <AvatarImage src={user.imageUrl} alt="" />}
+                <AvatarFallback>
+                  {initials(user.name || user.email || '?')}
+                </AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+          </Tip>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuGroup>
               <DropdownMenuLabel className="truncate">
@@ -219,5 +245,17 @@ function AppHeader() {
         </DropdownMenu>
       </div>
     </header>
+  )
+}
+
+/** The small square in front of the business name. */
+function BusinessMark() {
+  return (
+    <span
+      aria-hidden
+      className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/30"
+    >
+      <StorefrontIcon className="size-4" weight="fill" />
+    </span>
   )
 }

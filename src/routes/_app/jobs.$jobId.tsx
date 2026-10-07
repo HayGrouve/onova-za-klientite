@@ -1,10 +1,22 @@
 import {
   BellIcon,
   CalendarBlankIcon,
+  ClockCounterClockwiseIcon,
+  FlagIcon,
+  FlowArrowIcon,
+  ListBulletsIcon,
+  MapPinIcon,
+  NoteIcon,
+  PaperclipIcon,
   PencilSimpleIcon,
   PhoneIcon,
   PlusIcon,
+  ReceiptIcon,
+  StackIcon,
+  WalletIcon,
+  WarningCircleIcon,
 } from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { cn } from 'cn'
@@ -19,6 +31,7 @@ import { RepeatSection } from '#/components/job/repeat-section'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { monthsLabel } from '#/components/setup/steps'
 import { CostForm } from '#/components/money/cost-form'
+import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
 import { RefundForm } from '#/components/money/refund-form'
 import { RemovePayment } from '#/components/money/remove-payment'
@@ -26,8 +39,12 @@ import { WriteOffForm } from '#/components/money/write-off-form'
 import { JobEditForm } from '#/components/job/job-edit-form'
 import { JobSummaryButton } from '#/components/job-summary-sheet'
 import { LinesEditor } from '#/components/job/lines-editor'
+import { Hint } from '#/components/hint'
+import { InitialsAvatar } from '#/components/initials-avatar'
 import { formatMoment } from '#/components/job-row'
+import { ListCard, SectionHeader } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { Tip } from '#/components/tip'
 import { StageBadge } from '#/components/stage-badge'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
@@ -65,21 +82,42 @@ type Panel =
 
 function Section({
   title,
+  icon,
+  hint,
   action,
   children,
 }: {
   title: string
+  icon: Icon
+  hint?: React.ReactNode
   action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex min-h-9 items-center justify-between gap-2 px-4">
-        <h2 className="text-sm font-semibold text-muted-foreground">{title}</h2>
-        {action}
-      </div>
+      <SectionHeader title={title} icon={icon} hint={hint} action={action} />
       {children}
     </section>
+  )
+}
+
+/** One fact about the job, with an icon in front. */
+function InfoRow({
+  icon: IconComponent,
+  className,
+  children,
+}: {
+  icon: Icon
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className={cn('flex min-h-11 items-center gap-3 px-4 py-2', className)}
+    >
+      <IconComponent aria-hidden className="size-5 shrink-0 opacity-80" />
+      <span className="min-w-0 text-sm">{children}</span>
+    </div>
   )
 }
 
@@ -127,11 +165,19 @@ function JobPage() {
     }
   }
   const close = () => setPanel(null)
-  const editButton = (onClick: () => void, label = m.edit()) => (
-    <Button variant="ghost" className="h-9" onClick={onClick}>
-      {label}
-    </Button>
-  )
+  const editButton = (
+    onClick: () => void,
+    label = m.edit(),
+    icon: Icon = PencilSimpleIcon,
+  ) => {
+    const ActionIcon = icon
+    return (
+      <Button variant="ghost" className="h-9 text-primary" onClick={onClick}>
+        <ActionIcon data-icon="inline-start" />
+        {label}
+      </Button>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-6">
@@ -142,57 +188,78 @@ function JobPage() {
           </h1>
           <div className="flex shrink-0 items-center gap-1">
             <JobSummaryButton businessId={business._id} jobId={job._id} />
-            <Button
-              variant="ghost"
-              size="icon-xl"
-              aria-label={m.job_edit()}
-              onClick={() => setPanel({ kind: 'edit' })}
-            >
-              <PencilSimpleIcon />
-            </Button>
+            <Tip label={m.job_edit()}>
+              <Button
+                variant="ghost"
+                size="icon-xl"
+                aria-label={m.job_edit()}
+                onClick={() => setPanel({ kind: 'edit' })}
+              >
+                <PencilSimpleIcon />
+              </Button>
+            </Tip>
           </div>
         </div>
-        {client && (
-          <div className="flex items-center justify-between gap-3">
-            <Link
-              to="/clients/$clientId"
-              params={{ clientId: client._id }}
-              className="min-w-0 truncate text-base font-medium text-primary underline-offset-4 hover:underline"
-            >
-              {client.isNoClient ? m.no_client() : client.name}
-            </Link>
-            {phone && (
-              <a
-                href={telHref(phone)}
-                aria-label={m.client_call()}
-                className={buttonVariants({
-                  variant: 'outline',
-                  size: 'icon-xl',
-                })}
+        {(client || job.address || job.dueDate) && (
+          <div className="flex animate-rise flex-col divide-y divide-border/70 overflow-hidden surface">
+            {client && (
+              <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4">
+                <InitialsAvatar
+                  name={client.isNoClient ? m.no_client() : client.name}
+                  className="size-9 text-xs"
+                />
+                <Link
+                  to="/clients/$clientId"
+                  params={{ clientId: client._id }}
+                  className="min-w-0 flex-1 truncate text-base font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  {client.isNoClient ? m.no_client() : client.name}
+                </Link>
+                {phone && (
+                  <Tip label={m.client_call()}>
+                    <a
+                      href={telHref(phone)}
+                      aria-label={m.client_call()}
+                      className={buttonVariants({
+                        variant: 'outline',
+                        size: 'icon-xl',
+                        className: 'text-primary',
+                      })}
+                    >
+                      <PhoneIcon weight="fill" />
+                    </a>
+                  </Tip>
+                )}
+              </div>
+            )}
+            {job.address && (
+              <InfoRow icon={MapPinIcon} className="text-muted-foreground">
+                {job.address}
+              </InfoRow>
+            )}
+            {job.dueDate && (
+              <InfoRow
+                icon={late ? WarningCircleIcon : FlagIcon}
+                className={
+                  late
+                    ? 'bg-destructive/5 font-medium text-destructive'
+                    : 'text-muted-foreground'
+                }
               >
-                <PhoneIcon />
-              </a>
+                {late
+                  ? m.late_since({ date: formatDay(job.dueDate, today) })
+                  : m.due_short({ date: formatDay(job.dueDate, today) })}
+              </InfoRow>
             )}
           </div>
-        )}
-        {job.address && (
-          <p className="text-sm text-muted-foreground">{job.address}</p>
-        )}
-        {job.dueDate && (
-          <p
-            className={cn(
-              'text-sm',
-              late ? 'font-medium text-destructive' : 'text-muted-foreground',
-            )}
-          >
-            {late
-              ? m.late_since({ date: formatDay(job.dueDate, today) })
-              : m.due_short({ date: formatDay(job.dueDate, today) })}
-          </p>
         )}
       </header>
 
-      <Section title={m.job_stage()}>
+      <Section
+        title={m.job_stage()}
+        icon={FlowArrowIcon}
+        hint={<Hint term={m.job_stage()}>{m.hint_stage()}</Hint>}
+      >
         <div
           className="flex flex-wrap gap-2 px-4"
           role="radiogroup"
@@ -208,8 +275,8 @@ function JobPage() {
                 aria-checked={current}
                 onClick={() => !current && void moveTo(stage._id)}
                 className={cn(
-                  'rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                  current && 'ring-2 ring-primary ring-offset-2',
+                  'rounded-full ring-offset-2 ring-offset-canvas transition-[box-shadow,transform] duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95',
+                  current ? 'shadow-sm ring-2 ring-primary' : 'hover:shadow-sm',
                 )}
               >
                 <StageBadge
@@ -231,20 +298,27 @@ function JobPage() {
       {modules.appointments && (
         <Section
           title={words.appointment.plural}
+          icon={CalendarBlankIcon}
           action={editButton(
             () => setPanel({ kind: 'appointment' }),
             m.job_add_appointment(),
+            PlusIcon,
           )}
         >
-          <ul className="flex flex-col">
+          <ListCard>
             {data.appointments.map((appointment) => (
               <li key={appointment._id}>
                 <button
                   type="button"
                   onClick={() => setPanel({ kind: 'appointment', appointment })}
-                  className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left hover:bg-muted/60"
+                  className="flex w-full items-center gap-3 pressable px-4 py-2.5 text-left"
                 >
-                  <CalendarBlankIcon className="size-5 shrink-0 text-primary" />
+                  <span
+                    aria-hidden
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                  >
+                    <CalendarBlankIcon className="size-5" />
+                  </span>
                   <span className="flex flex-col">
                     <span>
                       {formatMoment(
@@ -262,28 +336,36 @@ function JobPage() {
                 </button>
               </li>
             ))}
-          </ul>
+          </ListCard>
         </Section>
       )}
 
-      <Section title={m.job_money()}>
-        <div className="mx-4 grid grid-cols-3 gap-2">
-          {[
-            { label: m.job_price(), value: job.priceCents },
-            { label: m.job_paid(), value: job.paidCents },
-            { label: m.job_balance(), value: job.balanceCents },
-          ].map((cell) => (
-            <div key={cell.label} className="rounded-2xl bg-muted p-3">
-              <div className="text-xs text-muted-foreground">{cell.label}</div>
-              <div className="font-semibold tabular-nums">
-                {formatMoney(cell.value)}
-              </div>
-            </div>
-          ))}
+      <Section title={m.job_money()} icon={WalletIcon}>
+        <div className="mx-4 grid stagger grid-cols-3 gap-2">
+          <MoneyFigure
+            size="sm"
+            label={m.job_price()}
+            cents={job.priceCents}
+            hint={m.hint_price()}
+          />
+          <MoneyFigure
+            size="sm"
+            label={m.job_paid()}
+            cents={job.paidCents}
+            hint={m.hint_paid()}
+          />
+          <MoneyFigure
+            size="sm"
+            label={m.job_balance()}
+            cents={job.balanceCents}
+            hint={m.hint_balance()}
+            tone={job.owes && job.balanceCents > 0 ? 'highlight' : 'plain'}
+          />
         </div>
         {modules.costs && (
-          <p className="px-4 text-sm text-muted-foreground">
+          <p className="flex items-center gap-1 px-4 text-sm text-muted-foreground">
             {m.job_profit()}: {formatMoney(job.paidCents - job.costCents)}
+            <Hint term={m.job_profit()}>{m.hint_job_profit()}</Hint>
           </p>
         )}
         {client && client.creditCents > 0 && job.owes && (
@@ -329,7 +411,7 @@ function JobPage() {
           </div>
         )}
         {data.payments.length > 0 && (
-          <ul className="flex flex-col">
+          <ListCard>
             {data.payments.map((payment) => (
               <li key={payment._id}>
                 <button
@@ -341,19 +423,19 @@ function JobPage() {
                       amountCents: payment.paymentAmountCents,
                     })
                   }
-                  className="flex w-full items-baseline justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-muted/60"
+                  className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
                 >
                   <span>
                     {payment.label ?? METHOD_LABEL[payment.method]()} ·{' '}
                     {formatDay(payment.date, today)}
                   </span>
-                  <span className="tabular-nums">
+                  <span className="font-medium tabular-nums">
                     {formatMoney(payment.amountCents)}
                   </span>
                 </button>
               </li>
             ))}
-          </ul>
+          </ListCard>
         )}
         <div className="flex flex-wrap gap-2 px-4">
           <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
@@ -383,17 +465,19 @@ function JobPage() {
 
       <Section
         title={m.job_lines()}
+        icon={ListBulletsIcon}
         action={editButton(
           () => setPanel({ kind: 'lines' }),
           job.lines.length ? m.edit() : m.job_add_line(),
+          job.lines.length ? PencilSimpleIcon : PlusIcon,
         )}
       >
         {job.lines.length > 0 ? (
-          <ul className="flex flex-col px-4">
+          <ListCard>
             {job.lines.map((line) => (
               <li
                 key={line.id}
-                className="flex items-baseline justify-between gap-3 py-1.5 text-sm"
+                className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm"
               >
                 <span className="min-w-0">
                   {line.description}
@@ -410,7 +494,7 @@ function JobPage() {
                 </span>
               </li>
             ))}
-          </ul>
+          </ListCard>
         ) : (
           job.typedPriceCents !== undefined && (
             <p className="px-4 text-sm text-muted-foreground">
@@ -423,15 +507,20 @@ function JobPage() {
       {modules.costs && (
         <Section
           title={m.job_costs()}
-          action={editButton(() => setPanel({ kind: 'cost' }), m.cost_add())}
+          icon={ReceiptIcon}
+          action={editButton(
+            () => setPanel({ kind: 'cost' }),
+            m.cost_add(),
+            PlusIcon,
+          )}
         >
-          <ul className="flex flex-col">
+          <ListCard>
             {data.costs.map((cost) => (
               <li key={cost._id}>
                 <button
                   type="button"
                   onClick={() => setPanel({ kind: 'cost', cost })}
-                  className="flex w-full items-baseline justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-muted/60"
+                  className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
                 >
                   <span>
                     {cost.label} · {formatDay(cost.date, today)}
@@ -442,13 +531,14 @@ function JobPage() {
                 </button>
               </li>
             ))}
-          </ul>
+          </ListCard>
         </Section>
       )}
 
       {modules.items && client && !client.isNoClient && (
         <Section
           title={words.item.plural}
+          icon={StackIcon}
           action={editButton(() => setPanel({ kind: 'items' }))}
         >
           <div className="flex flex-wrap gap-2 px-4">
@@ -459,7 +549,7 @@ function JobPage() {
                 params={{ itemId: item._id }}
                 className={buttonVariants({
                   variant: 'outline',
-                  className: 'h-11 rounded-xl',
+                  className: 'h-11 rounded-xl shadow-xs',
                 })}
               >
                 {item.name}
@@ -472,8 +562,10 @@ function JobPage() {
       <ExtraFieldsView fields={fields} values={job.extra} today={today} />
 
       {job.notes && (
-        <Section title={m.job_notes()}>
-          <p className="px-4 text-sm whitespace-pre-wrap">{job.notes}</p>
+        <Section title={m.job_notes()} icon={NoteIcon}>
+          <p className="mx-4 surface px-4 py-3 text-sm whitespace-pre-wrap">
+            {job.notes}
+          </p>
         </Section>
       )}
 
@@ -492,7 +584,7 @@ function JobPage() {
         </div>
       )}
 
-      <Section title={m.job_files()}>
+      <Section title={m.job_files()} icon={PaperclipIcon}>
         <FileGallery
           businessId={business._id}
           target={{ kind: 'job', jobId: job._id }}
@@ -500,7 +592,7 @@ function JobPage() {
       </Section>
 
       {data.timeline.length > 0 && (
-        <Section title={m.job_history()}>
+        <Section title={m.job_history()} icon={ClockCounterClockwiseIcon}>
           <Timeline items={data.timeline} />
         </Section>
       )}

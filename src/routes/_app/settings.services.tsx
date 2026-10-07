@@ -5,6 +5,7 @@ import type { FunctionReturnType } from 'convex/server'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
+import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { MoneyInput, moneyInputText } from '#/components/money/money-input'
 import { useSubmit } from '#/components/money/use-submit'
@@ -65,7 +66,7 @@ function ServicesSettings() {
         type="button"
         disabled={!owner}
         onClick={() => setPanel({ service })}
-        className="flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl px-4 py-2 text-left hover:bg-muted/60"
+        className="flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 pressable px-4 py-2 text-left"
       >
         <span className="truncate font-medium">{service.name}</span>
         <span className="text-muted-foreground tabular-nums">
@@ -102,12 +103,15 @@ function ServicesSettings() {
       {!settings.modules.services && (
         <p className="px-4 text-sm text-muted-foreground">{m.services_off()}</p>
       )}
-      <ul className="flex flex-col">
-        {active.map((service, index) => row(service, index))}
-      </ul>
+      <ListCard>{active.map((service, index) => row(service, index))}</ListCard>
       {owner && (
         <div className="px-4">
-          <Button variant="outline" size="xl" onClick={() => setPanel({})}>
+          <Button
+            variant="outline"
+            size="xl"
+            className="shadow-xs"
+            onClick={() => setPanel({})}
+          >
             <PlusIcon data-icon="inline-start" />
             {m.services_add()}
           </Button>
@@ -118,9 +122,9 @@ function ServicesSettings() {
           <h2 className="px-4 text-sm font-semibold text-muted-foreground">
             {m.services_archived()}
           </h2>
-          <ul className="flex flex-col opacity-70">
+          <ListCard className="opacity-70">
             {archived.map((service) => row(service))}
-          </ul>
+          </ListCard>
         </section>
       )}
       <Sheet

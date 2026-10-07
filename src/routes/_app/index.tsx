@@ -1,4 +1,12 @@
-import { SunIcon } from '@phosphor-icons/react'
+import {
+  BellIcon,
+  CalendarCheckIcon,
+  CalendarDotsIcon,
+  HandCoinsIcon,
+  HourglassMediumIcon,
+  SunIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -40,7 +48,7 @@ function TodayPage() {
   return (
     <>
       <div className="px-4 pt-2">
-        <span className="text-sm text-muted-foreground">
+        <span className="block text-sm font-medium text-muted-foreground first-letter:uppercase">
           {LONG_DATE.format(Date.now())}
         </span>
       </div>
@@ -60,6 +68,8 @@ function TodayPage() {
               title={m.today_appointments({
                 appointments: words.appointment.plural,
               })}
+              icon={CalendarCheckIcon}
+              count={data.appointments.length}
             >
               {data.appointments.map(
                 (item) =>
@@ -80,21 +90,35 @@ function TodayPage() {
             </ListSection>
           )}
           {data.overdue.length > 0 && (
-            <ListSection title={m.today_overdue()}>
+            <ListSection
+              title={m.today_overdue()}
+              icon={WarningCircleIcon}
+              tone="danger"
+              count={data.overdue.length}
+            >
               {data.overdue.map((job) => (
                 <JobRow key={job._id} job={job} today={today} />
               ))}
             </ListSection>
           )}
           {data.dueSoon.length > 0 && (
-            <ListSection title={m.today_due_soon()}>
+            <ListSection
+              title={m.today_due_soon()}
+              icon={HourglassMediumIcon}
+              tone="warning"
+              count={data.dueSoon.length}
+            >
               {data.dueSoon.map((job) => (
                 <JobRow key={job._id} job={job} today={today} />
               ))}
             </ListSection>
           )}
           {data.reminders.length > 0 && (
-            <ListSection title={m.today_reminders()}>
+            <ListSection
+              title={m.today_reminders()}
+              icon={BellIcon}
+              count={data.reminders.length}
+            >
               {data.reminders.map((reminder) => (
                 <ReminderRow
                   key={reminder._id}
@@ -108,14 +132,24 @@ function TodayPage() {
             </ListSection>
           )}
           {data.doneUnpaid.length > 0 && (
-            <ListSection title={m.today_done_unpaid()}>
+            <ListSection
+              title={m.today_done_unpaid()}
+              icon={HandCoinsIcon}
+              tone="success"
+              count={data.doneUnpaid.length}
+            >
               {data.doneUnpaid.map((job) => (
                 <JobRow key={job._id} job={job} today={today} />
               ))}
             </ListSection>
           )}
           {data.upcoming.length > 0 && (
-            <ListSection title={m.today_upcoming()}>
+            <ListSection
+              title={m.today_upcoming()}
+              icon={CalendarDotsIcon}
+              tone="muted"
+              count={data.upcoming.length}
+            >
               {data.upcoming.map(
                 (item) =>
                   item.job && (

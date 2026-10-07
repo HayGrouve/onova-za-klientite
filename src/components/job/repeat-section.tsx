@@ -6,6 +6,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { REPEAT_LABEL } from '#/components/setup/steps'
 import { Button, buttonVariants } from '#/components/ui/button'
+import { SectionHeader } from '#/components/list-section'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
 import { errorMessage } from '#/lib/errors'
@@ -38,13 +39,10 @@ export function RepeatSection({ job }: { job: Doc<'jobs'> }) {
   const active = job.repeat && job.repeat.stoppedAt === undefined
 
   return (
-    <section className="flex flex-col gap-2 px-4">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-        <RepeatIcon className="size-4" />
-        {m.repeat_title()}
-      </h2>
+    <section className="flex flex-col gap-2">
+      <SectionHeader title={m.repeat_title()} icon={RepeatIcon} />
       {active && job.repeat ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="mx-4 flex flex-wrap items-center gap-2 surface py-1.5 pr-1.5 pl-4">
           <span className="text-sm">
             {m.repeat_on({ every: lower(repeatLabel(job.repeat)) })}
           </span>
@@ -74,12 +72,12 @@ export function RepeatSection({ job }: { job: Doc<'jobs'> }) {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 px-4">
           {CHOICES.map((choice) => (
             <Button
               key={choice.key}
               variant="outline"
-              className="h-11 rounded-xl"
+              className="h-11 rounded-xl shadow-xs"
               onClick={() =>
                 void setRepeat({
                   businessId: business._id,

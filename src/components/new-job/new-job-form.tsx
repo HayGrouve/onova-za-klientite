@@ -1,4 +1,15 @@
-import { NotePencilIcon, XIcon } from '@phosphor-icons/react'
+import {
+  CalendarBlankIcon,
+  ClipboardTextIcon,
+  CoinsIcon,
+  FlagIcon,
+  NotePencilIcon,
+  RepeatIcon,
+  TagIcon,
+  UserIcon,
+  XIcon,
+} from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { cn } from 'cn'
@@ -68,6 +79,7 @@ function capitalize(text: string) {
 
 function ReadRow({
   label,
+  icon: IconComponent,
   value,
   missing,
   onFix,
@@ -75,6 +87,7 @@ function ReadRow({
   children,
 }: {
   label: string
+  icon: Icon
   value: React.ReactNode
   missing?: string | false
   onFix: () => void
@@ -84,13 +97,22 @@ function ReadRow({
   return (
     <div className="flex flex-col gap-2 py-2">
       <div className="flex min-h-11 items-center gap-3">
-        <span className="w-20 shrink-0 text-sm text-muted-foreground">
+        <span className="flex w-24 shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+          <IconComponent
+            aria-hidden
+            className={cn(
+              'size-4 shrink-0 transition-colors',
+              value && 'text-primary',
+            )}
+          />
           {label}
         </span>
         <span
+          // Re-keyed when a value first appears, so it rises in as it's understood.
+          key={value ? 'set' : 'unset'}
           className={cn(
             'min-w-0 flex-1 text-base',
-            !value && 'text-muted-foreground',
+            value ? 'animate-rise' : 'text-muted-foreground',
           )}
         >
           {value || '-'}
@@ -101,8 +123,8 @@ function ReadRow({
           </Button>
         )}
       </div>
-      {missing && <p className="ps-23 text-sm text-destructive">{missing}</p>}
-      {children && <div className="ps-23">{children}</div>}
+      {missing && <p className="ps-27 text-sm text-destructive">{missing}</p>}
+      {children && <div className="ps-27">{children}</div>}
     </div>
   )
 }
@@ -319,6 +341,7 @@ export function NewJobForm({
 
           <ReadRow
             label={words.client.singular}
+            icon={UserIcon}
             fixing={fixing === 'client'}
             onFix={() => setFixing('client')}
             value={
@@ -375,6 +398,7 @@ export function NewJobForm({
 
           <ReadRow
             label={m.new_what()}
+            icon={ClipboardTextIcon}
             value={chosenTitle}
             fixing={fixing === 'title'}
             onFix={() => setFixing('title')}
@@ -396,6 +420,7 @@ export function NewJobForm({
 
           <ReadRow
             label={m.new_price()}
+            icon={TagIcon}
             fixing={fixing === 'price'}
             onFix={() => setFixing('price')}
             value={
@@ -433,6 +458,7 @@ export function NewJobForm({
           {showDeposit && (
             <ReadRow
               label={m.new_deposit()}
+              icon={CoinsIcon}
               fixing={fixing === 'deposit'}
               onFix={() => setFixing('deposit')}
               value={
@@ -494,6 +520,7 @@ export function NewJobForm({
 
           <ReadRow
             label={single ? m.new_when() : m.new_due()}
+            icon={single ? CalendarBlankIcon : FlagIcon}
             value={dateText}
             fixing={fixing === 'date'}
             onFix={() => setFixing('date')}
@@ -576,7 +603,11 @@ export function NewJobForm({
                 htmlFor="new-repeat"
                 className="flex min-w-0 flex-1 items-center gap-3"
               >
-                <span className="w-20 shrink-0 text-sm text-muted-foreground">
+                <span className="flex w-24 shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+                  <RepeatIcon
+                    aria-hidden
+                    className={cn('size-4 shrink-0', repeat && 'text-primary')}
+                  />
                   {m.repeat_read_back()}
                 </span>
                 <span className="text-base">

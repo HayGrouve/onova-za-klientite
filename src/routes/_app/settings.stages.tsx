@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { useSubmit } from '#/components/money/use-submit'
 import { SettingsPage } from '#/components/settings/settings-page'
@@ -114,14 +115,14 @@ function StagesSettings() {
         <ListSkeleton />
       ) : (
         <>
-          <ul className="flex flex-col">
+          <ListCard>
             {settings.stages.map((stage, index) => (
               <li key={stage._id} className="flex items-center gap-1 pr-2">
                 <button
                   type="button"
                   disabled={!owner}
                   onClick={() => setPanel({ stage })}
-                  className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-2xl px-4 py-2 text-left hover:bg-muted/60"
+                  className="flex min-h-14 min-w-0 flex-1 items-center gap-3 pressable px-4 py-2 text-left"
                 >
                   <StageBadge name={stage.name} color={stage.color} />
                   <span className="flex min-w-0 flex-col text-sm text-muted-foreground">
@@ -156,10 +157,15 @@ function StagesSettings() {
                 </Button>
               </li>
             ))}
-          </ul>
+          </ListCard>
           {owner && (
             <div className="px-4">
-              <Button variant="outline" size="xl" onClick={() => setPanel({})}>
+              <Button
+                variant="outline"
+                size="xl"
+                className="shadow-xs"
+                onClick={() => setPanel({})}
+              >
                 <PlusIcon data-icon="inline-start" />
                 {m.stages_add()}
               </Button>

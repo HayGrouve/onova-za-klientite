@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
+import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { SettingsPage } from '#/components/settings/settings-page'
 import { Switch } from '#/components/ui/switch'
@@ -70,7 +71,7 @@ function ModulesSettings() {
       {!settings ? (
         <ListSkeleton />
       ) : (
-        <ul className="flex flex-col divide-y">
+        <ListCard>
           {MODULE_KEYS.map((key) => (
             <ToggleRow
               key={key}
@@ -100,7 +101,7 @@ function ModulesSettings() {
               }).catch(fail)
             }
           />
-        </ul>
+        </ListCard>
       )}
     </SettingsPage>
   )

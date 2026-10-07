@@ -67,7 +67,7 @@ function NamesForm({ initial, owner }: { initial: Words; owner: boolean }) {
     >
       <fieldset disabled={!owner} className="contents">
         {KEYS.map(({ key, label }) => (
-          <FieldSet key={key} className="rounded-2xl border p-4">
+          <FieldSet key={key} className="surface p-4">
             <FieldLegend variant="label">{label()}</FieldLegend>
             <div className="grid grid-cols-2 gap-3">
               <Field>

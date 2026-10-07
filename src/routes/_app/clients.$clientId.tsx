@@ -1,9 +1,20 @@
 import {
+  BellIcon,
+  CaretRightIcon,
   ChatCircleIcon,
+  ClipboardTextIcon,
+  ClockCounterClockwiseIcon,
+  EnvelopeSimpleIcon,
+  MapPinIcon,
+  NoteIcon,
+  PaperclipIcon,
   PencilSimpleIcon,
   PhoneIcon,
   PlusIcon,
+  StackIcon,
+  WalletIcon,
 } from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useState } from 'react'
@@ -14,13 +25,15 @@ import { ClientForm } from '#/components/client-form'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { JobRow } from '#/components/job-row'
+import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { RefundForm } from '#/components/money/refund-form'
 import { RemovePayment } from '#/components/money/remove-payment'
-import { ListSection } from '#/components/list-section'
+import { ListNote, ListSection, SectionHeader } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
 import {
@@ -82,14 +95,16 @@ function ClientPage() {
             {!client.isNoClient &&
               !client.anonymizedAt &&
               !client.mergedIntoId && (
-                <Button
-                  variant="ghost"
-                  size="icon-xl"
-                  aria-label={m.client_edit()}
-                  onClick={() => setPanel({ kind: 'edit' })}
-                >
-                  <PencilSimpleIcon />
-                </Button>
+                <Tip label={m.client_edit()}>
+                  <Button
+                    variant="ghost"
+                    size="icon-xl"
+                    aria-label={m.client_edit()}
+                    onClick={() => setPanel({ kind: 'edit' })}
+                  >
+                    <PencilSimpleIcon />
+                  </Button>
+                </Tip>
               )}
           </div>
         </div>
@@ -116,9 +131,12 @@ function ClientPage() {
           <div className="flex gap-2">
             <a
               href={telHref(phone)}
-              className={buttonVariants({ size: 'xl', className: 'flex-1' })}
+              className={buttonVariants({
+                size: 'xl',
+                className: 'flex-1 shadow-md shadow-primary/25',
+              })}
             >
-              <PhoneIcon data-icon="inline-start" />
+              <PhoneIcon data-icon="inline-start" weight="fill" />
               {m.client_call()}
             </a>
             <a
@@ -126,67 +144,62 @@ function ClientPage() {
               className={buttonVariants({
                 variant: 'outline',
                 size: 'xl',
-                className: 'flex-1',
+                className: 'flex-1 shadow-xs',
               })}
             >
-              <ChatCircleIcon data-icon="inline-start" />
+              {/* Viber's own purple, so the button is recognised at a glance. */}
+              <ChatCircleIcon
+                data-icon="inline-start"
+                weight="fill"
+                className="text-[#7360f2]"
+              />
               {m.client_viber()}
             </a>
           </div>
         )}
-        <dl className="flex flex-col gap-1 text-sm">
-          {client.phones.map((item) => (
-            <div key={item.e164} className="flex gap-3">
-              <dt className="w-28 shrink-0 text-muted-foreground">
-                {m.client_phone()}
-              </dt>
-              <dd>
+        {(client.phones.length > 0 || client.email || client.address) && (
+          <dl className="flex animate-rise flex-col divide-y divide-border/70 overflow-hidden surface text-sm">
+            {client.phones.map((item) => (
+              <ContactRow
+                key={item.e164}
+                icon={PhoneIcon}
+                label={m.client_phone()}
+              >
                 <a
                   href={telHref(item.e164)}
                   className="underline-offset-4 hover:underline"
                 >
                   {formatPhone(item.e164)}
                 </a>
-              </dd>
-            </div>
-          ))}
-          {client.email && (
-            <div className="flex gap-3">
-              <dt className="w-28 shrink-0 text-muted-foreground">
-                {m.client_email()}
-              </dt>
-              <dd className="min-w-0 truncate">{client.email}</dd>
-            </div>
-          )}
-          {client.address && (
-            <div className="flex gap-3">
-              <dt className="w-28 shrink-0 text-muted-foreground">
-                {m.client_address()}
-              </dt>
-              <dd>{client.address}</dd>
-            </div>
-          )}
-        </dl>
+              </ContactRow>
+            ))}
+            {client.email && (
+              <ContactRow icon={EnvelopeSimpleIcon} label={m.client_email()}>
+                <span className="block truncate">{client.email}</span>
+              </ContactRow>
+            )}
+            {client.address && (
+              <ContactRow icon={MapPinIcon} label={m.client_address()}>
+                {client.address}
+              </ContactRow>
+            )}
+          </dl>
+        )}
       </header>
 
       {(data.owedCents > 0 || client.creditCents > 0) && (
-        <div className="mx-4 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-muted p-3">
-            <div className="text-sm text-muted-foreground">
-              {m.client_owes_total()}
-            </div>
-            <div className="text-lg font-semibold tabular-nums">
-              {formatMoney(data.owedCents)}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-muted p-3">
-            <div className="text-sm text-muted-foreground">
-              {m.client_credit()}
-            </div>
-            <div className="text-lg font-semibold tabular-nums">
-              {formatMoney(client.creditCents)}
-            </div>
-          </div>
+        <div className="mx-4 grid stagger grid-cols-2 gap-2.5">
+          <MoneyFigure
+            label={m.client_owes_total()}
+            cents={data.owedCents}
+            hint={m.hint_owes_total()}
+            tone={data.owedCents > 0 ? 'highlight' : 'plain'}
+          />
+          <MoneyFigure
+            label={m.client_credit()}
+            cents={client.creditCents}
+            hint={m.hint_credit()}
+          />
         </div>
       )}
 
@@ -196,18 +209,28 @@ function ClientPage() {
         today={today}
       />
       {client.note && (
-        <p className="px-4 text-sm whitespace-pre-wrap">{client.note}</p>
+        <section className="flex flex-col gap-2">
+          <SectionHeader title={m.client_note()} icon={NoteIcon} />
+          <p className="mx-4 surface px-4 py-3 text-sm whitespace-pre-wrap">
+            {client.note}
+          </p>
+        </section>
       )}
 
       {business.modules.items && !client.isNoClient && (
         <ListSection
           title={words.item.plural}
+          icon={StackIcon}
           action={
             <Link
               to="/items/new"
               search={{ clientId: client._id }}
-              className={buttonVariants({ variant: 'ghost', className: 'h-9' })}
+              className={buttonVariants({
+                variant: 'ghost',
+                className: 'h-9 text-primary',
+              })}
             >
+              <PlusIcon data-icon="inline-start" />
               {m.item_add()}
             </Link>
           }
@@ -217,9 +240,13 @@ function ClientPage() {
               <Link
                 to="/items/$itemId"
                 params={{ itemId: item._id }}
-                className="block rounded-2xl px-4 py-3 font-medium hover:bg-muted/60"
+                className="flex items-center justify-between gap-3 pressable px-4 py-3 font-medium"
               >
                 {item.name}
+                <CaretRightIcon
+                  aria-hidden
+                  className="size-4 shrink-0 text-muted-foreground/60"
+                />
               </Link>
             </li>
           ))}
@@ -229,10 +256,11 @@ function ClientPage() {
       {business.modules.reminders && !client.isNoClient && (
         <ListSection
           title={m.reminder_list()}
+          icon={BellIcon}
           action={
             <Button
               variant="ghost"
-              className="h-9"
+              className="h-9 text-primary"
               onClick={() => setPanel({ kind: 'reminder' })}
             >
               <PlusIcon data-icon="inline-start" />
@@ -251,11 +279,13 @@ function ClientPage() {
         </ListSection>
       )}
 
-      <ListSection title={words.job.plural}>
+      <ListSection
+        title={words.job.plural}
+        icon={ClipboardTextIcon}
+        count={data.jobs.length || undefined}
+      >
         {data.jobs.length === 0 ? (
-          <li className="px-4 text-sm text-muted-foreground">
-            {m.client_no_jobs()}
-          </li>
+          <ListNote>{m.client_no_jobs()}</ListNote>
         ) : (
           data.jobs.map((job) => (
             <JobRow key={job._id} job={job} today={today} showClient={false} />
@@ -263,11 +293,30 @@ function ClientPage() {
         )}
       </ListSection>
 
-      <ListSection title={m.client_payments()}>
+      <ListSection
+        title={m.client_payments()}
+        icon={WalletIcon}
+        footer={
+          <div className="flex flex-wrap gap-2 px-4 pt-1">
+            <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
+              <PlusIcon data-icon="inline-start" />
+              {m.pay_add()}
+            </Button>
+            {client.creditCents > 0 && (
+              <Button
+                variant="outline"
+                size="xl"
+                className="shadow-xs"
+                onClick={() => setPanel({ kind: 'refund' })}
+              >
+                {m.refund_add()}
+              </Button>
+            )}
+          </div>
+        }
+      >
         {data.payments.length === 0 ? (
-          <li className="px-4 text-sm text-muted-foreground">
-            {m.client_no_payments()}
-          </li>
+          <ListNote>{m.client_no_payments()}</ListNote>
         ) : (
           data.payments.map((payment) => (
             <li key={payment._id}>
@@ -280,7 +329,7 @@ function ClientPage() {
                     amountCents: payment.amountCents,
                   })
                 }
-                className="flex w-full items-baseline justify-between gap-3 px-4 py-2 text-left hover:bg-muted/60"
+                className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
               >
                 <span className="flex flex-col">
                   <span>{payment.label ?? METHOD_LABEL[payment.method]()}</span>
@@ -296,28 +345,11 @@ function ClientPage() {
             </li>
           ))
         )}
-        <li className="flex flex-wrap gap-2 px-4 pt-2">
-          <Button size="xl" onClick={() => setPanel({ kind: 'payment' })}>
-            <PlusIcon data-icon="inline-start" />
-            {m.pay_add()}
-          </Button>
-          {client.creditCents > 0 && (
-            <Button
-              variant="outline"
-              size="xl"
-              onClick={() => setPanel({ kind: 'refund' })}
-            >
-              {m.refund_add()}
-            </Button>
-          )}
-        </li>
       </ListSection>
 
       {!client.isNoClient && (
         <section className="flex flex-col gap-2">
-          <h2 className="px-4 text-sm font-semibold text-muted-foreground">
-            {m.job_files()}
-          </h2>
+          <SectionHeader title={m.job_files()} icon={PaperclipIcon} />
           <FileGallery
             businessId={business._id}
             target={{ kind: 'client', clientId: client._id }}
@@ -327,9 +359,10 @@ function ClientPage() {
 
       {data.timeline.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="px-4 text-sm font-semibold text-muted-foreground">
-            {m.client_history()}
-          </h2>
+          <SectionHeader
+            title={m.client_history()}
+            icon={ClockCounterClockwiseIcon}
+          />
           <Timeline items={data.timeline} />
         </section>
       )}
@@ -402,6 +435,29 @@ function ClientPage() {
           </div>
         </SheetContent>
       </Sheet>
+    </div>
+  )
+}
+
+function ContactRow({
+  icon: IconComponent,
+  label,
+  children,
+}: {
+  icon: Icon
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5">
+      <IconComponent
+        aria-hidden
+        className="size-5 shrink-0 text-muted-foreground"
+      />
+      <div className="flex min-w-0 flex-col">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className="min-w-0">{children}</dd>
+      </div>
     </div>
   )
 }
