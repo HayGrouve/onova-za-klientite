@@ -1,11 +1,7 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
 import { jobOwes } from '../shared/allocation'
-import {
-  canRegroupStage,
-  canRemoveStage,
-  groupedOrder,
-} from '../shared/stages'
+import { canRegroupStage, canRemoveStage, groupedOrder } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
