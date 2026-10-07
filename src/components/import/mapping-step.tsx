@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { PreviewTable } from '#/components/import/preview-table'
 import { Button } from '#/components/ui/button'
 import {
   NativeSelect,
@@ -6,7 +7,12 @@ import {
   NativeSelectOption,
 } from '#/components/ui/native-select'
 import { m } from '#/paraglide/messages.js'
-import { detectTargets, foldName, mapRows } from '../../../shared/import'
+import {
+  FIELD_PREFIX,
+  detectTargets,
+  firstChoice,
+  mapRows,
+} from '../../../shared/import'
 import type { ColumnTarget, ImportRow, Table } from '../../../shared/import'
 
 type FieldOption = { id: string; name: string }
@@ -24,22 +30,15 @@ const BASIC: Array<[Exclude<ColumnTarget, 'extra'>, () => string]> = [
   ['company', m.import_target_company],
 ]
 
-const FIELD_PREFIX = 'field:'
+// The rows the live preview shows.
+const PREVIEW_ROWS = 5
 
-/** The first guess for a column: its detected meaning, or the field with its name, or a new field. */
-function firstChoice(
-  header: string,
-  target: ColumnTarget,
-  fields: FieldOption[],
-  canAddFields: boolean,
-): string {
-  if (target !== 'extra') return target
-  const same = fields.find((field) => foldName(field.name) === foldName(header))
-  if (same) return `${FIELD_PREFIX}${same.id}`
-  return canAddFields ? 'new' : 'skip'
-}
-
-/** Each column of the file, with what it becomes. Unknown columns can become new fields. */
+/**
+ * Each column of the file, with what it becomes. A column the app doesn't
+ * know is skipped until the person picks a field or "new field" for it. On a
+ * wide screen the first rows are shown beside the columns as they would be
+ * saved, and change with each choice.
+ */
 export function MappingStep({
   table,
   fields,
@@ -56,7 +55,7 @@ export function MappingStep({
 }) {
   const [choices, setChoices] = useState(() =>
     detectTargets(table.headers).map((target, col) =>
-      firstChoice(table.headers[col], target, fields, canAddFields),
+      firstChoice(table.headers[col], target, fields),
     ),
   )
 
@@ -71,6 +70,16 @@ export function MappingStep({
   )
   const canContinue = targets.some((target) =>
     ['name', 'company', 'phone'].includes(target),
+  )
+  const previewRows = useMemo(
+    () =>
+      mapRows(
+        { headers: table.headers, rows: table.rows.slice(0, PREVIEW_ROWS * 2) },
+        targets,
+      )
+        .slice(0, PREVIEW_ROWS)
+        .map((row) => ({ row })),
+    [table, targets],
   )
 
   const submit = () => {
@@ -87,8 +96,8 @@ export function MappingStep({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1 px-4">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-x-8">
+      <div className="flex flex-col gap-1 px-4 lg:col-span-2">
         <h2 className="text-xl font-semibold">{m.import_map_title()}</h2>
         <p className="text-sm text-muted-foreground">{m.import_map_help()}</p>
       </div>
@@ -168,6 +177,17 @@ export function MappingStep({
           {m.import_continue()}
         </Button>
       </div>
+      {/* A wide screen: the first rows as they would be saved, beside the
+          columns, changing with each choice. */}
+      <aside
+        aria-label={m.import_map_preview()}
+        className="hidden flex-col gap-2 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-3 lg:row-start-2 lg:flex"
+      >
+        <p className="text-sm font-medium text-muted-foreground">
+          {m.import_map_preview()}
+        </p>
+        <PreviewTable rows={previewRows} />
+      </aside>
     </div>
   )
 }

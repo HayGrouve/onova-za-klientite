@@ -1,20 +1,28 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
+import { BackLink, ImportDone } from '#/components/import/import-done'
 import { MappingStep } from '#/components/import/mapping-step'
 import type { ColumnFields } from '#/components/import/mapping-step'
 import { PreviewStep } from '#/components/import/preview-step'
 import { SourceStep } from '#/components/import/source-step'
 import { PageTitle } from '#/components/page'
 import { Spinner } from '#/components/ui/spinner'
-import { buttonVariants } from '#/components/ui/button'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
+import { canPickContact } from '#/lib/contacts'
+import { clearOutcome, useImportOutcome } from '#/lib/import-outcome'
 import { m } from '#/paraglide/messages.js'
 import type { ImportRow, Table } from '../../../shared/import'
 
-export const Route = createFileRoute('/_app/import')({ component: ImportPage })
+export const Route = createFileRoute('/_app/import')({
+  // Where the person came from, to offer the way back at the end.
+  validateSearch: (search: Record<string, unknown>): { from?: 'settings' } =>
+    search.from === 'settings' ? { from: 'settings' } : {},
+  staticData: { layout: 'wide' },
+  component: ImportPage,
+})
 
 type Step =
   | { name: 'source' }
@@ -35,6 +43,10 @@ function ImportPage() {
     target: 'client',
   })
   const [step, setStep] = useState<Step>({ name: 'source' })
+  const from = Route.useSearch({ select: (search) => search.from })
+  // The result is kept outside this page, so it shows even if the page was
+  // rebuilt while the import ran.
+  const outcome = useImportOutcome(business._id)
 
   if (role === 'worker') {
     return (
@@ -45,13 +57,34 @@ function ImportPage() {
     )
   }
 
+  if (outcome) {
+    return (
+      <div className="flex flex-col gap-4 pb-8">
+        <PageTitle>{m.import_title()}</PageTitle>
+        <ImportDone
+          outcome={outcome}
+          clients={business.words.client.plural}
+          from={from}
+          onAgain={() => {
+            clearOutcome()
+            setStep({ name: 'source' })
+          }}
+        />
+      </div>
+    )
+  }
+
+  const clients = lower(business.words.client.plural)
   return (
     <div className="flex flex-col gap-4 pb-8">
       <PageTitle>{m.import_title()}</PageTitle>
       {step.name === 'source' && (
-        <>
+        <div className="flex flex-col gap-4 lg:max-w-xl">
           <p className="px-4 text-muted-foreground">
-            {m.import_help({ clients: lower(business.words.client.plural) })}
+            {/* Only what this device offers: the phone's contacts are an Android Chrome feature. */}
+            {canPickContact()
+              ? m.import_help({ clients })
+              : m.import_help_file({ clients })}
           </p>
           <SourceStep
             onContacts={(rows) =>
@@ -60,11 +93,9 @@ function ImportPage() {
             onFile={(table) => setStep({ name: 'map', table })}
           />
           <div className="flex justify-center px-4 pt-2">
-            <Link to="/" className={buttonVariants({ variant: 'ghost' })}>
-              {m.import_go_today()}
-            </Link>
+            <BackLink from={from} />
           </div>
-        </>
+        </div>
       )}
       {step.name === 'map' &&
         (fields ? (
@@ -100,7 +131,6 @@ function ImportPage() {
                 : { name: 'source' },
             )
           }
-          onAgain={() => setStep({ name: 'source' })}
         />
       )}
     </div>
