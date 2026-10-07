@@ -8,18 +8,20 @@ import {
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { ItemForm } from '#/components/item-form'
 import { JobRow } from '#/components/job-row'
+import { useSubmit } from '#/components/money/use-submit'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
+import { ReminderForm } from '#/components/reminders/reminder-form'
+import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { Tip } from '#/components/tip'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { Timeline } from '#/components/timeline'
-import { Button } from '#/components/ui/button'
+import { Button, buttonVariants } from '#/components/ui/button'
 import { InputGroup, InputGroupInput } from '#/components/ui/input-group'
 import {
   Sheet,
@@ -27,10 +29,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { Spinner } from '#/components/ui/spinner'
+import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
-import { errorMessage } from '#/lib/errors'
+import { formatDayWithYear } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
+import { dateInSofia } from '../../../shared/dates'
 import { searchClients } from '../../../shared/search'
 
 export const Route = createFileRoute('/_app/items/$itemId')({
@@ -46,9 +51,25 @@ function ItemPage() {
     businessId: business._id,
     itemId: itemId as Id<'items'>,
   })
-  const [panel, setPanel] = useState<'edit' | 'move' | null>(null)
+  const [panel, setPanel] = useState<'edit' | 'move' | 'reminder' | null>(null)
+  const reminders = useQuery(
+    api.reminders.forItem,
+    business.modules.reminders
+      ? { businessId: business._id, itemId: itemId as Id<'items'> }
+      : 'skip',
+  )
   if (!data) return <ListSkeleton />
   const { item, client } = data
+  // "When did I last do this one?": the latest job that reached Done.
+  const lastDoneAt = data.jobs.reduce<number | undefined>(
+    (latest, job) =>
+      job.stageGroup === 'done' &&
+      job.doneAt !== undefined &&
+      (latest === undefined || job.doneAt > latest)
+        ? job.doneAt
+        : latest,
+    undefined,
+  )
 
   return (
     // A wide screen puts the owner and fields on the left, the work and files
@@ -70,6 +91,24 @@ function ItemPage() {
             </Button>
           </Tip>
         </div>
+        {lastDoneAt !== undefined && (
+          <p className="text-sm text-muted-foreground">
+            {m.item_last_done({
+              date: formatDayWithYear(dateInSofia(lastDoneAt), today),
+            })}
+          </p>
+        )}
+        {/* The job starts for this item's client with the item linked. */}
+        <Link
+          to="/new"
+          search={{ clientId: item.clientId, itemId: item._id }}
+          className={buttonVariants({
+            size: 'xl',
+            className: 'w-full lg:w-fit',
+          })}
+        >
+          {m.new_job({ job: business.words.job.singular })}
+        </Link>
       </header>
 
       <div className="contents lg:flex lg:flex-col lg:gap-4">
@@ -116,10 +155,24 @@ function ItemPage() {
         >
           <PanelList>
             {data.jobs.map((job) => (
-              <JobRow key={job._id} job={job} today={today} />
+              <JobRow
+                key={job._id}
+                job={job}
+                today={today}
+                showClient={false}
+                showDone
+              />
             ))}
           </PanelList>
         </Panel>
+
+        {business.modules.reminders && (
+          <RemindersPanel
+            reminders={reminders ?? []}
+            today={today}
+            onAdd={() => setPanel('reminder')}
+          />
+        )}
 
         <Panel title={m.job_files()} icon={PaperclipIcon}>
           <PanelBody className="px-0">
@@ -149,7 +202,11 @@ function ItemPage() {
         >
           <SheetHeader>
             <SheetTitle>
-              {panel === 'move' ? m.item_move_title() : item.name}
+              {panel === 'move'
+                ? m.item_move_title()
+                : panel === 'reminder'
+                  ? m.reminder_add_title()
+                  : item.name}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -167,6 +224,14 @@ function ItemPage() {
                 businessId={business._id}
                 itemId={item._id}
                 currentClientId={item.clientId}
+                onDone={() => setPanel(null)}
+              />
+            )}
+            {panel === 'reminder' && (
+              <ReminderForm
+                businessId={business._id}
+                target={{ itemId: item._id }}
+                initialDate={today}
                 onDone={() => setPanel(null)}
               />
             )}
@@ -190,7 +255,9 @@ function MovePicker({
 }) {
   const clients = useQuery(api.clients.list, { businessId })
   const move = useMutation(api.items.move)
+  const { busy, run } = useSubmit(onDone)
   const [query, setQuery] = useState('')
+  const [toId, setToId] = useState<Id<'clients'> | null>(null)
   if (!clients) return <ListSkeleton />
   const candidates = clients
     .filter((client) => !client.isNoClient && client._id !== currentClientId)
@@ -202,8 +269,10 @@ function MovePicker({
   const shown = query.trim()
     ? searchClients(candidates, query, 20)
     : candidates.slice(0, 20)
+  // Only a client in view can be moved to: what is chosen is what is seen.
+  const chosen = shown.find((client) => client._id === toId)
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <InputGroup>
         <InputGroupInput
           autoFocus
@@ -213,25 +282,42 @@ function MovePicker({
           onChange={(event) => setQuery(event.target.value)}
         />
       </InputGroup>
-      <div className="flex flex-col">
+      <ToggleGroup
+        aria-label={m.item_move_title()}
+        value={toId ? [toId] : []}
+        onValueChange={(next: string[]) => {
+          // Tapping the chosen one again keeps it chosen.
+          if (next[0]) setToId(next[0] as Id<'clients'>)
+        }}
+        variant="outline"
+        size="xl"
+        orientation="vertical"
+        className="w-full"
+      >
         {shown.map((client) => (
-          <Button
+          <ToggleGroupItem
             key={client._id}
-            variant="ghost"
-            className="h-12 justify-start rounded-xl text-base"
-            onClick={() =>
-              void move({ businessId, itemId, toClientId: client._id })
-                .then(() => {
-                  toast.success(m.item_moved())
-                  onDone()
-                })
-                .catch((error: unknown) => toast.error(errorMessage(error)))
-            }
+            value={client._id}
+            className="justify-start"
           >
             {client.name}
-          </Button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
+      <Button
+        size="xl"
+        disabled={busy || !chosen}
+        onClick={() =>
+          chosen &&
+          void run(
+            () => move({ businessId, itemId, toClientId: chosen._id }),
+            m.item_moved(),
+          )
+        }
+      >
+        {busy && <Spinner data-icon="inline-start" />}
+        {m.item_move_confirm()}
+      </Button>
     </div>
   )
 }

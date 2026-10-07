@@ -5,6 +5,7 @@ import {
   FlagIcon,
   NotePencilIcon,
   RepeatIcon,
+  StackIcon,
   TagIcon,
   UserIcon,
   XIcon,
@@ -90,8 +91,9 @@ function ReadRow({
   icon: Icon
   value: React.ReactNode
   missing?: string | false
-  onFix: () => void
-  fixing: boolean
+  /** Left out for a row that can't be fixed here. */
+  onFix?: () => void
+  fixing?: boolean
   children?: React.ReactNode
 }) {
   return (
@@ -117,7 +119,7 @@ function ReadRow({
         >
           {value || '-'}
         </span>
-        {!fixing && (
+        {!fixing && onFix && (
           <Button variant="link" className="h-11 shrink-0 px-1" onClick={onFix}>
             {m.new_fix()}
           </Button>
@@ -137,10 +139,16 @@ export function NewJobForm({
   business,
   clients,
   services,
+  start,
 }: {
   business: ActiveBusiness
   clients: ClientCandidate[]
   services: ServiceRef[]
+  /** Started from an item: its client is chosen already, and the job is linked to the item. */
+  start?: {
+    client: { id: string; name: string }
+    item?: { id: Id<'items'>; name: string }
+  }
 }) {
   const navigate = useNavigate()
   const save = useMutation(api.newJob.save)
@@ -151,7 +159,17 @@ export function NewJobForm({
   const [saving, setSaving] = useState(false)
   const [fixing, setFixing] = useState<Fixable | null>(null)
   // Fixes made by hand. A fix holds until the line reads that field differently.
-  const [clientFix, setClientFix] = useState<Fix<ClientChoice | null>>()
+  // An empty line reads no client, which is what the starting client is a fix of.
+  const [clientFix, setClientFix] = useState<
+    Fix<ClientChoice | null> | undefined
+  >(() =>
+    start
+      ? fix(
+          { kind: 'existing', id: start.client.id, name: start.client.name },
+          null,
+        )
+      : undefined,
+  )
   const [titleFix, setTitleFix] = useState<Fix<string>>()
   const [priceFix, setPriceFix] = useState<Fix<string>>()
   const [depositFix, setDepositFix] = useState<Fix<string>>()
@@ -194,6 +212,13 @@ export function NewJobForm({
     deposit === undefined ? parsed.depositCents : parseMoney(deposit)
   const chosenDate = date === undefined ? parsed.date : date
   const showDeposit = business.depositsOnNewJob || chosenDeposit !== null
+  // An item belongs to one client, so fixing the client to another unlinks it.
+  const linkedItem =
+    start &&
+    chosenClient?.kind === 'existing' &&
+    chosenClient.id === start.client.id
+      ? start.item
+      : undefined
   // A business set up for fixed-schedule work repeats new jobs by default (setup step 6).
   const [repeat, setRepeat] = useState(business.repeatDefault !== undefined)
 
@@ -206,6 +231,11 @@ export function NewJobForm({
   const setDate = (value: ParsedDate | null) =>
     setDateFix(fix(value, parsed.date))
   const onText = (value: string) => setText(value)
+  // From an item, back to it (the new job is in its list); otherwise Today.
+  const leave = () =>
+    start?.item
+      ? navigate({ to: '/items/$itemId', params: { itemId: start.item.id } })
+      : navigate({ to: '/' })
 
   const submit = async () => {
     setTried(true)
@@ -241,12 +271,13 @@ export function NewJobForm({
             : undefined,
         when: single && chosenDate ? chosenDate : undefined,
         dueDate: !single && chosenDate ? chosenDate.date : undefined,
+        itemIds: linkedItem ? [linkedItem.id] : undefined,
         repeat:
           repeat && business.repeatDefault ? business.repeatDefault : undefined,
       })
       recordTiming('newJob', Date.now() - startedAt)
       toast.success(m.new_saved())
-      await navigate({ to: '/' })
+      await leave()
     } catch (error) {
       toast.error(errorMessage(error))
       setSaving(false)
@@ -295,7 +326,7 @@ export function NewJobForm({
           variant="ghost"
           size="icon-xl"
           aria-label={m.new_close()}
-          onClick={() => void navigate({ to: '/' })}
+          onClick={() => void leave()}
         >
           <XIcon />
         </Button>
@@ -370,32 +401,44 @@ export function NewJobForm({
               />
             ) : (
               parsed.candidates.length > 1 && (
-                <div className="flex flex-wrap gap-2">
+                <ToggleGroup
+                  aria-label={words.client.singular}
+                  value={
+                    chosenClient?.kind === 'existing' ? [chosenClient.id] : []
+                  }
+                  onValueChange={(next: string[]) => {
+                    const candidate = parsed.candidates.find(
+                      (item) => item.id === next[0],
+                    )
+                    if (candidate) {
+                      setClient({
+                        kind: 'existing',
+                        id: candidate.id,
+                        name: candidate.name,
+                      })
+                    }
+                  }}
+                  variant="outline"
+                  size="xl"
+                  className="w-full flex-wrap"
+                >
                   {parsed.candidates.map((candidate) => (
-                    <Button
-                      key={candidate.id}
-                      variant={
-                        chosenClient?.kind === 'existing' &&
-                        chosenClient.id === candidate.id
-                          ? 'secondary'
-                          : 'outline'
-                      }
-                      className="h-11 rounded-xl"
-                      onClick={() =>
-                        setClient({
-                          kind: 'existing',
-                          id: candidate.id,
-                          name: candidate.name,
-                        })
-                      }
-                    >
+                    <ToggleGroupItem key={candidate.id} value={candidate.id}>
                       {candidate.name}
-                    </Button>
+                    </ToggleGroupItem>
                   ))}
-                </div>
+                </ToggleGroup>
               )
             )}
           </ReadRow>
+
+          {linkedItem && (
+            <ReadRow
+              label={words.item.singular}
+              icon={StackIcon}
+              value={linkedItem.name}
+            />
+          )}
 
           <ReadRow
             label={m.new_what()}
@@ -491,11 +534,7 @@ export function NewJobForm({
                     className="w-full flex-wrap"
                   >
                     {METHODS.map((method) => (
-                      <ToggleGroupItem
-                        key={method.value}
-                        value={method.value}
-                        className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-                      >
+                      <ToggleGroupItem key={method.value} value={method.value}>
                         {method.label()}
                       </ToggleGroupItem>
                     ))}

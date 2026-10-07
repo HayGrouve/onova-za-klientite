@@ -1,5 +1,6 @@
 import {
   CalendarBlankIcon,
+  CheckCircleIcon,
   CoinsIcon,
   FlagIcon,
   UserIcon,
@@ -11,7 +12,7 @@ import { cn } from 'cn'
 import type { FunctionReturnType } from 'convex/server'
 import type { api } from '../../convex/_generated/api'
 import { StageBadge } from '#/components/stage-badge'
-import { formatDay } from '#/i18n/dates'
+import { formatDay, formatDayWithYear } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia, isOverdue } from '../../shared/dates'
 import { formatMoney } from '../../shared/money'
@@ -36,36 +37,46 @@ export function JobRow({
   job,
   today,
   showClient = true,
+  showDone = false,
 }: {
   job: JobRowData
   today: string
   showClient?: boolean
+  /** A done job shows when it was done, as a history list needs. */
+  showDone?: boolean
 }) {
   const late =
     (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
     isOverdue(job.dueDate, today)
   // Lateness comes first: an overdue job shows how late it is even with an appointment ahead.
   const timing =
-    late && job.dueDate
+    showDone && job.stageGroup === 'done' && job.doneAt
       ? {
-          icon: WarningCircleIcon,
-          text: m.late_since({ date: formatDay(job.dueDate, today) }),
+          icon: CheckCircleIcon,
+          text: m.done_short({
+            date: formatDayWithYear(dateInSofia(job.doneAt), today),
+          }),
         }
-      : job.nextAppointment
+      : late && job.dueDate
         ? {
-            icon: CalendarBlankIcon,
-            text: formatMoment(
-              job.nextAppointment.start,
-              job.nextAppointment.allDay,
-              today,
-            ),
+            icon: WarningCircleIcon,
+            text: m.late_since({ date: formatDay(job.dueDate, today) }),
           }
-        : job.dueDate
+        : job.nextAppointment
           ? {
-              icon: FlagIcon,
-              text: m.due_short({ date: formatDay(job.dueDate, today) }),
+              icon: CalendarBlankIcon,
+              text: formatMoment(
+                job.nextAppointment.start,
+                job.nextAppointment.allDay,
+                today,
+              ),
             }
-          : null
+          : job.dueDate
+            ? {
+                icon: FlagIcon,
+                text: m.due_short({ date: formatDay(job.dueDate, today) }),
+              }
+            : null
   const owes = job.owes && job.priceCents > 0
   const client = showClient && job.clientName
 
