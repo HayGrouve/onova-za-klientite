@@ -1,5 +1,10 @@
+import { monthsLabel, repeatDefaultLabel } from '#/components/setup/steps'
 import { m } from '#/paraglide/messages.js'
 import type { Modules, SetupPlan, SetupSettings } from '../../../shared/setup'
+import type { JobFlow } from '../../../shared/stages'
+
+const flowName = (flow: JobFlow) =>
+  flow === 'single' ? m.setup_flow_single() : m.setup_flow_multi()
 
 function moduleName(key: keyof Modules, settings: SetupSettings) {
   switch (key) {
@@ -16,7 +21,7 @@ function moduleName(key: keyof Modules, settings: SetupSettings) {
   }
 }
 
-/** What "Run setup again" is about to change (Q12). Nothing is ever deleted. */
+/** What "Run setup again" is about to change (Q12), all of it. Nothing is ever deleted. */
 export function SetupChanges({
   plan,
   settings,
@@ -28,6 +33,11 @@ export function SetupChanges({
   const lines = [
     plan.nameChange && m.setup_change_name(plan.nameChange),
     ...plan.wordChanges.map((change) => m.setup_change_word(change)),
+    plan.flowChange &&
+      m.setup_change_flow({
+        from: flowName(plan.flowChange.from),
+        to: flowName(plan.flowChange.to),
+      }),
     plan.stagesToAdd.length > 0 &&
       m.setup_change_stages({
         names: join(plan.stagesToAdd.map((stage) => stage.name)),
@@ -42,6 +52,22 @@ export function SetupChanges({
           ),
         ),
       }),
+    plan.depositsChange &&
+      (plan.depositsChange.to
+        ? m.setup_change_deposits_on()
+        : m.setup_change_deposits_off()),
+    plan.repeatChange &&
+      (plan.repeatChange.to
+        ? m.setup_change_repeat_on({
+            every: repeatDefaultLabel(plan.repeatChange.to),
+          })
+        : m.setup_change_repeat_off()),
+    plan.reminderRuleChange &&
+      (plan.reminderRuleChange.to
+        ? m.setup_change_rule_on({
+            after: monthsLabel(plan.reminderRuleChange.to.months),
+          })
+        : m.setup_change_rule_off()),
     plan.modulesOn.length > 0 &&
       m.setup_change_modules_on({
         names: join(plan.modulesOn.map((key) => moduleName(key, settings))),

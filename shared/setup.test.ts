@@ -1,14 +1,18 @@
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   ITEM_KINDS,
   JOB_WORDS,
+  MAX_SERVICES,
+  OWN_ITEM_FIELDS,
   answersFromBusiness,
   defaultBusiness,
   jobFormFields,
   planSetup,
   settingsFromAnswers,
+  stagesAfter,
 } from './setup'
-import type { CurrentSetup } from './setup'
+import type { CurrentSetup, SetupPlan } from './setup'
 import { STAGE_GROUPS, stagesFor } from './stages'
 
 const fresh = (): CurrentSetup => ({
@@ -286,5 +290,333 @@ describe('answersFromBusiness', () => {
     expect(plan.modulesOn).toEqual([])
     expect(plan.modulesOff).toEqual([])
     expect(plan.wordChanges).toEqual([])
+  })
+})
+
+const NO_CHANGES: SetupPlan = {
+  replaceStages: false,
+  stagesToAdd: [],
+  fieldsToAdd: [],
+  servicesToAdd: [],
+  servicesToUpdate: [],
+  wordChanges: [],
+  modulesOn: [],
+  modulesOff: [],
+}
+
+/** Run setup again and confirm every answer as it was filled in. */
+function confirmUnchanged(current: CurrentSetup) {
+  const answers = answersFromBusiness(current)
+  const settings = settingsFromAnswers(answers, current)
+  return { answers, settings, plan: planSetup(current, settings) }
+}
+
+describe('running setup again and confirming changes nothing', () => {
+  const word = fc.constantFrom(...JOB_WORDS, {
+    singular: 'Любимец',
+    plural: 'Любимци',
+    gender: 'm' as const,
+  })
+  const serviceNames = Array.from({ length: 12 }, (_, i) => `Услуга ${i + 1}`)
+  const fieldNames = [
+    'Модел',
+    'Помещение',
+    'Порода',
+    'Характер',
+    'Рег. номер',
+    'Пробег',
+    'Цвят',
+    'Площ',
+    'Адрес',
+  ]
+  const business: fc.Arbitrary<CurrentSetup> = fc.record({
+    name: fc.constantFrom('Груминг у дома - Ели', 'Мебели Стоянов'),
+    words: fc.record({
+      client: word,
+      job: word,
+      item: word,
+      appointment: word,
+    }),
+    modules: fc.record({
+      appointments: fc.boolean(),
+      costs: fc.boolean(),
+      items: fc.boolean(),
+      reminders: fc.boolean(),
+      services: fc.boolean(),
+    }),
+    jobFlow: fc.constantFrom('single' as const, 'multi' as const),
+    depositsOnNewJob: fc.boolean(),
+    repeatDefault: fc.option(
+      fc.record({
+        every: fc.integer({ min: 1, max: 4 }),
+        unit: fc.constantFrom('week' as const, 'month' as const),
+      }),
+      { nil: undefined },
+    ),
+    reminderRule: fc.option(
+      fc.record({ months: fc.integer({ min: 1, max: 60 }) }),
+      { nil: undefined },
+    ),
+    stages: fc.constantFrom(
+      ...(['single', 'multi'] as const).map((flow) =>
+        stagesFor(flow).map(({ name, group }) => ({ name, group })),
+      ),
+    ),
+    itemFields: fc.uniqueArray(fc.constantFrom(...fieldNames), {
+      maxLength: fieldNames.length,
+    }),
+    services: fc.uniqueArray(
+      fc.record({
+        name: fc.constantFrom(...serviceNames),
+        priceCents: fc.integer({ min: 0, max: 500_000 }),
+      }),
+      { selector: (service) => service.name, maxLength: serviceNames.length },
+    ),
+    hasJobs: fc.boolean(),
+    setupDone: fc.constant(true),
+  })
+
+  it('whatever Settings made of the business', () => {
+    fc.assert(
+      fc.property(business, (current) => {
+        const { answers, settings, plan } = confirmUnchanged(current)
+        expect(settings).toMatchObject({
+          name: current.name,
+          words: current.words,
+          modules: current.modules,
+          jobFlow: current.jobFlow,
+          depositsOnNewJob: current.depositsOnNewJob,
+        })
+        expect(settings.repeatDefault).toEqual(current.repeatDefault)
+        expect(settings.reminderRule).toEqual(current.reminderRule)
+        expect(plan).toEqual(NO_CHANGES)
+        // Small enough for the server to accept (convex/setup.ts checkAnswers).
+        expect(answers.item?.fields.length ?? 0).toBeLessThanOrEqual(6)
+        expect(answers.services?.length ?? 0).toBeLessThanOrEqual(MAX_SERVICES)
+      }),
+    )
+  })
+
+  it('renames, services and the item word made in Settings are what the wizard starts from', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      name: 'Груминг у дома - Ели',
+      words: {
+        ...defaultBusiness().words,
+        item: { singular: 'Любимец', plural: 'Любимци', gender: 'm' },
+      },
+      modules: { ...defaultBusiness().modules, items: true, services: true },
+      itemFields: ['Порода'],
+      services: [{ name: 'Къпане', priceCents: 3500 }],
+    }
+    const { answers, settings, plan } = confirmUnchanged(current)
+    expect(answers.businessName).toBe('Груминг у дома - Ели')
+    expect(answers.item?.word.singular).toBe('Любимец')
+    expect(answers.services).toEqual([{ name: 'Къпане', price: '35' }])
+    expect(settings.name).toBe('Груминг у дома - Ели')
+    expect(settings.words.item.singular).toBe('Любимец')
+    expect(plan).toEqual(NO_CHANGES)
+  })
+
+  it('what the business cannot tell is not carried over: the import choice is asked again', () => {
+    const answers = answersFromBusiness({ ...fresh(), setupDone: true })
+    expect(answers).not.toHaveProperty('importFrom')
+  })
+
+  it('a repeat default and a reminder rule together both stay', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      repeatDefault: { every: 2, unit: 'week' },
+      reminderRule: { months: 6 },
+      modules: { ...defaultBusiness().modules, reminders: true },
+    }
+    const { settings, plan } = confirmUnchanged(current)
+    expect(settings.repeatDefault).toEqual({ every: 2, unit: 'week' })
+    expect(settings.reminderRule).toEqual({ months: 6 })
+    expect(plan).toEqual(NO_CHANGES)
+  })
+
+  it('a reminders module switched off with its rule left on stays off', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      reminderRule: { months: 12 },
+    }
+    expect(confirmUnchanged(current).settings.modules.reminders).toBe(false)
+  })
+
+  it('the reminders module switched on without a rule stays on', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      modules: { ...defaultBusiness().modules, reminders: true },
+    }
+    expect(confirmUnchanged(current).settings.modules.reminders).toBe(true)
+  })
+
+  it('services kept while the Services module is off do not switch it on', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      services: [{ name: 'Къпане', priceCents: 3500 }],
+    }
+    const { answers, plan } = confirmUnchanged(current)
+    expect(answers.services).toEqual([{ name: 'Къпане', price: '35' }])
+    expect(plan.modulesOn).toEqual([])
+  })
+
+  it('a change of answer is still applied', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      reminderRule: { months: 6 },
+      modules: { ...defaultBusiness().modules, reminders: true },
+    }
+    const answers = { ...answersFromBusiness(current), repeat: 'none' as const }
+    const settings = settingsFromAnswers(answers, current)
+    expect(settings.reminderRule).toBeUndefined()
+    expect(settings.modules.reminders).toBe(false)
+  })
+})
+
+describe('planSetup lists every change the apply makes', () => {
+  const rerun = (): CurrentSetup => ({ ...fresh(), setupDone: true })
+
+  it('the deposit switch', () => {
+    const on = planSetup(rerun(), settingsFromAnswers({ deposits: true }))
+    expect(on.depositsChange).toEqual({ to: true })
+    const current = { ...rerun(), depositsOnNewJob: true }
+    const off = planSetup(
+      current,
+      settingsFromAnswers({ deposits: false }, current),
+    )
+    expect(off.depositsChange).toEqual({ to: false })
+    expect(
+      planSetup(rerun(), settingsFromAnswers({})).depositsChange,
+    ).toBeUndefined()
+  })
+
+  it('the job flow', () => {
+    const plan = planSetup(rerun(), settingsFromAnswers({ flow: 'multi' }))
+    expect(plan.flowChange).toEqual({ from: 'single', to: 'multi' })
+    expect(
+      planSetup(rerun(), settingsFromAnswers({ flow: 'single' })).flowChange,
+    ).toBeUndefined()
+  })
+
+  it('the repeat default, turned on, changed and off', () => {
+    const on = planSetup(
+      rerun(),
+      settingsFromAnswers({ repeat: 'schedule', repeatEvery: '2weeks' }),
+    )
+    expect(on.repeatChange).toEqual({ to: { every: 2, unit: 'week' } })
+    const current = {
+      ...rerun(),
+      repeatDefault: { every: 1, unit: 'week' as const },
+    }
+    const month = planSetup(
+      current,
+      settingsFromAnswers(
+        { repeat: 'schedule', repeatEvery: 'month' },
+        current,
+      ),
+    )
+    expect(month.repeatChange).toEqual({ to: { every: 1, unit: 'month' } })
+    const off = planSetup(
+      current,
+      settingsFromAnswers({ repeat: 'none' }, current),
+    )
+    expect(off.repeatChange).toEqual({ to: null })
+  })
+
+  it('the reminder rule, turned on, changed and off', () => {
+    const on = planSetup(
+      rerun(),
+      settingsFromAnswers({ repeat: 'months', reminderMonths: 6 }),
+    )
+    expect(on.reminderRuleChange).toEqual({ to: { months: 6 } })
+    const current = { ...rerun(), reminderRule: { months: 6 } }
+    const year = planSetup(
+      current,
+      settingsFromAnswers({ repeat: 'months', reminderMonths: 12 }, current),
+    )
+    expect(year.reminderRuleChange).toEqual({ to: { months: 12 } })
+    const off = planSetup(
+      current,
+      settingsFromAnswers({ repeat: 'none' }, current),
+    )
+    expect(off.reminderRuleChange).toEqual({ to: null })
+  })
+
+  it('a service listed twice is not an update when each keeps its price', () => {
+    const current: CurrentSetup = {
+      ...rerun(),
+      services: [
+        { name: 'Къпане', priceCents: 3500 },
+        { name: 'Къпане', priceCents: 5000 },
+      ],
+    }
+    expect(confirmUnchanged(current).plan).toEqual(NO_CHANGES)
+  })
+})
+
+describe('stagesAfter', () => {
+  const names = (stages: Array<{ name: string }>) =>
+    stages.map((stage) => stage.name)
+
+  it('a first run on an empty business gets the flow’s stages', () => {
+    const current = fresh()
+    const plan = planSetup(current, settingsFromAnswers({ flow: 'multi' }))
+    expect(names(stagesAfter(current, plan))).toEqual([
+      'Запитване',
+      'Оглед',
+      'В работа',
+      'Готово',
+      'Отказано',
+    ])
+  })
+
+  it('running setup again with the same flow keeps the stages as they are', () => {
+    const current: CurrentSetup = {
+      ...fresh(),
+      setupDone: true,
+      jobFlow: 'multi',
+      stages: [
+        { name: 'Приет', group: 'new' },
+        { name: 'Изработка', group: 'in_progress' },
+        { name: 'Готов', group: 'done' },
+      ],
+    }
+    const { plan } = confirmUnchanged(current)
+    expect(stagesAfter(current, plan)).toEqual(current.stages)
+  })
+
+  it('a flow that changes adds the missing stages at the end of their groups', () => {
+    const current: CurrentSetup = { ...fresh(), setupDone: true, hasJobs: true }
+    const plan = planSetup(
+      current,
+      settingsFromAnswers({ flow: 'multi' }, current),
+    )
+    expect(names(stagesAfter(current, plan))).toEqual([
+      'Насрочено',
+      'Запитване',
+      'В работа',
+      'Оглед',
+      'Готово',
+      'Отказано',
+    ])
+  })
+})
+
+describe('the item step', () => {
+  it('an item named by the owner is offered only fields that suit anything', () => {
+    expect(OWN_ITEM_FIELDS).toEqual(['Описание', 'Бележка'])
+  })
+
+  it('an animal comes with breed and temperament', () => {
+    const animal = ITEM_KINDS.find((kind) => kind.word.singular === 'Животно')
+    expect(animal?.fields).toEqual(['Порода', 'Характер'])
   })
 })

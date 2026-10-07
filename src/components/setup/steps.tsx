@@ -5,6 +5,7 @@ import {
   PlusIcon,
   XIcon,
 } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import {
@@ -35,11 +36,12 @@ import {
   REPEAT_EVERY,
 } from '../../../shared/setup'
 import type {
+  RepeatDefault,
   RepeatEvery,
   SetupAnswers,
   SetupStep,
 } from '../../../shared/setup'
-import { stagesFor } from '../../../shared/stages'
+import type { StageGroup } from '../../../shared/stages'
 import { guessGender, guessPlural } from '../../../shared/words'
 import type { Words } from '../../../shared/words'
 
@@ -47,6 +49,8 @@ export type StepProps = {
   answers: SetupAnswers
   update: (patch: Partial<SetupAnswers>) => void
   words: Words
+  /** The stages the business will have once these answers are applied. */
+  stages: Array<{ name: string; group: StageGroup }>
 }
 
 function Title({ children }: { children: React.ReactNode }) {
@@ -70,6 +74,12 @@ export const REPEAT_LABEL: Record<RepeatEvery, () => string> = {
   week: m.repeat_week,
   '2weeks': m.repeat_2weeks,
   month: m.repeat_month,
+}
+
+/** The label of a repeat default, however it was set. */
+export function repeatDefaultLabel(every: RepeatDefault) {
+  if (every.unit === 'month') return REPEAT_LABEL.month()
+  return every.every === 2 ? REPEAT_LABEL['2weeks']() : REPEAT_LABEL.week()
 }
 
 export function monthsLabel(months: number) {
@@ -162,7 +172,7 @@ function JobWordStep({ answers, update }: StepProps) {
   )
 }
 
-function FlowStep({ answers, update }: StepProps) {
+function FlowStep({ answers, update, stages }: StepProps) {
   return (
     <FieldSet>
       <Title>{m.setup_flow_title()}</Title>
@@ -187,11 +197,11 @@ function FlowStep({ answers, update }: StepProps) {
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">{m.setup_flow_stages()}</span>
           <div className="flex flex-wrap gap-1.5">
-            {stagesFor(answers.flow)
+            {stages
               .filter((stage) => stage.group !== 'cancelled')
-              .map((stage) => (
+              .map((stage, index) => (
                 <Badge
-                  key={stage.name}
+                  key={`${index}-${stage.name}`}
                   variant="secondary"
                   className="h-7 px-2.5 text-sm"
                 >
@@ -212,12 +222,27 @@ function ItemStep({ answers, update }: StepProps) {
     (kind) => kind.word.singular === item?.word.singular,
   )
   const isOther = !!item && !preset
+  const kindKey = preset?.word.singular ?? 'other'
+  // The chips keep their places when one is switched off and on again: the
+  // fields offered for this kind first, then any the business already has.
+  const [opened] = useState({ kind: kindKey, fields: item?.fields ?? [] })
   const suggested = [
     ...new Set([
       ...(preset?.fields ?? OWN_ITEM_FIELDS),
-      ...(item?.fields ?? []),
+      ...(opened.kind === kindKey ? opened.fields : []),
     ]),
   ]
+  // The chips appear below the question that offers them; bring them into view.
+  const fieldsRef = useRef<HTMLFieldSetElement>(null)
+  const hasFields = !!answers.hasItem && !!item
+  useEffect(() => {
+    if (!hasFields) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    fieldsRef.current?.scrollIntoView({
+      block: 'nearest',
+      behavior: reduce ? 'auto' : 'smooth',
+    })
+  }, [hasFields, kindKey])
 
   return (
     <FieldSet>
@@ -304,7 +329,7 @@ function ItemStep({ answers, update }: StepProps) {
             </FieldGroup>
           )}
           {item && (
-            <FieldSet>
+            <FieldSet ref={fieldsRef}>
               <FieldLegend variant="label">{m.setup_item_fields()}</FieldLegend>
               <Choices
                 label={m.setup_item_fields()}
@@ -315,7 +340,17 @@ function ItemStep({ answers, update }: StepProps) {
                   label: field,
                 }))}
                 value={item.fields}
-                onChange={(fields) => update({ item: { ...item, fields } })}
+                onChange={(fields) =>
+                  update({
+                    item: {
+                      ...item,
+                      // In the order of the chips, whichever was pressed last.
+                      fields: suggested.filter((field) =>
+                        fields.includes(field),
+                      ),
+                    },
+                  })
+                }
               />
             </FieldSet>
           )}

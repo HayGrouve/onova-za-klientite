@@ -95,8 +95,8 @@ export const ITEM_KINDS: ItemKind[] = [
   },
 ]
 
-/** Fields suggested for an item the person names themselves. */
-export const OWN_ITEM_FIELDS = ['Модел', 'Бележка']
+/** Fields suggested for an item the person names themselves: only ones that suit a dog as well as a property. */
+export const OWN_ITEM_FIELDS = ['Описание', 'Бележка']
 
 export const REPEAT_EVERY = ['week', '2weeks', 'month'] as const
 export type RepeatEvery = (typeof REPEAT_EVERY)[number]
@@ -178,13 +178,65 @@ const REPEAT_DEFAULTS: Record<RepeatEvery, RepeatDefault> = {
   month: { every: 1, unit: 'month' },
 }
 
+function sameServices(
+  a: Array<{ name: string; priceCents: number }>,
+  b: Array<{ name: string; priceCents: number }>,
+) {
+  return (
+    a.length === b.length &&
+    a.every(
+      (service, index) =>
+        service.name === b[index].name &&
+        service.priceCents === b[index].priceCents,
+    )
+  )
+}
+
+type RepeatAnswer = Pick<
+  SetupAnswers,
+  'repeat' | 'repeatEvery' | 'reminderMonths'
+>
+
+/** The repeat answer that describes a business as it is (it can hold both a repeat default and a reminder rule). */
+function repeatAnswerOf(business: BusinessDefaults): RepeatAnswer {
+  if (business.reminderRule) {
+    return { repeat: 'months', reminderMonths: business.reminderRule.months }
+  }
+  const { repeatDefault } = business
+  if (repeatDefault) {
+    const every = Object.entries(REPEAT_DEFAULTS).find(
+      ([, value]) =>
+        value.every === repeatDefault.every &&
+        value.unit === repeatDefault.unit,
+    )?.[0] as RepeatEvery | undefined
+    return { repeat: 'schedule', repeatEvery: every ?? 'week' }
+  }
+  return { repeat: 'none' }
+}
+
+function sameRepeatAnswer(a: RepeatAnswer, b: RepeatAnswer) {
+  return (
+    a.repeat === b.repeat &&
+    (a.repeat !== 'schedule' ||
+      (a.repeatEvery ?? 'week') === (b.repeatEvery ?? 'week')) &&
+    (a.repeat !== 'months' ||
+      (a.reminderMonths ?? 12) === (b.reminderMonths ?? 12))
+  )
+}
+
+/** What setup starts from: the defaults on a first run, the business as it is when setup runs again. */
+type SetupBase = BusinessDefaults & {
+  services?: Array<{ name: string; priceCents: number }>
+}
+
 /**
- * What the answers set. Skipped answers keep `base`: the defaults on a first
- * run, the business as it is when setup runs again.
+ * What the answers set. Skipped answers keep `base`, and so does an answer
+ * that says what `base` already is, so confirming a re-run unchanged changes
+ * nothing, even where a business holds more than one answer can say.
  */
 export function settingsFromAnswers(
   answers: SetupAnswers,
-  base: BusinessDefaults = defaultBusiness(),
+  base: SetupBase = defaultBusiness(),
 ): SetupSettings {
   const jobFlow = answers.flow ?? base.jobFlow
   const jobWord =
@@ -216,19 +268,25 @@ export function settingsFromAnswers(
     .filter((service) => service.name)
     .slice(0, MAX_SERVICES)
 
+  // One question sets the repeat default, the reminder rule and the module.
   const repeat = answers.repeat
-  const repeatDefault =
-    repeat === undefined
-      ? base.repeatDefault
-      : repeat === 'schedule'
-        ? REPEAT_DEFAULTS[answers.repeatEvery ?? 'week']
-        : undefined
-  const reminderRule =
-    repeat === undefined
-      ? base.reminderRule
-      : repeat === 'months'
-        ? { months: answers.reminderMonths ?? 12 }
-        : undefined
+  const keepRepeat =
+    repeat === undefined || sameRepeatAnswer(answers, repeatAnswerOf(base))
+  const repeatDefault = keepRepeat
+    ? base.repeatDefault
+    : repeat === 'schedule'
+      ? REPEAT_DEFAULTS[answers.repeatEvery ?? 'week']
+      : undefined
+  const reminderRule = keepRepeat
+    ? base.reminderRule
+    : repeat === 'months'
+      ? { months: answers.reminderMonths ?? 12 }
+      : undefined
+  // The list as it was filled in from the business is not an answer to change.
+  const keepServices =
+    answers.services === undefined ||
+    (base.services !== undefined &&
+      sameServices(services, base.services.slice(0, MAX_SERVICES)))
 
   return {
     name: answers.businessName?.trim() || base.name,
@@ -249,12 +307,8 @@ export function settingsFromAnswers(
       appointments: base.modules.appointments,
       items: item !== null,
       costs: answers.costs ?? base.modules.costs,
-      reminders:
-        repeat === undefined ? base.modules.reminders : repeat === 'months',
-      services:
-        answers.services === undefined
-          ? base.modules.services
-          : services.length > 0,
+      reminders: keepRepeat ? base.modules.reminders : repeat === 'months',
+      services: keepServices ? base.modules.services : services.length > 0,
     },
   }
 }
@@ -263,7 +317,12 @@ export function settingsFromAnswers(
 export type FormField =
   'client' | 'item' | 'title' | 'price' | 'deposit' | 'when' | 'due' | 'repeat'
 
-export function jobFormFields(settings: SetupSettings): FormField[] {
+export function jobFormFields(
+  settings: Pick<
+    SetupSettings,
+    'item' | 'depositsOnNewJob' | 'jobFlow' | 'repeatDefault'
+  >,
+): FormField[] {
   const fields: FormField[] = ['client']
   if (settings.item) fields.push('item')
   fields.push('title', 'price')
@@ -296,15 +355,22 @@ export type SetupPlan = {
   modulesOn: Array<keyof Modules>
   modulesOff: Array<keyof Modules>
   nameChange?: { from: string; to: string }
+  flowChange?: { from: JobFlow; to: JobFlow }
+  /** The new "deposit on a new job" switch, when it changes. */
+  depositsChange?: { to: boolean }
+  /** The new repeat default (null: none), when it changes. */
+  repeatChange?: { to: RepeatDefault | null }
+  /** The new reminder rule (null: none), when it changes. */
+  reminderRuleChange?: { to: { months: number } | null }
 }
 
 const sameName = (a: string, b: string) =>
   a.trim().toLocaleLowerCase('bg') === b.trim().toLocaleLowerCase('bg')
 
 /**
- * What applying the settings changes. Safe-change rules: words are renamed,
- * modules switched (hidden, never deleted), stages and item fields only
- * added, services merged by name. Nothing is ever deleted.
+ * What applying the settings changes, every part of it. Safe-change rules:
+ * words are renamed, modules switched (hidden, never deleted), stages and item
+ * fields only added, services merged by name. Nothing is ever deleted.
  */
 export function planSetup(
   current: CurrentSetup,
@@ -339,9 +405,13 @@ export function planSetup(
   const servicesToAdd: SetupPlan['servicesToAdd'] = []
   const servicesToUpdate: SetupPlan['servicesToUpdate'] = []
   for (const service of settings.services) {
-    const existing = current.services.find((item) =>
-      sameName(item.name, service.name),
-    )
+    // Two services may share a name: one at this price is already right.
+    const existing =
+      current.services.find(
+        (item) =>
+          sameName(item.name, service.name) &&
+          item.priceCents === service.priceCents,
+      ) ?? current.services.find((item) => sameName(item.name, service.name))
     if (!existing) servicesToAdd.push(service)
     else if (existing.priceCents !== service.priceCents) {
       servicesToUpdate.push({
@@ -376,7 +446,48 @@ export function planSetup(
     ...(settings.name !== current.name
       ? { nameChange: { from: current.name, to: settings.name } }
       : {}),
+    ...(flowChanged
+      ? { flowChange: { from: current.jobFlow, to: settings.jobFlow } }
+      : {}),
+    ...(settings.depositsOnNewJob !== current.depositsOnNewJob
+      ? { depositsChange: { to: settings.depositsOnNewJob } }
+      : {}),
+    ...(!sameRepeatDefault(current.repeatDefault, settings.repeatDefault)
+      ? { repeatChange: { to: settings.repeatDefault ?? null } }
+      : {}),
+    ...(current.reminderRule?.months !== settings.reminderRule?.months
+      ? { reminderRuleChange: { to: settings.reminderRule ?? null } }
+      : {}),
   }
+}
+
+function sameRepeatDefault(a?: RepeatDefault, b?: RepeatDefault) {
+  return a?.every === b?.every && a?.unit === b?.unit
+}
+
+/**
+ * The stages the business has once the plan is applied: all it has now, and
+ * the plan's new ones at the end of their group (as `insertStage` places them).
+ */
+export function stagesAfter(
+  current: CurrentSetup,
+  plan: SetupPlan,
+): Array<{ name: string; group: StageGroup }> {
+  if (plan.replaceStages) {
+    return plan.stagesToAdd.map(({ name, group }) => ({ name, group }))
+  }
+  const stages = [...current.stages]
+  for (const { name, group } of plan.stagesToAdd) {
+    let at = stages.length
+    for (let index = stages.length - 1; index >= 0; index--) {
+      if (stages[index].group === group) {
+        at = index + 1
+        break
+      }
+    }
+    stages.splice(at, 0, { name, group })
+  }
+  return stages
 }
 
 function formatPrice(cents: number) {
@@ -387,36 +498,36 @@ function formatPrice(cents: number) {
     : `${whole},${String(rest).padStart(2, '0')}`
 }
 
-/** Answers that reproduce the business as it is, for "Run setup again" when none were stored. */
+/** The most item fields setup stores in its answers (convex/setup.ts checkAnswers). */
+const MAX_ITEM_FIELDS = 6
+
+/**
+ * Answers that reproduce the business as it is now, whatever was changed in
+ * Settings since: "Run setup again" starts here, so confirming changes nothing.
+ * The one thing a business cannot tell is where its clients come from, which
+ * setup asks again each time.
+ */
 export function answersFromBusiness(current: CurrentSetup): SetupAnswers {
-  const repeatEvery = current.repeatDefault
-    ? (Object.entries(REPEAT_DEFAULTS).find(
-        ([, value]) =>
-          value.every === current.repeatDefault?.every &&
-          value.unit === current.repeatDefault.unit,
-      )?.[0] as RepeatEvery | undefined)
-    : undefined
   return {
     businessName: current.name,
     jobWord: current.words.job,
     flow: current.jobFlow,
     hasItem: current.modules.items,
     ...(current.modules.items
-      ? { item: { word: current.words.item, fields: current.itemFields } }
+      ? {
+          item: {
+            word: current.words.item,
+            // Setup edits the first few; the rest stay as Settings has them.
+            fields: current.itemFields.slice(0, MAX_ITEM_FIELDS),
+          },
+        }
       : {}),
     deposits: current.depositsOnNewJob,
     costs: current.modules.costs,
-    ...(current.reminderRule
-      ? {
-          repeat: 'months' as const,
-          reminderMonths: current.reminderRule.months,
-        }
-      : current.repeatDefault
-        ? { repeat: 'schedule' as const, repeatEvery: repeatEvery ?? 'week' }
-        : {}),
+    ...repeatAnswerOf(current),
     ...(current.services.length > 0
       ? {
-          services: current.services.map((service) => ({
+          services: current.services.slice(0, MAX_SERVICES).map((service) => ({
             name: service.name,
             price: formatPrice(service.priceCents),
           })),

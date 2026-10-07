@@ -305,7 +305,7 @@ function AppHeader() {
 }
 
 /** The business name, and a menu to switch when the user has more than one. */
-function BusinessSwitcher() {
+export function BusinessSwitcher() {
   const { business, businesses } = useViewer()
   const navigate = useNavigate()
   const setActive = useMutation(api.users.setActiveBusiness)

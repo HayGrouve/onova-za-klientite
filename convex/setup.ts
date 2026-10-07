@@ -80,17 +80,14 @@ const vCurrent = v.object({
   setupDone: v.boolean(),
 })
 
-/** The business as setup finds it, and the answers it was last set up with. */
+/**
+ * The business as setup finds it. Running setup again starts from this, not
+ * from the answers stored last time, so Settings edits since then are kept.
+ */
 export const current = businessQuery({
   args: {},
-  returns: v.object({
-    current: vCurrent,
-    answers: v.union(vSetupAnswers, v.null()),
-  }),
-  handler: async (ctx) => ({
-    current: await loadCurrent(ctx),
-    answers: ctx.business.setup.answers ?? null,
-  }),
+  returns: v.object({ current: vCurrent }),
+  handler: async (ctx) => ({ current: await loadCurrent(ctx) }),
 })
 
 function checkAnswers(answers: Infer<typeof vSetupAnswers>): SetupAnswers {
