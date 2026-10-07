@@ -146,11 +146,12 @@ export function ReminderRow({
           <span className={textClass}>{text}</span>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2 pl-12">
+      {/* Under the text where there's room; from the edge on a narrow phone, so the three fit on one line. */}
+      <div className="flex flex-wrap items-center gap-1.5 min-[440px]:pl-12">
         <Tip label={m.reminder_done_tip()} side="top">
           <Button
             variant="outline"
-            className="h-11 rounded-xl px-3 hover:bg-green-100 hover:text-green-800 dark:hover:bg-green-950 dark:hover:text-green-300"
+            className="h-11 rounded-xl px-2.5 hover:bg-green-100 hover:text-green-800 dark:hover:bg-green-950 dark:hover:text-green-300"
             onClick={() => finish('done')}
           >
             <CheckIcon weight="bold" data-icon="inline-start" />
@@ -161,7 +162,7 @@ export function ReminderRow({
           <DropdownMenuTrigger
             className={buttonVariants({
               variant: 'outline',
-              className: 'h-11 rounded-xl px-3',
+              className: 'h-11 rounded-xl px-2.5',
             })}
           >
             <ClockIcon data-icon="inline-start" />
@@ -182,7 +183,7 @@ export function ReminderRow({
         <Tip label={m.reminder_dismiss_tip()} side="top">
           <Button
             variant="ghost"
-            className="h-11 rounded-xl px-3 text-muted-foreground"
+            className="h-11 rounded-xl px-2.5 text-muted-foreground"
             onClick={() => finish('dismissed')}
           >
             <XIcon data-icon="inline-start" />
