@@ -686,6 +686,7 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - the Convex production deployment `ideal-shepherd-123` in `aws-eu-west-1`, and the first production deploy at https://onova-za-klientite.vercel.app (D50);
   - the CI `e2e` job's GitHub secrets, pointed at the dev deployment and the Clerk development instance.
   - a visual pass: cards on a tinted page, section icons, light motion, tooltips and money hints (D52).
+  - a friction pass from simulated use (#31): live Settings previews and about 60 fixes found by simulated users on phone and desk, confirmed by a second round (D57–D84). After it merges, production needs `npx convex run search:rebuildAll '{}' --prod` once (D60).
 - **Next, with the owner:**
   1. The real-device spikes: push on Android and an installed iPhone app (spike 3), sharing the summary to Viber and contact import (spike 4), an airplane-mode cold start (spike 5).
   2. A real `VAPID_SUBJECT` on production (now `mailto:push@example.com`): the operator's contact address that push services see, not something each user sets.
