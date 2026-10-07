@@ -12,7 +12,8 @@ import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
 import { jobFormFields } from '../../../shared/setup'
 import type { FormField, SetupSettings, SetupStep } from '../../../shared/setup'
-import { REPEAT_LABEL } from '#/components/setup/steps'
+import type { StageGroup } from '../../../shared/stages'
+import { repeatDefaultLabel } from '#/components/setup/steps'
 
 const FIELD_STEP: Record<FormField, SetupStep> = {
   client: 'import',
@@ -78,6 +79,11 @@ function FakeInput({
   )
 }
 
+/** The settings the form is drawn from, with the stages the business will have. */
+export type FormSettings = Omit<SetupSettings, 'stages'> & {
+  stages: Array<{ name: string; group: StageGroup }>
+}
+
 /** A read-only miniature of the new-job form, built from the settings the answers give. */
 export function JobFormPreview({
   settings,
@@ -85,7 +91,7 @@ export function JobFormPreview({
   pulse,
   onEdit,
 }: {
-  settings: SetupSettings
+  settings: FormSettings
   highlight: SetupStep | null
   pulse: number
   onEdit?: (step: SetupStep) => void
@@ -167,13 +173,9 @@ export function JobFormPreview({
               </Row>
             )
           case 'repeat': {
-            const every = settings.repeatDefault
-            const label =
-              every?.unit === 'month'
-                ? REPEAT_LABEL.month()
-                : every?.every === 2
-                  ? REPEAT_LABEL['2weeks']()
-                  : REPEAT_LABEL.week()
+            const label = repeatDefaultLabel(
+              settings.repeatDefault ?? { every: 1, unit: 'week' },
+            )
             return (
               <Row key={field} {...props} label={m.preview_repeat()}>
                 <div className="flex items-center gap-2 text-sm">

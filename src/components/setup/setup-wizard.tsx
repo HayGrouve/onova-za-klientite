@@ -20,6 +20,7 @@ import {
   clearStep,
   planSetup,
   settingsFromAnswers,
+  stagesAfter,
 } from '../../../shared/setup'
 import type {
   CurrentSetup,
@@ -59,6 +60,13 @@ export function SetupWizard({
     [answers, current],
   )
   const plan = useMemo(() => planSetup(current, settings), [current, settings])
+  // The stages the business will really have: a re-run keeps its own and only
+  // adds the flow's missing ones.
+  const stages = useMemo(() => stagesAfter(current, plan), [current, plan])
+  const formSettings = useMemo(
+    () => ({ ...settings, stages }),
+    [settings, stages],
+  )
 
   // Keep the part of the form this question changes in view.
   useEffect(() => {
@@ -114,7 +122,6 @@ export function SetupWizard({
   }
 
   const Body = key ? STEP_BODY[key] : null
-
   return (
     // A wide screen puts the live form and the questions side by side.
     <main className="flex h-dvh flex-col bg-muted lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:p-8">
@@ -132,7 +139,7 @@ export function SetupWizard({
         </p>
         <div className="rounded-2xl border bg-card p-4 shadow-sm shadow-zinc-900/5">
           <JobFormPreview
-            settings={settings}
+            settings={formSettings}
             highlight={key ?? null}
             pulse={pulse}
             onEdit={step === DONE ? edit : undefined}
@@ -147,7 +154,12 @@ export function SetupWizard({
               key={key}
               className="min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-3 motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in"
             >
-              <Body answers={answers} update={update} words={settings.words} />
+              <Body
+                answers={answers}
+                update={update}
+                words={settings.words}
+                stages={stages}
+              />
             </div>
             <div className="flex items-center gap-1 border-t px-2 py-3">
               <Button
