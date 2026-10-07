@@ -553,6 +553,8 @@ Q19–Q22 are answered.
 
 > **Answer (6 Oct 2026):** Free while developing. There is no data worth keeping, so there are no backups. Plan and backups are decided again before the production deployment is created.
 
+> **Update (7 Oct 2026):** the team is on Starter (pay as you go), which is fine for the development cycle. Backups are decided again before real customer data goes in.
+
 **Q22. Merging deploys production.** With ADR 0004, a merge to `main` runs `npx convex deploy` and the Vercel production build together. So approving a merge also approves a production deploy.
 *Proposal:* accept that once milestone 1's first production deploy has gone well. The alternative is the sibling's model: production only from GitHub Actions, which still runs on merge, so it's no safer, just more moving parts.
 
@@ -563,7 +565,11 @@ Q19–Q22 are answered.
 
 **Q24. Production domain.** A Clerk production instance needs a domain you own (`clerk.<domain>`), and `*.vercel.app` won't do. Which domain will production use? It's only needed at the end of the cycle, but the sooner the better for Google OAuth.
 
+> **Answer (7 Oct 2026):** no domain while developing. Production stays on https://onova-za-klientite.vercel.app with the Clerk development instance (D50) until the domain is bought.
+
 **Q25. Google OAuth for production.** Production Google sign-in needs your own OAuth client in Google Cloud: consent screen, app name "Онова за клиентите", redirect URI from Clerk. This is a console step only you can do; I'll give you the exact values when we get there.
+
+> **Answer (7 Oct 2026):** Google stays a sign-in option inside Clerk; nothing else handles auth. The development instance signs in with Google through Clerk's shared credentials, so nothing is needed now. Only the Clerk production instance asks for our own Google client ID and secret, so this waits for Q24.
 
 **Q26. Error tracking.** The sibling uses Sentry. Adding it here is a new provider, so it needs your OK.
 *Proposal:* not in v1. Rely on Convex logs, `npx convex logs` and Vercel's runtime logs, and revisit before other users join.
@@ -648,9 +654,8 @@ Risky bits to try early, in a throwaway branch or the first PR that can reach th
   - the CI `e2e` job's GitHub secrets, pointed at the dev deployment and the Clerk development instance.
 - **Next, with the owner:**
   1. The real-device spikes: push on Android and an installed iPhone app (spike 3), sharing the summary to Viber and contact import (spike 4), an airplane-mode cold start (spike 5).
-  2. The launch switch (D50): the production domain (Q24), the Clerk production instance on it with Google OAuth (Q25), then on Vercel Production the `pk_live_` publishable key, and on the Convex production deployment the production `CLERK_JWT_ISSUER_DOMAIN`, `CLERK_SECRET_KEY` and `APP_URL`.
-  3. A real `VAPID_SUBJECT` on production (now `mailto:push@example.com`).
-  4. The Convex plan and backups before the first user's real data goes in (Q21).
+  2. A real `VAPID_SUBJECT` on production (now `mailto:push@example.com`): the operator's contact address that push services see, not something each user sets.
+  3. At launch, once the domain is bought (Q24): the Clerk production instance on it with our own Google OAuth client (Q25), then on Vercel Production the `pk_live_` publishable key, and on the Convex production deployment the production `CLERK_JWT_ISSUER_DOMAIN`, `CLERK_SECRET_KEY` and `APP_URL`. Backups are decided before real customer data goes in (Q21).
 - **Open:**
   - Q23–Q26;
   - the free-tier limits and prices (design doc), and the written СУПТО answer before public launch.
