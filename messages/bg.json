@@ -230,6 +230,7 @@
   "today_due_soon": "Срок до 3 дни",
   "today_reminders": "Напомняния",
   "today_done_unpaid": "Готови, но неплатени",
+  "today_owed_done": "готови: {count}",
   "all_day": "цял ден",
   "jobs_group_empty": "Тук няма нищо.",
   "jobs_view": "Изглед",

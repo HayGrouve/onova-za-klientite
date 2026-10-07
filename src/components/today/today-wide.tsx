@@ -24,6 +24,7 @@ import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
+import { isJobLate } from '../../../shared/today'
 
 type TodayData = FunctionReturnType<typeof api.today.list>
 type AppointmentRow = TodayData['appointments'][number]
@@ -50,6 +51,25 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
     seesMoney ? { businessId: business._id, month: monthOf(today) } : 'skip',
   )
 
+  // The figure is every unpaid balance, so say how many jobs it covers and how
+  // many of them are done, not only the done ones.
+  const owed = money?.whoOwesMe.reduce(
+    (sum, row) => ({
+      jobs: sum.jobs + row.jobs,
+      done: sum.done + row.doneJobs,
+    }),
+    { jobs: 0, done: 0 },
+  )
+  const owedDetail =
+    owed && owed.jobs > 0
+      ? [
+          m.money_jobs_count({ jobs: words.job.plural, count: owed.jobs }),
+          owed.done > 0 && m.today_owed_done({ count: owed.done }),
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : undefined
+
   const attention =
     data.overdue.length +
     data.dueSoon.length +
@@ -65,7 +85,12 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
           count={data.overdue.length}
         >
           {data.overdue.map((job) => (
-            <JobRow key={job._id} job={job} today={today} />
+            <JobRow
+              key={job._id}
+              job={job}
+              today={today}
+              lead={{ kind: 'due' }}
+            />
           ))}
         </ListSection>
       )}
@@ -76,7 +101,12 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
           count={data.dueSoon.length}
         >
           {data.dueSoon.map((job) => (
-            <JobRow key={job._id} job={job} today={today} />
+            <JobRow
+              key={job._id}
+              job={job}
+              today={today}
+              lead={{ kind: 'due' }}
+            />
           ))}
         </ListSection>
       )}
@@ -105,7 +135,12 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
           count={data.doneUnpaid.length}
         >
           {data.doneUnpaid.map((job) => (
-            <JobRow key={job._id} job={job} today={today} />
+            <JobRow
+              key={job._id}
+              job={job}
+              today={today}
+              lead={{ kind: 'none' }}
+            />
           ))}
         </ListSection>
       )}
@@ -160,10 +195,7 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
               tone="primary"
               label={m.money_still_owed()}
               value={money ? formatMoney(money.stillOwedCents) : '…'}
-              detail={m.count({
-                label: m.today_done_unpaid(),
-                count: data.doneUnpaid.length,
-              })}
+              detail={owedDetail}
             />
             <StatTile
               to="/money"
@@ -240,7 +272,7 @@ function Schedule({ data, today }: { data: TodayData; today: string }) {
         <DayHeading>{formatDay(today, today)}</DayHeading>
         <PanelList>
           {data.appointments.map((item) => (
-            <AgendaRow key={item._id} item={item} />
+            <AgendaRow key={item._id} item={item} today={today} />
           ))}
           {data.appointments.length === 0 && (
             <ListNote>
@@ -253,7 +285,7 @@ function Schedule({ data, today }: { data: TodayData; today: string }) {
             <DayHeading>{formatDay(day, today)}</DayHeading>
             <PanelList>
               {items.map((item) => (
-                <AgendaRow key={item._id} item={item} />
+                <AgendaRow key={item._id} item={item} today={today} />
               ))}
             </PanelList>
           </div>
@@ -271,10 +303,11 @@ function DayHeading({ children }: { children: React.ReactNode }) {
   )
 }
 
-/** One appointment in the schedule: its time, the job and client, the stage. */
-function AgendaRow({ item }: { item: AppointmentRow }) {
+/** One appointment in the schedule: its time, the job, label and client, the stage. */
+function AgendaRow({ item, today }: { item: AppointmentRow; today: string }) {
   const { job } = item
   if (!job) return null
+  const late = isJobLate(job, today)
   const owes = job.owes && job.balanceCents > 0
   return (
     <li>
@@ -295,9 +328,15 @@ function AgendaRow({ item }: { item: AppointmentRow }) {
             {job.title}
           </span>
           <span className="truncate text-sm text-muted-foreground">
-            {[job.isNoClient ? m.no_client() : job.clientName, item.label]
+            {[item.label, job.isNoClient ? m.no_client() : job.clientName]
               .filter(Boolean)
               .join(' · ')}
+            {late && job.dueDate && (
+              <span className="font-medium text-destructive">
+                {' · '}
+                {m.late_since({ date: formatDay(job.dueDate, today) })}
+              </span>
+            )}
           </span>
         </span>
         {owes && (

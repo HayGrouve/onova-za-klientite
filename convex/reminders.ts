@@ -30,7 +30,11 @@ export const add = businessMutation({
     const job = args.jobId ? await getOwned(ctx, 'jobs', args.jobId) : null
     const item = args.itemId ? await getOwned(ctx, 'items', args.itemId) : null
     const clientId = args.clientId ?? job?.clientId ?? item?.clientId
-    if (clientId) await getOwned(ctx, 'clients', clientId)
+    const client = clientId ? await getOwned(ctx, 'clients', clientId) : null
+    // The rule suggests a follow-up with someone: not with the built-in No client.
+    if (args.source === 'rule' && (!client || client.isNoClient)) {
+      fail('client.noClient')
+    }
     if (job && clientId && job.clientId !== clientId) fail('job.otherClient')
     const note = requiredText(args.note, 'note', 300)
     const reminderId = await ctx.db.insert('reminders', {

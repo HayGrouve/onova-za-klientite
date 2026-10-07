@@ -141,7 +141,17 @@ function JobPage() {
   const moveTo = async (stageId: Id<'stages'>) => {
     const target = data.stages.find((stage) => stage._id === stageId)
     // Q5: reaching Done offers the reminder rule's reminder, pre-filled.
-    if (target && (await move(job, target))) {
+    const offer =
+      target &&
+      (await move(
+        {
+          _id: job._id,
+          stageGroup: job.stageGroup,
+          isNoClient: client?.isNoClient ?? false,
+        },
+        target,
+      ))
+    if (offer) {
       setPanel({ kind: 'reminder', rule: true })
     }
   }
