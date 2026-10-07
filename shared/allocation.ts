@@ -19,6 +19,23 @@ export function jobBalanceCents(a: {
   return a.priceCents - a.paidCents - a.writeOffCents
 }
 
+/** Paid minus costs (design doc); it is not stored. */
+export function jobProfitCents(a: {
+  paidCents: number
+  costCents: number
+}): number {
+  return a.paidCents - a.costCents
+}
+
+/**
+ * Whether a job's profit is the final figure. New and in-progress work can
+ * still be paid or cost more, so its profit is only "so far"; a done job's
+ * profit is settled, and a cancelled one has nothing more coming either.
+ */
+export function jobProfitIsFinal(group: JobGroup): boolean {
+  return group === 'done' || group === 'cancelled'
+}
+
 export function jobOwes(balanceCents: number, group: JobGroup): boolean {
   return balanceCents > 0 && group !== 'cancelled'
 }
