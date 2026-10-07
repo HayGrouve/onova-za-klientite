@@ -8,8 +8,8 @@ const DAY = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'UTC',
 })
 
-// A date in another year than today's needs its year: "петък, 7.11" in 2025 and
-// in 2026 are different days (and a different weekday).
+// A date in another year than today's needs its year: 7 Nov 2025 and 7 Nov 2026
+// would otherwise read alike, yet one is a Friday and the other a Saturday.
 const DAY_AND_YEAR = new Intl.DateTimeFormat('bg-BG', {
   weekday: 'long',
   day: 'numeric',

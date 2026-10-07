@@ -119,9 +119,11 @@ export function parseMoment(
 ): { date: string; time?: { hour: number; minute: number } } | undefined {
   const match = /^(\d{4}-\d{2}-\d{2})(?: (\d{1,2}):(\d{2}))?$/.exec(text)
   if (!match || !isValidDate(match[1])) return undefined
-  if (match[2] === undefined) return { date: match[1] }
-  const hour = Number(match[2])
-  const minute = Number(match[3])
+  // The time group is absent when the text is a date alone.
+  const groups: Array<string | undefined> = match
+  if (groups[2] === undefined) return { date: match[1] }
+  const hour = Number(groups[2])
+  const minute = Number(groups[3])
   if (hour > 23 || minute > 59) return undefined
   return { date: match[1], time: { hour, minute } }
 }

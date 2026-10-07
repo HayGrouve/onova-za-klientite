@@ -9,14 +9,17 @@ export type TodayAppointment = {
 /** A job in one of Today's job lists. */
 export type TodayJob = { _id: string }
 
-export type TodayLists<A extends TodayAppointment, J extends TodayJob> = {
+export type TodayLists<
+  TAppointment extends TodayAppointment,
+  TJob extends TodayJob,
+> = {
   /** Appointments that start today, earliest first. */
-  appointments: A[]
+  appointments: TAppointment[]
   /** Appointments over the next days, earliest first. */
-  upcoming: A[]
-  overdue: J[]
-  dueSoon: J[]
-  doneUnpaid: J[]
+  upcoming: TAppointment[]
+  overdue: TJob[]
+  dueSoon: TJob[]
+  doneUnpaid: TJob[]
 }
 
 const CLOSED: ReadonlySet<StageGroup> = new Set(['done', 'cancelled'])
@@ -37,16 +40,18 @@ export function isJobLate(
  * the schedule: its leftover appointments stay on the job, not on Today.
  * Today's schedule keeps every visit of a job, the week ahead only its first.
  */
-export function arrangeToday<A extends TodayAppointment, J extends TodayJob>(
-  lists: TodayLists<A, J>,
-): TodayLists<A, J> {
+export function arrangeToday<
+  TAppointment extends TodayAppointment,
+  TJob extends TodayJob,
+>(lists: TodayLists<TAppointment, TJob>): TodayLists<TAppointment, TJob> {
   const shown = new Set<string>()
-  const open = (item: A) => !item.job || !CLOSED.has(item.job.stageGroup)
+  const open = (item: TAppointment) =>
+    !item.job || !CLOSED.has(item.job.stageGroup)
 
   const appointments = lists.appointments.filter(open)
   for (const item of appointments) if (item.job) shown.add(item.job._id)
 
-  const claim = (jobs: J[]) =>
+  const claim = (jobs: TJob[]) =>
     jobs.filter((item) => {
       if (shown.has(item._id)) return false
       shown.add(item._id)
