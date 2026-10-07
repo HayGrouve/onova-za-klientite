@@ -15,6 +15,7 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppImportRouteImport } from './routes/_app/import'
 import { Route as AppMoneyRouteImport } from './routes/_app/money'
 import { Route as AppNewRouteImport } from './routes/_app/new'
+import { Route as AppSearchRouteImport } from './routes/_app/search'
 import { Route as AppSetupRouteImport } from './routes/_app/setup'
 import { Route as AppTimingRouteImport } from './routes/_app/timing'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients.index'
@@ -30,6 +31,7 @@ import { Route as AppSettingsDataRouteImport } from './routes/_app/settings.data
 import { Route as AppSettingsFieldsRouteImport } from './routes/_app/settings.fields'
 import { Route as AppSettingsModulesRouteImport } from './routes/_app/settings.modules'
 import { Route as AppSettingsNamesRouteImport } from './routes/_app/settings.names'
+import { Route as AppSettingsNotificationsRouteImport } from './routes/_app/settings.notifications'
 import { Route as AppSettingsRemindersRouteImport } from './routes/_app/settings.reminders'
 import { Route as AppSettingsServicesRouteImport } from './routes/_app/settings.services'
 import { Route as AppSettingsStagesRouteImport } from './routes/_app/settings.stages'
@@ -61,6 +63,11 @@ const AppMoneyRoute = AppMoneyRouteImport.update({
 const AppNewRoute = AppNewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSearchRoute = AppSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSetupRoute = AppSetupRouteImport.update({
@@ -138,6 +145,12 @@ const AppSettingsNamesRoute = AppSettingsNamesRouteImport.update({
   path: '/settings/names',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsNotificationsRoute =
+  AppSettingsNotificationsRouteImport.update({
+    id: '/settings/notifications',
+    path: '/settings/notifications',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppSettingsRemindersRoute = AppSettingsRemindersRouteImport.update({
   id: '/settings/reminders',
   path: '/settings/reminders',
@@ -160,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/import': typeof AppImportRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
+  '/search': typeof AppSearchRoute
   '/setup': typeof AppSetupRoute
   '/timing': typeof AppTimingRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
@@ -172,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/settings/fields': typeof AppSettingsFieldsRoute
   '/settings/modules': typeof AppSettingsModulesRoute
   '/settings/names': typeof AppSettingsNamesRoute
+  '/settings/notifications': typeof AppSettingsNotificationsRoute
   '/settings/reminders': typeof AppSettingsRemindersRoute
   '/settings/services': typeof AppSettingsServicesRoute
   '/settings/stages': typeof AppSettingsStagesRoute
@@ -184,6 +199,7 @@ export interface FileRoutesByTo {
   '/import': typeof AppImportRoute
   '/money': typeof AppMoneyRoute
   '/new': typeof AppNewRoute
+  '/search': typeof AppSearchRoute
   '/setup': typeof AppSetupRoute
   '/timing': typeof AppTimingRoute
   '/': typeof AppIndexRoute
@@ -197,6 +213,7 @@ export interface FileRoutesByTo {
   '/settings/fields': typeof AppSettingsFieldsRoute
   '/settings/modules': typeof AppSettingsModulesRoute
   '/settings/names': typeof AppSettingsNamesRoute
+  '/settings/notifications': typeof AppSettingsNotificationsRoute
   '/settings/reminders': typeof AppSettingsRemindersRoute
   '/settings/services': typeof AppSettingsServicesRoute
   '/settings/stages': typeof AppSettingsStagesRoute
@@ -211,6 +228,7 @@ export interface FileRoutesById {
   '/_app/import': typeof AppImportRoute
   '/_app/money': typeof AppMoneyRoute
   '/_app/new': typeof AppNewRoute
+  '/_app/search': typeof AppSearchRoute
   '/_app/setup': typeof AppSetupRoute
   '/_app/timing': typeof AppTimingRoute
   '/_app/': typeof AppIndexRoute
@@ -224,6 +242,7 @@ export interface FileRoutesById {
   '/_app/settings/fields': typeof AppSettingsFieldsRoute
   '/_app/settings/modules': typeof AppSettingsModulesRoute
   '/_app/settings/names': typeof AppSettingsNamesRoute
+  '/_app/settings/notifications': typeof AppSettingsNotificationsRoute
   '/_app/settings/reminders': typeof AppSettingsRemindersRoute
   '/_app/settings/services': typeof AppSettingsServicesRoute
   '/_app/settings/stages': typeof AppSettingsStagesRoute
@@ -239,6 +258,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/money'
     | '/new'
+    | '/search'
     | '/setup'
     | '/timing'
     | '/clients/$clientId'
@@ -251,6 +271,7 @@ export interface FileRouteTypes {
     | '/settings/fields'
     | '/settings/modules'
     | '/settings/names'
+    | '/settings/notifications'
     | '/settings/reminders'
     | '/settings/services'
     | '/settings/stages'
@@ -263,6 +284,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/money'
     | '/new'
+    | '/search'
     | '/setup'
     | '/timing'
     | '/'
@@ -276,6 +298,7 @@ export interface FileRouteTypes {
     | '/settings/fields'
     | '/settings/modules'
     | '/settings/names'
+    | '/settings/notifications'
     | '/settings/reminders'
     | '/settings/services'
     | '/settings/stages'
@@ -289,6 +312,7 @@ export interface FileRouteTypes {
     | '/_app/import'
     | '/_app/money'
     | '/_app/new'
+    | '/_app/search'
     | '/_app/setup'
     | '/_app/timing'
     | '/_app/'
@@ -302,6 +326,7 @@ export interface FileRouteTypes {
     | '/_app/settings/fields'
     | '/_app/settings/modules'
     | '/_app/settings/names'
+    | '/_app/settings/notifications'
     | '/_app/settings/reminders'
     | '/_app/settings/services'
     | '/_app/settings/stages'
@@ -357,6 +382,13 @@ declare module '@tanstack/react-router' {
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof AppNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/search': {
+      id: '/_app/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof AppSearchRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/setup': {
@@ -464,6 +496,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsNamesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/notifications': {
+      id: '/_app/settings/notifications'
+      path: '/settings/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof AppSettingsNotificationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/reminders': {
       id: '/_app/settings/reminders'
       path: '/settings/reminders'
@@ -492,6 +531,7 @@ interface AppRouteChildren {
   AppImportRoute: typeof AppImportRoute
   AppMoneyRoute: typeof AppMoneyRoute
   AppNewRoute: typeof AppNewRoute
+  AppSearchRoute: typeof AppSearchRoute
   AppSetupRoute: typeof AppSetupRoute
   AppTimingRoute: typeof AppTimingRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -505,6 +545,7 @@ interface AppRouteChildren {
   AppSettingsFieldsRoute: typeof AppSettingsFieldsRoute
   AppSettingsModulesRoute: typeof AppSettingsModulesRoute
   AppSettingsNamesRoute: typeof AppSettingsNamesRoute
+  AppSettingsNotificationsRoute: typeof AppSettingsNotificationsRoute
   AppSettingsRemindersRoute: typeof AppSettingsRemindersRoute
   AppSettingsServicesRoute: typeof AppSettingsServicesRoute
   AppSettingsStagesRoute: typeof AppSettingsStagesRoute
@@ -517,6 +558,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppImportRoute: AppImportRoute,
   AppMoneyRoute: AppMoneyRoute,
   AppNewRoute: AppNewRoute,
+  AppSearchRoute: AppSearchRoute,
   AppSetupRoute: AppSetupRoute,
   AppTimingRoute: AppTimingRoute,
   AppIndexRoute: AppIndexRoute,
@@ -530,6 +572,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsFieldsRoute: AppSettingsFieldsRoute,
   AppSettingsModulesRoute: AppSettingsModulesRoute,
   AppSettingsNamesRoute: AppSettingsNamesRoute,
+  AppSettingsNotificationsRoute: AppSettingsNotificationsRoute,
   AppSettingsRemindersRoute: AppSettingsRemindersRoute,
   AppSettingsServicesRoute: AppSettingsServicesRoute,
   AppSettingsStagesRoute: AppSettingsStagesRoute,

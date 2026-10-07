@@ -23,6 +23,7 @@ export type ErrorCode =
   | 'payment.exceeds'
   | 'payment.zero'
   | 'credit.notEnough'
+  | 'job.noDate'
   | 'file.rejected'
 
 export function fail(

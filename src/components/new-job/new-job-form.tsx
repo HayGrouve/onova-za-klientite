@@ -20,7 +20,9 @@ import {
   InputGroupText,
 } from '#/components/ui/input-group'
 import { Spinner } from '#/components/ui/spinner'
+import { Switch } from '#/components/ui/switch'
 import { Textarea } from '#/components/ui/textarea'
+import { repeatLabel } from '#/components/job/repeat-section'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import type { ActiveBusiness } from '#/hooks/use-viewer'
 import { formatDay, formatTime } from '#/i18n/dates'
@@ -170,6 +172,8 @@ export function NewJobForm({
     deposit === undefined ? parsed.depositCents : parseMoney(deposit)
   const chosenDate = date === undefined ? parsed.date : date
   const showDeposit = business.depositsOnNewJob || chosenDeposit !== null
+  // A business set up for fixed-schedule work repeats new jobs by default (setup step 6).
+  const [repeat, setRepeat] = useState(business.repeatDefault !== undefined)
 
   const setClient = (value: ClientChoice | null) =>
     setClientFix(fix(value, parsed.client))
@@ -211,6 +215,8 @@ export function NewJobForm({
             : undefined,
         when: single && chosenDate ? chosenDate : undefined,
         dueDate: !single && chosenDate ? chosenDate.date : undefined,
+        repeat:
+          repeat && business.repeatDefault ? business.repeatDefault : undefined,
       })
       recordTiming('newJob', Date.now() - startedAt)
       toast.success(m.new_saved())
@@ -560,6 +566,28 @@ export function NewJobForm({
               </div>
             )}
           </ReadRow>
+          {business.repeatDefault && (
+            <div className="flex min-h-14 items-center gap-3 py-2">
+              <label
+                htmlFor="new-repeat"
+                className="flex min-w-0 flex-1 items-center gap-3"
+              >
+                <span className="w-20 shrink-0 text-sm text-muted-foreground">
+                  {m.repeat_read_back()}
+                </span>
+                <span className="text-base">
+                  {repeat
+                    ? repeatLabel(business.repeatDefault)
+                    : m.repeat_off()}
+                </span>
+              </label>
+              <Switch
+                id="new-repeat"
+                checked={repeat}
+                onCheckedChange={setRepeat}
+              />
+            </div>
+          )}
         </section>
       </div>
 

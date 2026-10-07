@@ -20,6 +20,7 @@ import {
   vCreateJobArgs,
 } from './lib/jobWrite'
 import { recomputeJob } from './lib/recompute'
+import { jobDate, refreshRepeat } from './lib/repeat'
 import { jobSearchText } from './lib/search'
 import { cents, optionalDate, optionalText, requiredText } from './lib/validate'
 import { jobRow, newLookups, timeline, vJobRow } from './lib/views'
@@ -335,5 +336,59 @@ export const get = businessQuery({
       costs: costs.sort((a, b) => b.date.localeCompare(a.date)),
       timeline: await timeline(ctx, events),
     }
+  },
+})
+
+/** Turns repeating on for a job (Q6). It needs a date: an appointment or a due date. */
+export const setRepeat = businessMutation({
+  args: {
+    jobId: v.id('jobs'),
+    every: v.number(),
+    unit: v.union(v.literal('week'), v.literal('month')),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireRole(ctx.member, 'manager')
+    const job = await getOwned(ctx, 'jobs', args.jobId)
+    if (!Number.isInteger(args.every) || args.every < 1 || args.every > 52) {
+      fail('invalid', { field: 'every' })
+    }
+    if (!(await jobDate(ctx, job))) fail('job.noDate')
+    await ctx.db.patch('jobs', job._id, {
+      repeat: {
+        every: args.every,
+        unit: args.unit,
+        nextJobId: job.repeat?.nextJobId,
+      },
+    })
+    await refreshRepeat(ctx, job._id)
+    await logActivity(ctx, {
+      type: 'job.repeatSet',
+      jobId: job._id,
+      clientId: job.clientId,
+      data: { to: `${args.every} ${args.unit}` },
+    })
+    return null
+  },
+})
+
+/** "Stop repeating": no more jobs are created for this series from here. */
+export const stopRepeat = businessMutation({
+  args: { jobId: v.id('jobs') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireRole(ctx.member, 'manager')
+    const job = await getOwned(ctx, 'jobs', args.jobId)
+    if (!job.repeat || job.repeat.stoppedAt !== undefined) return null
+    await ctx.db.patch('jobs', job._id, {
+      repeat: { ...job.repeat, stoppedAt: Date.now() },
+      nextRepeatOn: undefined,
+    })
+    await logActivity(ctx, {
+      type: 'job.repeatStopped',
+      jobId: job._id,
+      clientId: job.clientId,
+    })
+    return null
   },
 })

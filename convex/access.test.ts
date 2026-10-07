@@ -108,7 +108,14 @@ async function ownerData(t: TestConvex, b: TestBusiness) {
     name: 'Монтаж',
     priceCents: 4000,
   })
+  const reminderId = await owner.mutation(api.reminders.add, {
+    businessId,
+    clientId,
+    date: '2026-11-01',
+    note: 'Обади се',
+  })
   return {
+    reminderId,
     serviceId,
     appointmentId,
     clientId,
@@ -200,6 +207,8 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'jobs:create': (ids) => ({ clientId: ids.clientId, title: 'Нова' }),
   'jobs:removeWriteOff': (ids) => ({ jobId: ids.jobId }),
+  'jobs:setRepeat': (ids) => ({ jobId: ids.jobId, every: 1, unit: 'week' }),
+  'jobs:stopRepeat': (ids) => ({ jobId: ids.jobId }),
   'jobs:setItems': (ids) => ({ jobId: ids.jobId, itemIds: [ids.itemId] }),
   'jobs:setLines': (ids) => ({ jobId: ids.jobId, lines: [] }),
   'jobs:update': (ids) => ({ jobId: ids.jobId, title: 'Друга' }),
@@ -210,6 +219,8 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     client: { kind: 'existing', clientId: ids.clientId },
     title: 'Нова',
   }),
+  'push:setNotify': () => ({ overdue: false }),
+  'push:settings': () => ({}),
   'payments:addFromClient': (ids) => ({
     clientId: ids.clientId,
     amountCents: 100,
@@ -230,6 +241,14 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
   }),
   'payments:remove': (ids) => ({ paymentId: ids.paymentId }),
   'payments:useCredit': (ids) => ({ jobId: ids.jobId }),
+  'reminders:add': (ids) => ({
+    clientId: ids.clientId,
+    date: '2026-12-01',
+    note: 'x',
+  }),
+  'reminders:close': (ids) => ({ reminderId: ids.reminderId, status: 'done' }),
+  'reminders:forClient': (ids) => ({ clientId: ids.clientId }),
+  'search:all': () => ({ query: 'ivan' }),
   'services:add': () => ({ name: 'Нова', priceCents: 100 }),
   'services:list': () => ({}),
   'services:reorder': (ids) => ({ serviceIds: [ids.serviceId] }),
@@ -247,6 +266,8 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
 
 /** Functions outside any business: they act only on the caller's own user. */
 const USER_SCOPED = [
+  'push:subscribe',
+  'push:unsubscribe',
   'users:ensureCurrent',
   'users:setActiveBusiness',
   'users:viewer',
@@ -254,6 +275,7 @@ const USER_SCOPED = [
 
 /** Functions that take no record id, so only the business check applies. */
 const NO_RECORD_IDS = new Set([
+  'search:all',
   'businesses:setModules',
   'businesses:setNewJobOptions',
   'businesses:setReminderRule',
@@ -271,6 +293,8 @@ const NO_RECORD_IDS = new Set([
   'files:generateUploadUrl',
   'files:list',
   'money:summary',
+  'push:setNotify',
+  'push:settings',
   'newJob:context',
   'setup:apply',
   'setup:current',
@@ -351,6 +375,8 @@ const EVENTS: Record<string, string | null> = {
   'jobs:create': 'job.created',
   'jobs:removeWriteOff': null,
   'jobs:setItems': 'job.itemsChanged',
+  'jobs:setRepeat': 'job.repeatSet',
+  'jobs:stopRepeat': null,
   'jobs:setLines': 'job.linesChanged',
   'jobs:update': 'job.edited',
   'jobs:writeOff': 'job.writtenOff',
@@ -360,6 +386,9 @@ const EVENTS: Record<string, string | null> = {
   'payments:refund': 'payment.added',
   'payments:remove': 'payment.removed',
   'payments:useCredit': 'credit.used',
+  'push:setNotify': null,
+  'reminders:add': 'reminder.added',
+  'reminders:close': 'reminder.closed',
   'services:add': 'settings.changed',
   'services:reorder': 'settings.changed',
   'services:update': 'settings.changed',

@@ -26,14 +26,22 @@ import type * as lib_extra from "../lib/extra.js";
 import type * as lib_insertStage from "../lib/insertStage.js";
 import type * as lib_jobWrite from "../lib/jobWrite.js";
 import type * as lib_moveJob from "../lib/moveJob.js";
+import type * as lib_pushText from "../lib/pushText.js";
 import type * as lib_recompute from "../lib/recompute.js";
+import type * as lib_repeat from "../lib/repeat.js";
 import type * as lib_search from "../lib/search.js";
 import type * as lib_seedAccess from "../lib/seedAccess.js";
+import type * as lib_summary from "../lib/summary.js";
 import type * as lib_validate from "../lib/validate.js";
 import type * as lib_views from "../lib/views.js";
 import type * as money from "../money.js";
 import type * as newJob from "../newJob.js";
 import type * as payments from "../payments.js";
+import type * as push from "../push.js";
+import type * as pushNode from "../pushNode.js";
+import type * as reminders from "../reminders.js";
+import type * as repeat from "../repeat.js";
+import type * as search from "../search.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
 import type * as services from "../services.js";
@@ -69,14 +77,22 @@ declare const fullApi: ApiFromModules<{
   "lib/insertStage": typeof lib_insertStage;
   "lib/jobWrite": typeof lib_jobWrite;
   "lib/moveJob": typeof lib_moveJob;
+  "lib/pushText": typeof lib_pushText;
   "lib/recompute": typeof lib_recompute;
+  "lib/repeat": typeof lib_repeat;
   "lib/search": typeof lib_search;
   "lib/seedAccess": typeof lib_seedAccess;
+  "lib/summary": typeof lib_summary;
   "lib/validate": typeof lib_validate;
   "lib/views": typeof lib_views;
   money: typeof money;
   newJob: typeof newJob;
   payments: typeof payments;
+  push: typeof push;
+  pushNode: typeof pushNode;
+  reminders: typeof reminders;
+  repeat: typeof repeat;
+  search: typeof search;
   seed: typeof seed;
   seedData: typeof seedData;
   services: typeof services;
@@ -114,4 +130,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  pushPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"pushPool">;
+};

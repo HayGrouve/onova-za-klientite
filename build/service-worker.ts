@@ -76,6 +76,55 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
+// Web Push (ADR 0011). Declarative Web Push is shown by the browser on iOS
+// 18.4+ without this code. Everywhere else the payload arrives here in the
+// same shape, and a notification is always shown (iOS drops the subscription
+// of a worker that receives a push and shows nothing).
+self.addEventListener('push', (event) => {
+  let title = ''
+  let options = {}
+  try {
+    const payload = event.data ? event.data.json() : null
+    const note = payload && payload.notification
+    if (note) {
+      title = String(note.title || '')
+      options = {
+        body: note.body ? String(note.body) : undefined,
+        data: { url: note.navigate ? String(note.navigate) : '/' },
+        lang: note.lang || 'bg',
+      }
+    }
+  } catch {
+    // An unreadable payload still gets a notification below.
+  }
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      ...options,
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const data = event.notification.data
+  const target = new URL((data && data.url) || '/', self.location.origin).href
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windows) => {
+        const open = windows.find((client) => 'focus' in client)
+        if (open) {
+          return open.focus().then((client) =>
+            'navigate' in client ? client.navigate(target) : client,
+          )
+        }
+        return self.clients.openWindow(target)
+      }),
+  )
+})
+
 self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET') return

@@ -10,4 +10,19 @@ crons.daily(
   {},
 )
 
+crons.interval(
+  'morning summaries',
+  { minutes: 15 },
+  internal.push.runDueSummaries,
+  {},
+)
+
+// Q6: repeating jobs, once a day at 01:07 UTC (just after 03:00 or 04:00 in Sofia).
+crons.daily(
+  'repeat jobs',
+  { hourUTC: 1, minuteUTC: 7 },
+  internal.repeat.run,
+  {},
+)
+
 export default crons

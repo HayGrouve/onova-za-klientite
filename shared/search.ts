@@ -59,14 +59,78 @@ function words(text: string): string[] {
     .filter(Boolean)
 }
 
+// The 12 letters Bulgarian plates share with Latin (А В Е К М Н О Р С Т У Х).
+const PLATE_LOOKALIKES: Partial<Record<string, string>> = {
+  а: 'a',
+  в: 'b',
+  е: 'e',
+  к: 'k',
+  м: 'm',
+  н: 'h',
+  о: 'o',
+  р: 'p',
+  с: 'c',
+  т: 't',
+  у: 'y',
+  х: 'x',
+}
+
+/** СА 1234 ВР → ca 1234 bp: look-alike letters read as the Latin they look like. */
+export function plateFold(text: string): string {
+  let out = ''
+  for (const char of text.toLowerCase()) out += PLATE_LOOKALIKES[char] ?? char
+  return transliterate(out)
+}
+
+/** Convex search silently drops terms over 32 bytes; keys are Latin, so 32 characters. */
+const MAX_KEY = 32
+/** Values this short also get a copy without spaces: plates, model numbers. */
+const SPACELESS_UP_TO = 20
+
 /** One folded key string for a record, built from its searchable values. */
 export function buildSearchText(values: Array<string | undefined>): string {
   const keys = new Set<string>()
+  const add = (key: string) => {
+    if (key) keys.add(key.slice(0, MAX_KEY))
+  }
   for (const value of values) {
     if (!value) continue
-    for (const word of words(transliterate(value))) keys.add(word)
+    // Plates and model numbers have digits: they also get the look-alike
+    // fold and a copy without spaces. Plain names stay plain.
+    const codeLike = /\d/.test(value)
+    const folds = new Set([
+      transliterate(value),
+      ...(codeLike ? [plateFold(value)] : []),
+    ])
+    for (const fold of folds) {
+      for (const word of words(fold)) add(word)
+      const compact = fold.replace(/[^\p{L}\p{N}]+/gu, '')
+      if (
+        codeLike &&
+        compact.length <= SPACELESS_UP_TO &&
+        words(fold).length > 1
+      )
+        add(compact)
+    }
+    // A phone in international form is also typed the local way: +359888… → 0888…
+    const phone = value.replace(/[\s()-]/g, '')
+    if (/^\+359\d{8,9}$/.test(phone)) add(`0${phone.slice(4)}`)
   }
   return [...keys].join(' ')
+}
+
+/**
+ * A search box query, folded like the stored keys. A query with digits also
+ * gets a compact look-alike form, so "СА 1234 ВР" finds "CA1234BP". Search
+ * runs each variant and merges the results.
+ */
+export function foldQuery(query: string): string[] {
+  const plain = words(transliterate(query)).join(' ')
+  if (!/\d/.test(query)) return plain ? [plain] : []
+  const compact = plateFold(query)
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+    .slice(0, MAX_KEY)
+  return [...new Set([plain, compact].filter(Boolean))]
 }
 
 /**

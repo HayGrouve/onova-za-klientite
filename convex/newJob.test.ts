@@ -139,3 +139,20 @@ describe('newJob.save', () => {
     ])
   })
 })
+
+describe('newJob.save with repeat', () => {
+  it('a weekly job from "+" is set to repeat from its date', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const { jobId } = await owner.mutation(api.newJob.save, {
+      businessId,
+      client: { kind: 'none' },
+      title: 'Почистване',
+      when: { date: '2026-10-09', time: { hour: 8, minute: 0 } },
+      repeat: { every: 1, unit: 'week' },
+    })
+    const job = await getDoc(t, 'jobs', jobId)
+    expect(job.repeat).toEqual({ every: 1, unit: 'week' })
+    expect(job.nextRepeatOn).toBe('2026-10-09')
+  })
+})

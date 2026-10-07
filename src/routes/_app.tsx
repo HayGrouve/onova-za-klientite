@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { AppShell } from '#/components/app-shell'
 import { CenteredMessage } from '#/components/centered-message'
+import { PushKeeper } from '#/components/push-keeper'
 import { Spinner } from '#/components/ui/spinner'
 import { ViewerProvider } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
@@ -83,6 +84,7 @@ function WithViewer() {
     return <CenteredMessage>{m.error_profile()}</CenteredMessage>
   return (
     <ViewerProvider value={viewer}>
+      <PushKeeper />
       <AppShell>
         <Outlet />
       </AppShell>
