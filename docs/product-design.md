@@ -99,7 +99,7 @@ Users change words, visibility, extra fields and job stages, never structure. Th
 | --- | --- | --- | --- |
 | Names | Rename Client, Job, Item, Appointment (singular and plural) | Job → "Ремонт" | 1 |
 | Modules | Switch Appointments, Costs, Items, Reminders, Service list on or off | A tutor switches Costs off | 1 |
-| Job stages | Name, order and colour their own stages; each belongs to one stage group | "Чака части" in the *In progress* group | 1 |
+| Job stages | Name and order their own stages; each belongs to one stage group, and the group sets its colour (D53) | "Чака части" in the *In progress* group | 1 |
 | Extra fields | Add fields to Client, Job or Item | Item field "Plate number" | 1 |
 | Service list | Saved services and default prices | "Монтаж – €40" | 1 |
 | Reminder rule | When a job is done, suggest a reminder in N months | 12 months | 1 |
@@ -159,7 +159,7 @@ One settings page with short, separate sections. Nothing on it is required to st
 | Business | Name, logo, contact details | 1 |
 | Names | Renaming Client, Job, Item, Appointment | 1 |
 | Modules | On/off switches for optional building blocks | 1 |
-| Job stages | Stage names, order, colours, stage groups | 1 |
+| Job stages | Stage names, order, stage groups | 1 |
 | Fields | Extra fields, in tabs for Clients, Jobs, Items | 1 |
 | Services & prices | The service list | 1 |
 | Reminders | The reminder rule and its interval | 1 |

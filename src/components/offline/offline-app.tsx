@@ -55,7 +55,7 @@ function JobLine({
       >
         <span className="flex items-start justify-between gap-3">
           <span className="font-medium">{job.title}</span>
-          <StageBadge name={job.stageName} color={job.stageColor} />
+          <StageBadge name={job.stageName} group={job.stageGroup} />
         </span>
         <span className="flex justify-between gap-3 text-sm text-muted-foreground">
           <span className="truncate">{job.clientName}</span>
@@ -132,7 +132,7 @@ export function OfflineApp({ saved }: { saved: SavedSnapshot | null }) {
           <h1 className="text-2xl font-semibold">{view.job.title}</h1>
           <StageBadge
             name={view.job.stageName}
-            color={view.job.stageColor}
+            group={view.job.stageGroup}
             className="w-fit"
           />
           {clientsById.get(view.job.clientId) && (
@@ -200,10 +200,12 @@ export function OfflineApp({ saved }: { saved: SavedSnapshot | null }) {
               <a
                 href={viberHref(phone)}
                 aria-label={m.client_viber()}
-                className={buttonVariants({
-                  variant: 'outline',
-                  size: 'icon-xl',
-                })}
+                className={cn(
+                  buttonVariants({
+                    variant: 'outline',
+                    size: 'icon-xl',
+                  }),
+                )}
               >
                 <ChatCircleIcon />
               </a>

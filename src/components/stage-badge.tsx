@@ -1,37 +1,34 @@
 import { cn } from 'cn'
-import type { StageColor } from '../../shared/stages'
+import type { StageGroup } from '../../shared/stages'
 
-const COLORS: Record<StageColor, string> = {
-  gray: 'bg-zinc-200/70 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200',
-  blue: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
-  amber: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
-  violet:
-    'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200',
-  green: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-  red: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+// Colour carries meaning only: work still open is blue, done is green,
+// cancelled is red. The stage's own name says the rest (D53).
+const GROUP_STYLE: Record<StageGroup, string> = {
+  new: 'bg-blue-50 text-blue-800 ring-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-900',
+  in_progress:
+    'bg-blue-50 text-blue-800 ring-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-900',
+  done: 'bg-green-50 text-green-800 ring-green-200 dark:bg-green-950 dark:text-green-200 dark:ring-green-900',
+  cancelled:
+    'bg-red-50 text-red-700 ring-red-200 dark:bg-red-950 dark:text-red-200 dark:ring-red-900',
 }
 
 export function StageBadge({
   name,
-  color,
+  group,
   className,
 }: {
   name: string
-  color: StageColor
+  group: StageGroup
   className?: string
 }) {
   return (
     <span
       className={cn(
-        'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium',
-        COLORS[color],
+        'inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-xs font-medium ring-1 ring-inset',
+        GROUP_STYLE[group],
         className,
       )}
     >
-      <span
-        aria-hidden
-        className="size-1.5 rounded-full bg-current opacity-70"
-      />
       {name}
     </span>
   )
