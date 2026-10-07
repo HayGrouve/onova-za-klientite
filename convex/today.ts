@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { addDays, isValidDate, sofiaTimeToUtc } from '../shared/dates'
+import { arrangeToday } from '../shared/today'
 import { businessQuery } from './lib/auth'
 import { fail } from './lib/errors'
 import { jobRow, newLookups, vJobRow } from './lib/views'
@@ -29,7 +30,8 @@ const SOON_DAYS = 3
 
 /**
  * Today: what to act on (CONTEXT "Today"). `today` is the Sofia calendar date
- * from the device, so the list turns over at local midnight.
+ * from the device, so the list turns over at local midnight. A job is in one
+ * section only (`arrangeToday`).
  */
 export const list = businessQuery({
   args: { today: v.string() },
@@ -76,7 +78,6 @@ export const list = businessQuery({
     const upcoming = []
     for (const item of live) {
       const row = await appointmentRow(item)
-      if (row.job?.stageGroup === 'cancelled') continue
       if (item.start < tomorrowStart) todays.push(row)
       else upcoming.push(row)
     }
@@ -157,12 +158,14 @@ export const list = businessQuery({
     }
 
     return {
-      appointments: todays,
-      upcoming,
-      overdue,
-      dueSoon,
+      ...arrangeToday({
+        appointments: todays,
+        upcoming,
+        overdue,
+        dueSoon,
+        doneUnpaid,
+      }),
       reminders: reminderRows,
-      doneUnpaid,
     }
   },
 })
