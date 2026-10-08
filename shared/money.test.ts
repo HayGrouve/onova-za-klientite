@@ -38,6 +38,13 @@ describe('parseMoney', () => {
     ['-0', 0],
     ['  12,3 ', 1230],
     ['12 000,00 €', 1200000],
+    ['0.5', 50],
+    ['0,5', 50],
+    ['0,99', 99],
+    ['0.05', 5],
+    ['100,000', 10000000],
+    ['10.000', 1000000],
+    ['999.999,99', 99999999],
   ])('parses %j as %j cents', (input, cents) => {
     expect(parseMoney(input)).toBe(cents)
   })
@@ -59,8 +66,36 @@ describe('parseMoney', () => {
     ['--5'],
     ['5-'],
     ['9'.repeat(30)],
+    // A thousands group can't open with a zero: "0,125" is no 125 euros.
+    ['0,125'],
+    ['0.125'],
+    ['0.001'],
+    ['0,001,000'],
+    ['00,125'],
+    // Leading zeros are ambiguous (a slip, or an octal habit): ask again.
+    ['012'],
+    ['00'],
+    ['007,50'],
+    ['-012'],
+    ['0.200,50'],
   ])('rejects %j', (input) => {
     expect(parseMoney(input)).toBeNull()
+  })
+
+  it('never reads a text with a leading zero group as a bigger amount', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 999 }),
+        fc.integer({ min: 0, max: 999 }),
+        fc.constantFrom('.', ','),
+        (first, second, separator) => {
+          const text = `${String(first).padStart(3, '0')}${separator}${String(second).padStart(3, '0')}`
+          const parsed = parseMoney(text)
+          // Only "000,xyz" shapes with a real group lead can be thousands.
+          if (first === 0) expect(parsed).toBeNull()
+        },
+      ),
+    )
   })
 
   it('does not return -0', () => {
