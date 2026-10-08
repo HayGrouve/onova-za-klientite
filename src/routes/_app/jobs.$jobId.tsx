@@ -74,6 +74,7 @@ import { formatMoney, lineTotalCents } from '../../../shared/money'
 import { formatQuantity } from '../../../shared/quantity'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
+import { hasRole } from '../../../shared/roles'
 import { isJobLate } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
 
@@ -163,6 +164,8 @@ function JobPage() {
     ? m.job_profit()
     : m.job_profit_so_far()
   const late = isJobLate(job, today)
+  // Workers see the stage; moving a job is for managers, as on the board.
+  const canMove = hasRole(business.role, 'manager')
 
   const moveTo = async (stageId: Id<'stages'>) => {
     const target = data.stages.find((stage) => stage._id === stageId)
@@ -308,11 +311,14 @@ function JobPage() {
               <Panel
                 title={m.job_stage()}
                 icon={FlowArrowIcon}
-                hint={<Hint term={m.job_stage()}>{m.hint_stage()}</Hint>}
+                hint={
+                  canMove && <Hint term={m.job_stage()}>{m.hint_stage()}</Hint>
+                }
               >
                 <PanelBody>
                   <ToggleGroup
                     aria-label={m.job_stage()}
+                    disabled={!canMove}
                     value={[job.stageId]}
                     onValueChange={(next: string[]) => {
                       // The current stage can't be switched off: only a move counts.
@@ -323,12 +329,13 @@ function JobPage() {
                   >
                     {data.stages.map((stage) => {
                       const current = stage._id === job.stageId
+                      if (!canMove && !current) return null
                       return (
                         <ToggleGroupItem
                           key={stage._id}
                           value={stage._id}
                           className={cn(
-                            'h-9 max-w-full rounded-full px-3.5 whitespace-normal ring-offset-0 duration-200 active:scale-95',
+                            'h-9 max-w-full rounded-full px-3.5 whitespace-normal ring-offset-0 duration-200 active:scale-95 disabled:opacity-100',
                             current
                               ? cn('shadow-sm', CURRENT_STAGE[stage.group])
                               : cn(
