@@ -3,6 +3,7 @@ import { addDays, isValidDate, sofiaTimeToUtc } from '../shared/dates'
 import { arrangeToday } from '../shared/today'
 import type { Doc } from './_generated/dataModel'
 import { businessQuery } from './lib/auth'
+import { queryNow } from './lib/clock'
 import { fail } from './lib/errors'
 import { isWorker, seesAppointment, seesJob } from './lib/scope'
 import { jobRow, newLookups, vJobRow } from './lib/views'
@@ -36,7 +37,7 @@ const SOON_DAYS = 3
  * section only (`arrangeToday`).
  */
 export const list = businessQuery({
-  args: { today: v.string() },
+  args: { today: v.string(), now: v.optional(v.number()) },
   returns: v.object({
     appointments: v.array(vAppointmentRow),
     upcoming: v.array(vAppointmentRow),
@@ -45,11 +46,11 @@ export const list = businessQuery({
     reminders: v.array(vReminderRow),
     doneUnpaid: v.array(vJobRow),
   }),
-  handler: async (ctx, { today }) => {
+  handler: async (ctx, { today, now: clientNow }) => {
     if (!isValidDate(today)) fail('invalid', { field: 'today' })
     const businessId = ctx.business._id
     const lookups = newLookups()
-    const now = Date.now()
+    const now = queryNow(clientNow)
 
     const dayStart = sofiaTimeToUtc(today, 0, 0)
     const tomorrowStart = sofiaTimeToUtc(addDays(today, 1), 0, 0)

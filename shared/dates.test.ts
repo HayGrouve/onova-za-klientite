@@ -10,6 +10,7 @@ import {
   isValidDate,
   isValidMonth,
   monthOf,
+  roundedNow,
   monthRange,
   nextSofiaTime,
   parseMoment,
@@ -461,5 +462,24 @@ describe('isValidMonth', () => {
     expect(isValidMonth('2026-00')).toBe(false)
     expect(isValidMonth('2026-1')).toBe(false)
     expect(isValidMonth('2026-10-01')).toBe(false)
+  })
+})
+
+describe('roundedNow', () => {
+  it('rounds down to a 5-minute step', () => {
+    const base = Date.UTC(2026, 9, 9, 10, 0, 0)
+    expect(roundedNow(base)).toBe(base)
+    expect(roundedNow(base + 4 * 60_000 + 59_999)).toBe(base)
+    expect(roundedNow(base + 5 * 60_000)).toBe(base + 5 * 60_000)
+  })
+
+  it('never moves forward or more than a step back', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 4_000_000_000_000 }), (ms) => {
+        const rounded = roundedNow(ms)
+        expect(rounded).toBeLessThanOrEqual(ms)
+        expect(ms - rounded).toBeLessThan(5 * 60_000)
+      }),
+    )
   })
 })

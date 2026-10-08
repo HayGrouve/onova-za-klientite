@@ -50,6 +50,18 @@ export function todayInSofia(nowMs: number): string {
   return dateInSofia(nowMs)
 }
 
+/** How coarsely a query that needs "now" is told the time, so it can be cached. */
+export const NOW_STEP_MS = 5 * MINUTE
+
+/**
+ * The time rounded down to a 5-minute step. A query that depends on the clock
+ * (the next appointment window) only recomputes on data changes, so the device
+ * passes this as an argument: it changes every 5 minutes, and the query with it.
+ */
+export function roundedNow(ms: number): number {
+  return Math.floor(ms / NOW_STEP_MS) * NOW_STEP_MS
+}
+
 export function isValidDate(date: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
   const [y, m, d] = parts(date)

@@ -2,6 +2,7 @@ import { useMutation } from 'convex/react'
 import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
+import { useNow } from '#/hooks/use-now'
 import { useViewer } from '#/hooks/use-viewer'
 import { GROUP_LABEL } from '#/i18n/groups'
 import { runChange } from '#/lib/change'
@@ -21,9 +22,11 @@ type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
  */
 export function useMoveJob() {
   const { business } = useViewer()
+  // The board's query arguments, so the optimistic update finds its result.
+  const now = useNow()
   const changeStage = useMutation(api.jobs.changeStage).withOptimisticUpdate(
     (store, { businessId, jobId, stageId }) => {
-      const board = store.getQuery(api.jobs.board, { businessId })
+      const board = store.getQuery(api.jobs.board, { businessId, now })
       const stage = board?.stages.find((item) => item._id === stageId)
       const moving = board?.columns
         .flatMap((column) => column.jobs)
@@ -41,7 +44,7 @@ export function useMoveJob() {
       }
       store.setQuery(
         api.jobs.board,
-        { businessId },
+        { businessId, now },
         {
           ...board,
           columns: board.columns.map((column) => {

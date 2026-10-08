@@ -168,3 +168,23 @@ describe('today.list leaves finished and cancelled jobs out of the schedule', ()
     expect(result.upcoming).toEqual([])
   })
 })
+
+describe('today.list takes the time from the device', () => {
+  it('shows a visit under its job until 12 hours after it, by the `now` it is given', async () => {
+    const { owner, businessId, job, visit } = await shop()
+    const id = await job('Монтаж')
+    // 08:00 Sofia on the 8th (UTC+3), all day off.
+    await visit(id, TODAY, { hour: 8, minute: 0 })
+    const rowAt = async (now: number) => {
+      const data = await owner.query(api.today.list, {
+        businessId,
+        today: TODAY,
+        now,
+      })
+      return data.appointments[0].job?.nextAppointment
+    }
+    const start = Date.parse('2026-10-08T05:00:00Z')
+    expect(await rowAt(start + 11 * 3_600_000)).toBeDefined()
+    expect(await rowAt(start + 13 * 3_600_000)).toBeUndefined()
+  })
+})
