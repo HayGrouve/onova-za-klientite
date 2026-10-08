@@ -54,6 +54,47 @@ describe('payments', () => {
     await expectCachesFresh(t)
   })
 
+  it('a Worker cannot take more than the job still owes; a Manager still can', async () => {
+    const { t, owner, businessId, clientId, jobIds, ...b } = await withJobs([
+      10000,
+    ])
+    const { member: worker, membershipId } = await addMember(
+      t,
+      { owner, businessId, ...b },
+      'worker',
+    )
+    const { member: manager } = await addMember(
+      t,
+      { owner, businessId, ...b },
+      'manager',
+    )
+    await t.run((ctx) =>
+      ctx.db.patch('jobs', jobIds[0], { assigneeIds: [membershipId] }),
+    )
+    const pay = (who: typeof worker, amountCents: number) =>
+      who.mutation(api.payments.addFromJob, {
+        businessId,
+        jobId: jobIds[0],
+        amountCents,
+        date: DATE,
+        method: 'cash',
+      })
+    await expect(pay(worker, 10001)).rejects.toThrow(/payment.exceeds/)
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(0)
+    await pay(worker, 6000)
+    // 40 € left: one cent more is refused, the rest is accepted.
+    await expect(pay(worker, 4001)).rejects.toThrow(/payment.exceeds/)
+    await pay(worker, 4000)
+    // Paid in full: a Worker can add nothing more.
+    await expect(pay(worker, 1)).rejects.toThrow(/payment.exceeds/)
+    expect((await getDoc(t, 'jobs', jobIds[0])).balanceCents).toBe(0)
+    expect((await getDoc(t, 'clients', clientId)).creditCents).toBe(0)
+    // A Manager may take more: the rest is client credit.
+    await pay(manager, 2500)
+    expect((await getDoc(t, 'clients', clientId)).creditCents).toBe(2500)
+    await expectCachesFresh(t)
+  })
+
   it('a payment from a client is split across their jobs, oldest first', async () => {
     const { t, owner, businessId, clientId, jobIds } = await withJobs([
       10000, 20000, 30000,

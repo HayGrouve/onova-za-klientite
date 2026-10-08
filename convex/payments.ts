@@ -71,7 +71,8 @@ async function openJobs(ctx: BusinessMutationCtx, clientId: Id<'clients'>) {
 
 /**
  * Paying from a job allocates to that job, up to its balance. Any rest is
- * kept as client credit.
+ * kept as client credit, except from a Worker, who may not take more than the
+ * balance.
  */
 export const addFromJob = businessMutation({
   args: { jobId: v.id('jobs'), ...paymentFields },
@@ -81,6 +82,11 @@ export const addFromJob = businessMutation({
     requireJobMoneyAccess(ctx, job)
     const amountCents = cents(args.amountCents, 'amountCents')
     if (amountCents === 0) fail('payment.zero')
+    // A Worker takes money on site for the job, up to what it owes. Prepaid
+    // credit is a Manager's to hold (D89).
+    if (isWorker(ctx.member) && amountCents > jobOwedCents(job)) {
+      fail('payment.exceeds', { limitCents: jobOwedCents(job) })
+    }
 
     const paymentId = await payJob(
       ctx,
