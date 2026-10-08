@@ -1,5 +1,4 @@
 import {
-  BellIcon,
   CalendarBlankIcon,
   CheckIcon,
   ClockCounterClockwiseIcon,
@@ -21,21 +20,24 @@ import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { cn } from 'cn'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import { ListExtras } from '#/components/list-extras'
+import { AddressLink } from '#/components/address-link'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { AppointmentForm } from '#/components/job/appointment-form'
 import { RepeatSection } from '#/components/job/repeat-section'
 import { ReminderForm } from '#/components/reminders/reminder-form'
+import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { monthsLabel } from '#/components/setup/steps'
 import { CostForm } from '#/components/money/cost-form'
 import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
+import { PaymentSheet } from '#/components/money/payment-sheet'
 import { RefundForm } from '#/components/money/refund-form'
-import { RemovePayment } from '#/components/money/remove-payment'
 import { WriteOffForm } from '#/components/money/write-off-form'
 import { JobEditForm } from '#/components/job/job-edit-form'
 import { JobSummaryButton } from '#/components/job-summary-sheet'
@@ -45,6 +47,7 @@ import { Hint } from '#/components/hint'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { formatMoment } from '#/components/job-row'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { DetailError } from '#/components/not-found'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
@@ -55,6 +58,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useMoveJob } from '#/hooks/use-move-job'
 import { useViewer } from '#/hooks/use-viewer'
@@ -62,14 +67,18 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
+import { jobProfitCents, jobProfitIsFinal } from '../../../shared/allocation'
 import { addMonths, isOverdue } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
+import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
 import type { StageGroup } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/jobs/$jobId')({
   staticData: { layout: 'wide' },
   component: JobPage,
+  // A wrong address, or a record from another business, says so (D16).
+  errorComponent: ({ error }) => <DetailError error={error} kind="job" />,
 })
 
 type OpenSheet =
@@ -81,8 +90,12 @@ type OpenSheet =
   | { kind: 'refund' }
   | { kind: 'writeOff' }
   | { kind: 'cost'; cost?: Doc<'costs'> }
-  | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
   | { kind: 'reminder'; rule: boolean }
+
+type StageRef = { _id: Id<'stages'>; name: string; group: StageGroup }
+
+/** One toast at a time for stage changes: a new one replaces the last. */
+const STAGE_TOAST = 'stage-moved'
 
 // The current stage is the one filled chip; colour follows its group (D53).
 const CURRENT_STAGE: Record<StageGroup, string> = {
@@ -118,34 +131,103 @@ function JobPage() {
   const today = useToday()
   const data = useQuery(api.jobs.get, {
     businessId: business._id,
-    jobId: jobId as Id<'jobs'>,
+    jobId,
   })
+  usePageTitle(data?.job.title)
   const fields = useQuery(api.fields.list, {
     businessId: business._id,
     target: 'job',
   })
   const services = useQuery(api.services.list, { businessId: business._id })
+  const reminders = useQuery(
+    api.reminders.forJob,
+    business.modules.reminders
+      ? { businessId: business._id, jobId: jobId as Id<'jobs'> }
+      : 'skip',
+  )
   const move = useMoveJob()
   const applyCredit = useMutation(api.payments.useCredit)
   const removeWriteOff = useMutation(api.jobs.removeWriteOff)
   const [panel, setPanel] = useState<OpenSheet | null>(null)
+  // The stage toast waits here while the reminder offer is open (see moveTo).
+  const afterSheet = useRef<(() => void) | null>(null)
+  const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const { words, modules } = business
+
+  // A toast's undo and payment buttons belong to this job's page.
+  useEffect(() => () => void toast.dismiss(STAGE_TOAST), [jobId])
 
   if (!data || !fields) return <ListSkeleton />
   const { job, client } = data
   const phone = client?.phones.at(0)?.e164
+  // New and in-progress work can still be paid or cost more: profit so far.
+  const profitLabel = jobProfitIsFinal(job.stageGroup)
+    ? m.job_profit()
+    : m.job_profit_so_far()
   const late =
     (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
     isOverdue(job.dueDate, today)
 
-  const moveTo = async (stageId: Id<'stages'>) => {
-    const target = data.stages.find((stage) => stage._id === stageId)
-    // Q5: reaching Done offers the reminder rule's reminder, pre-filled.
-    if (target && (await move(job, target))) {
-      setPanel({ kind: 'reminder', rule: true })
-    }
+  // Tells the person which stage the job is in now, with a way back. Reaching
+  // Done with a balance also offers the payment.
+  const announceMove = (target: StageRef, previous: StageRef | undefined) => {
+    const undo = previous
+      ? {
+          label: m.undo(),
+          onClick: () =>
+            void move(
+              {
+                _id: job._id,
+                stageGroup: target.group,
+                isNoClient: client?.isNoClient ?? false,
+              },
+              previous,
+            ),
+        }
+      : undefined
+    const offerPayment =
+      target.group === 'done' &&
+      job.stageGroup !== 'done' &&
+      job.balanceCents > 0
+    toast.success(m.job_stage_moved({ stage: target.name }), {
+      id: STAGE_TOAST,
+      duration: offerPayment ? 10_000 : 6000,
+      ...(offerPayment
+        ? {
+            action: {
+              label: m.pay_add(),
+              onClick: () => setPanel({ kind: 'payment' }),
+            },
+            cancel: undo,
+          }
+        : { action: undo }),
+    })
   }
-  const close = () => setPanel(null)
+  const moveTo = (stageId: Id<'stages'>) => {
+    const target = data.stages.find((stage) => stage._id === stageId)
+    const previous = data.stages.find((stage) => stage._id === job.stageId)
+    if (!target) return
+    const moving = {
+      _id: job._id,
+      stageGroup: job.stageGroup,
+      isNoClient: client?.isNoClient ?? false,
+    }
+    void move(moving, target, (offerRule) => {
+      // Q5: reaching Done offers the reminder rule's reminder, pre-filled. Its
+      // sheet covers the page, so the toast comes once the sheet is closed.
+      if (offerRule) {
+        afterSheet.current = () => announceMove(target, previous)
+        setPanel({ kind: 'reminder', rule: true })
+      } else {
+        announceMove(target, previous)
+      }
+    })
+  }
+  const close = () => {
+    setPanel(null)
+    afterSheet.current?.()
+    afterSheet.current = null
+  }
   const editButton = (
     onClick: () => void,
     label = m.edit(),
@@ -222,7 +304,7 @@ function JobPage() {
                 )}
                 {job.address && (
                   <InfoRow icon={MapPinIcon} className="text-muted-foreground">
-                    {job.address}
+                    <AddressLink address={job.address} />
                   </InfoRow>
                 )}
                 {job.dueDate && (
@@ -264,7 +346,7 @@ function JobPage() {
                           type="button"
                           role="radio"
                           aria-checked={current}
-                          onClick={() => !current && void moveTo(stage._id)}
+                          onClick={() => !current && moveTo(stage._id)}
                           className={cn(
                             'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-[background-color,color,transform] duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95',
                             current
@@ -400,15 +482,30 @@ function JobPage() {
                   />
                 </div>
                 {modules.costs && (
-                  <div className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2.5 text-sm">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      {m.job_profit()}
-                      <Hint term={m.job_profit()}>{m.hint_job_profit()}</Hint>
-                    </span>
-                    <span className="font-medium tabular-nums">
-                      {formatMoney(job.paidCents - job.costCents)}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2.5 text-sm">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        {m.job_costs()}
+                        <Hint term={m.job_costs()}>{m.hint_job_costs()}</Hint>
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {formatMoney(job.costCents)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2.5 text-sm">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        {profitLabel}
+                        <Hint term={profitLabel}>
+                          {jobProfitIsFinal(job.stageGroup)
+                            ? m.hint_job_profit()
+                            : m.hint_job_profit_so_far()}
+                        </Hint>
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {formatMoney(jobProfitCents(job))}
+                      </span>
+                    </div>
+                  </>
                 )}
                 {client && client.creditCents > 0 && job.owes && (
                   <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-primary/5 py-2 pr-2 pl-4">
@@ -418,8 +515,8 @@ function JobPage() {
                       })}
                     </span>
                     <Button
-                      variant="secondary"
-                      className="h-10"
+                      variant="outline"
+                      className="h-10 border-primary bg-background text-primary hover:bg-primary/10 dark:bg-background dark:hover:bg-primary/15"
                       onClick={() =>
                         void applyCredit({
                           businessId: business._id,
@@ -463,31 +560,40 @@ function JobPage() {
                   </div>
                 )}
                 <PanelList>
-                  {data.payments.map((payment) => (
-                    <li key={payment._id}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPanel({
-                            kind: 'removePayment',
-                            paymentId: payment.paymentId,
-                            amountCents: payment.paymentAmountCents,
-                          })
-                        }
-                        className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
-                      >
-                        <span>
-                          {payment.label ?? METHOD_LABEL[payment.method]()} ·{' '}
-                          <span className="text-muted-foreground">
-                            {formatDay(payment.date, today)}
+                  {data.payments.map((payment) => {
+                    // Money paid beyond what the job owed stays with the client.
+                    const rest =
+                      payment.paymentAmountCents - payment.paymentAllocatedCents
+                    return (
+                      <li key={payment._id}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenPayment(payment.paymentId)}
+                          className="flex w-full flex-col gap-0.5 pressable px-4 py-2.5 text-left text-sm"
+                        >
+                          <span className="flex w-full items-baseline justify-between gap-3">
+                            <span>
+                              {payment.label ?? METHOD_LABEL[payment.method]()}{' '}
+                              ·{' '}
+                              <span className="text-muted-foreground">
+                                {formatDay(payment.date, today)}
+                              </span>
+                            </span>
+                            <span className="font-medium tabular-nums">
+                              {formatMoney(payment.amountCents)}
+                            </span>
                           </span>
-                        </span>
-                        <span className="font-medium tabular-nums">
-                          {formatMoney(payment.amountCents)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                          {payment.paymentAmountCents > 0 && rest > 0 && (
+                            <span className="text-muted-foreground">
+                              {m.job_payment_rest({
+                                amount: formatMoney(rest),
+                              })}
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </PanelList>
               </Panel>
             ),
@@ -592,11 +698,17 @@ function JobPage() {
                         className={cn(
                           buttonVariants({
                             variant: 'outline',
-                            className: 'h-11 rounded-xl',
+                            className:
+                              'h-auto min-h-11 flex-col items-start gap-0 rounded-xl py-1.5 whitespace-normal',
                           }),
                         )}
                       >
                         {item.name}
+                        <ListExtras
+                          target="item"
+                          values={item.listExtra}
+                          className="text-xs font-normal"
+                        />
                       </Link>
                     ))}
                   </PanelBody>
@@ -627,20 +739,16 @@ function JobPage() {
           {
             key: 'repeat',
             side: true,
-            node: <RepeatSection job={job} />,
+            node: <RepeatSection job={job} appointments={data.appointments} />,
           },
           {
             key: 'reminders',
             side: true,
             node: modules.reminders && client && !client.isNoClient && (
-              <Panel
-                title={m.reminder_list()}
-                icon={BellIcon}
-                action={editButton(
-                  () => setPanel({ kind: 'reminder', rule: false }),
-                  m.reminder_add(),
-                  PlusIcon,
-                )}
+              <RemindersPanel
+                reminders={reminders ?? []}
+                today={today}
+                onAdd={() => setPanel({ kind: 'reminder', rule: false })}
               />
             ),
           },
@@ -687,19 +795,17 @@ function JobPage() {
                     ? m.writeoff_title()
                     : panel?.kind === 'cost'
                       ? m.cost_title()
-                      : panel?.kind === 'removePayment'
-                        ? m.pay_remove()
-                        : panel?.kind === 'reminder'
-                          ? panel.rule
-                            ? m.reminder_rule_title()
-                            : m.reminder_add_title()
-                          : panel?.kind === 'lines'
-                            ? m.job_lines()
-                            : panel?.kind === 'appointment'
-                              ? words.appointment.singular
-                              : panel?.kind === 'items'
-                                ? words.item.plural
-                                : job.title}
+                      : panel?.kind === 'reminder'
+                        ? panel.rule
+                          ? m.reminder_rule_title()
+                          : m.reminder_add_title()
+                        : panel?.kind === 'lines'
+                          ? m.job_lines()
+                          : panel?.kind === 'appointment'
+                            ? words.appointment.singular
+                            : panel?.kind === 'items'
+                              ? words.item.plural
+                              : job.title}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -738,6 +844,12 @@ function JobPage() {
                 }}
                 today={today}
                 depositsOn={business.depositsOnNewJob}
+                defaultMethod={defaultPaymentMethod(
+                  data.payments.map((payment) => ({
+                    amountCents: payment.paymentAmountCents,
+                    method: payment.method,
+                  })),
+                )}
                 onDone={close}
               />
             )}
@@ -745,8 +857,13 @@ function JobPage() {
               <RefundForm
                 businessId={business._id}
                 clientId={client._id}
-                job={{ _id: job._id, paidCents: job.paidCents }}
-                creditCents={client.creditCents}
+                sources={[
+                  {
+                    jobId: job._id,
+                    title: job.title,
+                    limitCents: job.paidCents,
+                  },
+                ]}
                 today={today}
                 onDone={close}
               />
@@ -794,14 +911,6 @@ function JobPage() {
                 />
               </>
             )}
-            {panel?.kind === 'removePayment' && (
-              <RemovePayment
-                businessId={business._id}
-                paymentId={panel.paymentId}
-                amountCents={panel.amountCents}
-                onDone={close}
-              />
-            )}
             {panel?.kind === 'items' && client && (
               <ItemsPicker
                 businessId={business._id}
@@ -813,6 +922,12 @@ function JobPage() {
           </div>
         </SheetContent>
       </Sheet>
+      <PaymentSheet
+        businessId={business._id}
+        paymentId={openPayment}
+        today={today}
+        onClose={() => setOpenPayment(null)}
+      />
     </div>
   )
 }
@@ -828,33 +943,35 @@ function ItemsPicker({
   clientId: Id<'clients'>
   onDone: () => void
 }) {
+  const { business } = useViewer()
   const items = useQuery(api.items.byClient, { businessId, clientId })
   const setItems = useMutation(api.jobs.setItems)
   const [chosen, setChosen] = useState<Array<Id<'items'>>>(job.itemIds)
   if (!items) return <ListSkeleton />
-  const toggle = (itemId: Id<'items'>) =>
-    setChosen(
-      chosen.includes(itemId)
-        ? chosen.filter((id) => id !== itemId)
-        : [...chosen, itemId],
-    )
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => (
-          <Button
-            key={item._id}
-            variant={chosen.includes(item._id) ? 'secondary' : 'outline'}
-            aria-pressed={chosen.includes(item._id)}
-            className="h-11 rounded-xl aria-pressed:border-primary"
-            onClick={() => toggle(item._id)}
-          >
-            {item.name}
-          </Button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          multiple
+          aria-label={business.words.item.plural}
+          value={chosen}
+          onValueChange={(next: string[]) =>
+            setChosen(next as Array<Id<'items'>>)
+          }
+          variant="outline"
+          size="xl"
+          className="flex-wrap"
+        >
+          {items.map((item) => (
+            <ToggleGroupItem key={item._id} value={item._id}>
+              {item.name}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        {/* The new item comes back to this job, linked to it. */}
         <Link
           to="/items/new"
-          search={{ clientId }}
+          search={{ clientId, jobId: job._id }}
           className={buttonVariants({
             variant: 'ghost',
             className: 'h-11 rounded-xl',

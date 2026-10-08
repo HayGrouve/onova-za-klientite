@@ -13,8 +13,23 @@ export type Answers = {
   costs?: boolean
   repeat?:
     | 'none'
-    | { schedule: 'Всяка седмица' | 'През седмица' | 'Всеки месец' }
-    | { months: 'След 3 месеца' | 'След 6 месеца' | 'След година' }
+    | {
+        schedule:
+          | 'Всяка седмица'
+          | 'През седмица'
+          | 'Всеки месец'
+          | 'Всеки 3 месеца'
+          | 'Всеки 6 месеца'
+          | 'Всяка година'
+      }
+    | {
+        months:
+          | 'След месец'
+          | 'След 2 месеца'
+          | 'След 3 месеца'
+          | 'След 6 месеца'
+          | 'След година'
+      }
 }
 
 export const nav = (page: Page) =>
@@ -34,7 +49,9 @@ async function choose(page: Page, title: string, option: string) {
 }
 
 const next = (page: Page) => page.getByRole('button', { name: 'Напред' })
-const skip = (page: Page) => page.getByRole('button', { name: 'Пропусни' })
+// "Пропусни всичко" skips the rest of the wizard, so match this one exactly.
+const skip = (page: Page) =>
+  page.getByRole('button', { name: 'Пропусни', exact: true })
 
 /** Waits for the setup screen of a business that was just created. */
 export async function expectSetup(page: Page) {

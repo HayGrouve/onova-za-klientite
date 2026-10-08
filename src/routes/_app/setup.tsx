@@ -21,10 +21,11 @@ function SetupPage() {
       </CenteredMessage>
     )
   }
-  // Run again: start from the stored answers, or from the business as it is.
-  const initialAnswers =
-    data.answers ??
-    (data.current.setupDone ? answersFromBusiness(data.current) : {})
+  // Run again: start from the business as it is now, with every edit made in
+  // Settings since, so confirming without changes changes nothing.
+  const initialAnswers = data.current.setupDone
+    ? answersFromBusiness(data.current)
+    : {}
   return (
     <SetupWizard
       // A switch to another business starts over.

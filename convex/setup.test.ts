@@ -4,7 +4,13 @@ import { api } from './_generated/api'
 import { getDoc, lastActivity, setupBusiness, setupConvex } from './test.setup'
 import type { TestConvex } from './test.setup'
 import type { Id } from './_generated/dataModel'
-import { ITEM_KINDS, JOB_WORDS } from '../shared/setup'
+import { REPEAT_CHOICES } from '../shared/repeat'
+import {
+  ITEM_KINDS,
+  JOB_WORDS,
+  REMINDER_MONTHS,
+  answersFromBusiness,
+} from '../shared/setup'
 
 async function stagesOf(t: TestConvex, businessId: Id<'businesses'>) {
   return await t.run((ctx) =>
@@ -68,6 +74,34 @@ describe('setup.apply', () => {
     expect(
       services.map((service) => [service.name, service.priceCents]),
     ).toEqual([['Профилактика', 5000]])
+  })
+
+  it('every repeat interval setup offers is stored', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    for (const { key, every, unit } of REPEAT_CHOICES) {
+      await owner.mutation(api.setup.apply, {
+        businessId,
+        answers: { repeat: 'schedule', repeatEvery: key },
+      })
+      expect((await getDoc(t, 'businesses', businessId)).repeatDefault).toEqual(
+        { every, unit },
+      )
+    }
+  })
+
+  it('every reminder delay setup offers is stored', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    for (const months of REMINDER_MONTHS) {
+      await owner.mutation(api.setup.apply, {
+        businessId,
+        answers: { repeat: 'months', reminderMonths: months },
+      })
+      const business = await getDoc(t, 'businesses', businessId)
+      expect(business.reminderRule).toEqual({ months })
+      expect(business.repeatDefault).toBeUndefined()
+    }
   })
 
   it('a first run on an empty business swaps in the stages of the chosen flow', async () => {
@@ -159,18 +193,95 @@ describe('setup.apply', () => {
     ])
   })
 
-  it('setup.current starts from the stored answers', async () => {
+  it('setup.current reports the business as it is now, Settings edits included', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)
     expect(
-      (await owner.query(api.setup.current, { businessId })).answers,
-    ).toBeNull()
+      (await owner.query(api.setup.current, { businessId })).current.setupDone,
+    ).toBe(false)
     await owner.mutation(api.setup.apply, {
       businessId,
       answers: { businessName: 'Ателие' },
     })
-    const result = await owner.query(api.setup.current, { businessId })
-    expect(result.answers?.businessName).toBe('Ателие')
-    expect(result.current.setupDone).toBe(true)
+    await owner.mutation(api.businesses.updateProfile, {
+      businessId,
+      name: 'Ателие Мария',
+    })
+    const { current } = await owner.query(api.setup.current, { businessId })
+    expect(current.name).toBe('Ателие Мария')
+    expect(current.setupDone).toBe(true)
+  })
+
+  it('running setup again after Settings edits starts from the business and confirming changes nothing', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    await owner.mutation(api.setup.apply, {
+      businessId,
+      answers: {
+        businessName: 'Кучешки Салон Ели',
+        flow: 'single',
+        hasItem: true,
+        item: {
+          word: { singular: 'Куче', plural: 'Кучета', gender: 'n' },
+          fields: ['Порода'],
+        },
+        repeat: 'schedule',
+        repeatEvery: '2weeks',
+        services: [{ name: 'Къпане', price: '35' }],
+      },
+    })
+    // Settings: a new name, an item word, a service, deposits and a reminder rule.
+    await owner.mutation(api.businesses.updateProfile, {
+      businessId,
+      name: 'Груминг у дома - Ели',
+    })
+    const { words } = await getDoc(t, 'businesses', businessId)
+    await owner.mutation(api.businesses.setWords, {
+      businessId,
+      words: {
+        ...words,
+        item: { singular: 'Любимец', plural: 'Любимци', gender: 'm' },
+      },
+    })
+    await owner.mutation(api.services.add, {
+      businessId,
+      name: 'Подстригване',
+      priceCents: 4550,
+    })
+    await owner.mutation(api.businesses.setNewJobOptions, {
+      businessId,
+      depositsOnNewJob: true,
+    })
+    await owner.mutation(api.businesses.setReminderRule, {
+      businessId,
+      months: 6,
+    })
+
+    const snapshot = async () =>
+      await t.run(async (ctx) => {
+        const { setup: _setup, ...business } = (await ctx.db.get(
+          'businesses',
+          businessId,
+        ))!
+        return {
+          business,
+          stages: await ctx.db.query('stages').collect(),
+          fields: await ctx.db.query('fields').collect(),
+          services: await ctx.db.query('services').collect(),
+        }
+      })
+    const before = await snapshot()
+
+    const { current } = await owner.query(api.setup.current, { businessId })
+    const answers = answersFromBusiness(current)
+    expect(answers.businessName).toBe('Груминг у дома - Ели')
+    expect(answers.item?.word.singular).toBe('Любимец')
+    expect(answers.services).toEqual([
+      { name: 'Къпане', price: '35' },
+      { name: 'Подстригване', price: '45,50' },
+    ])
+    await owner.mutation(api.setup.apply, { businessId, answers })
+
+    expect(await snapshot()).toEqual(before)
   })
 })

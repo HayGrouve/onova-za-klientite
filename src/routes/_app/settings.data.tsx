@@ -16,10 +16,12 @@ import { Field, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
+import { canPickContact } from '#/lib/contacts'
 import { errorMessage } from '#/lib/errors'
 import { buildExportZip } from '#/lib/export-zip'
 import { wipeSnapshots } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
+import { todayInSofia } from '../../../shared/dates'
 
 export const Route = createFileRoute('/_app/settings/data')({
   component: DataSettings,
@@ -35,6 +37,7 @@ function DataSettings() {
         <li>
           <Link
             to="/import"
+            search={{ from: 'settings' }}
             className="flex min-h-16 items-center gap-3 pressable px-4 py-3"
           >
             <span
@@ -46,7 +49,10 @@ function DataSettings() {
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="font-medium">{m.data_import()}</span>
               <span className="text-sm text-muted-foreground">
-                {m.data_import_body()}
+                {/* Only what this device offers. */}
+                {canPickContact()
+                  ? m.data_import_body()
+                  : m.data_import_body_file()}
               </span>
             </span>
             <CaretRightIcon className="size-5 shrink-0 text-muted-foreground/60" />
@@ -77,7 +83,7 @@ function ExportRow() {
       )
       const link = document.createElement('a')
       link.href = url
-      link.download = `onova-${new Date().toISOString().slice(0, 10)}.zip`
+      link.download = `onova-${todayInSofia(Date.now())}.zip`
       link.click()
       URL.revokeObjectURL(url)
     } catch (error) {

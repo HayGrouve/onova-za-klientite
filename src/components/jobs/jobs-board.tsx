@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
+import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import { Tip } from '#/components/tip'
 import {
@@ -36,7 +37,8 @@ import { GROUP_LABEL } from '#/i18n/groups'
 import { m } from '#/paraglide/messages.js'
 import { isOverdue } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
-import { nameMatches } from '../../../shared/search'
+import { filterJobs, isFiltering, owedCents } from '../../../shared/board'
+import type { JobFilter } from '../../../shared/board'
 import { STAGE_GROUPS } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
 
@@ -64,7 +66,7 @@ export function JobsBoard({
   filter,
   today,
 }: {
-  filter: string
+  filter: JobFilter
   today: string
 }) {
   const { business, businesses } = useViewer()
@@ -94,12 +96,7 @@ export function JobsBoard({
 
   if (!board) return <BoardSkeleton />
 
-  const matches = (card: Card) =>
-    !filter.trim() ||
-    nameMatches(
-      filter,
-      `${card.title} ${card.isNoClient ? '' : card.clientName}`,
-    )
+  const filtering = isFiltering(filter)
 
   return (
     <>
@@ -108,8 +105,9 @@ export function JobsBoard({
           <Column
             key={column.group}
             column={column}
-            cards={column.jobs.filter(matches)}
-            filtering={filter.trim() !== ''}
+            cards={filterJobs(column.jobs, filter, today)}
+            filter={filter}
+            filtering={filtering}
             stages={stagesOf(column.group)}
             allStages={board.stages}
             canMove={canMove}
@@ -285,6 +283,7 @@ function useCardDrag(onDrop: (card: Card, key: string) => void) {
 function Column({
   column,
   cards,
+  filter,
   filtering,
   stages,
   allStages,
@@ -297,6 +296,7 @@ function Column({
 }: {
   column: Board['columns'][number]
   cards: Card[]
+  filter: JobFilter
   filtering: boolean
   stages: Stage[]
   allStages: Stage[]
@@ -321,6 +321,8 @@ function Column({
     stages.some((stage) => stage._id !== dragging.stageId)
   const over = drag?.over === `column:${group}`
   const hidden = column.total - column.jobs.length
+  // The header counts what is shown: with a filter on, the cards that pass it.
+  const owed = filtering ? owedCents(cards) : column.owedCents
 
   return (
     <section
@@ -356,9 +358,9 @@ function Column({
             </Tip>
           )}
         </div>
-        {column.owedCents > 0 && (
+        {owed > 0 && (
           <span className="pl-4.5 text-xs text-muted-foreground">
-            {m.balance_short({ amount: formatMoney(column.owedCents) })}
+            {m.balance_short({ amount: formatMoney(owed) })}
           </span>
         )}
       </header>
@@ -433,7 +435,13 @@ function Column({
           })}
           <Link
             to="/jobs"
-            search={{ view: 'table', group }}
+            search={{
+              view: 'table',
+              group,
+              ...(filter.text?.trim() && { q: filter.text }),
+              ...(filter.owing && { owing: true as const }),
+              ...(filter.dueThisMonth && { due: 'month' as const }),
+            }}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
             {m.board_show_all()}
@@ -550,7 +558,9 @@ function CardFace({ card, today }: { card: Card; today: string }) {
 
   return (
     <span className="flex flex-col gap-1.5 p-3">
-      <span className="flex items-start justify-between gap-2">
+      {/* On a narrow column the stage sits on its own line above the title, so
+          the title gets the card's whole width; from xl it shares the line. */}
+      <span className="flex flex-col-reverse gap-1.5 xl:flex-row xl:items-start xl:justify-between xl:gap-2">
         <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium">
           {card.title}
         </span>
@@ -559,13 +569,13 @@ function CardFace({ card, today }: { card: Card; today: string }) {
           name={card.stageName}
           group={card.stageGroup}
           corner
-          className="-mt-3 -mr-3 h-6 px-2.5 text-[0.6875rem]"
+          className="-mt-3 -mr-3 h-6 self-end px-2.5 text-[0.6875rem] xl:self-auto"
         />
       </span>
       <span className="flex flex-col gap-1 pr-7 text-xs text-muted-foreground">
         {!card.isNoClient && (
           <Meta icon={UserIcon}>
-            <span className="truncate">{card.clientName}</span>
+            <span className="line-clamp-2 min-w-0">{card.clientName}</span>
           </Meta>
         )}
         {timing && (
@@ -581,6 +591,7 @@ function CardFace({ card, today }: { card: Card; today: string }) {
             {m.balance_short({ amount: formatMoney(card.balanceCents) })}
           </Meta>
         )}
+        <ListExtras target="job" values={card.listExtra} className="text-xs" />
       </span>
     </span>
   )
@@ -667,8 +678,11 @@ function Meta({
   children: React.ReactNode
 }) {
   return (
-    <span className={cn('inline-flex min-w-0 items-center gap-1', className)}>
-      <IconComponent aria-hidden className="size-3.5 shrink-0 opacity-80" />
+    <span className={cn('inline-flex min-w-0 items-start gap-1', className)}>
+      <IconComponent
+        aria-hidden
+        className="mt-px size-3.5 shrink-0 opacity-80"
+      />
       {children}
     </span>
   )

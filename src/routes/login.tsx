@@ -2,6 +2,7 @@ import { SignIn, useAuth } from '@clerk/tanstack-react-start'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { CenteredMessage } from '#/components/centered-message'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { safeRedirect } from '#/lib/safe-redirect'
 import { m } from '#/paraglide/messages.js'
 
@@ -13,6 +14,7 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
+  usePageTitle(m.login_title())
   const { redirect } = Route.useSearch()
   const { isLoaded, isSignedIn } = useAuth()
   const navigate = useNavigate()

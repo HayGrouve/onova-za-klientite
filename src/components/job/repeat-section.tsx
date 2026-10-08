@@ -4,93 +4,145 @@ import { useMutation } from 'convex/react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
+import { useSubmit } from '#/components/money/use-submit'
 import { REPEAT_LABEL } from '#/components/setup/steps'
 import { Button, buttonVariants } from '#/components/ui/button'
 import { Panel, PanelBody } from '#/components/panel'
 import { useViewer } from '#/hooks/use-viewer'
+import { formatLongDay } from '#/i18n/dates'
 import { lower } from '#/i18n/words'
-import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
-import type { RepeatEvery } from '../../../shared/setup'
+import {
+  REPEAT_CHOICES,
+  nextJobDate,
+  pickJobDate,
+} from '../../../shared/repeat'
+import type { RepeatInterval } from '../../../shared/repeat'
 
-const CHOICES: Array<{
-  key: RepeatEvery
-  every: number
-  unit: 'week' | 'month'
-}> = [
-  { key: 'week', every: 1, unit: 'week' },
-  { key: '2weeks', every: 2, unit: 'week' },
-  { key: 'month', every: 1, unit: 'month' },
-]
-
-export function repeatLabel(repeat: { every: number; unit: 'week' | 'month' }) {
-  const choice = CHOICES.find(
+export function repeatLabel(repeat: RepeatInterval) {
+  const choice = REPEAT_CHOICES.find(
     (item) => item.every === repeat.every && item.unit === repeat.unit,
   )
-  return choice ? REPEAT_LABEL[choice.key]() : `${repeat.every} ${repeat.unit}`
+  if (choice) return REPEAT_LABEL[choice.key]()
+  return repeat.unit === 'week'
+    ? m.repeat_every_weeks({ every: repeat.every })
+    : m.repeat_every_months({ every: repeat.every })
 }
 
-/** Repeat (Q6): on, how often, or stop. The next job appears when this one's date arrives. */
-export function RepeatSection({ job }: { job: Doc<'jobs'> }) {
+/**
+ * Repeat (Q6): on, how often, or stop. The next job appears when this one's
+ * date arrives (D41), and the date it gets is shown here before and after.
+ * `appointments` are the job's live ones, as the Job page already has them.
+ */
+export function RepeatSection({
+  job,
+  appointments,
+}: {
+  job: Doc<'jobs'>
+  appointments: ReadonlyArray<{ start: number }>
+}) {
   const { business } = useViewer()
   const setRepeat = useMutation(api.jobs.setRepeat)
   const stopRepeat = useMutation(api.jobs.stopRepeat)
-  const fail = (error: unknown) => toast.error(errorMessage(error))
+  const { busy, run } = useSubmit()
   const active = job.repeat && job.repeat.stoppedAt === undefined
+  const dated = { appointments, dueDate: job.dueDate }
 
   return (
     <Panel title={m.repeat_title()} icon={RepeatIcon}>
       {active && job.repeat ? (
-        <PanelBody className="flex flex-wrap items-center gap-2 py-1.5 pr-1.5">
-          <span className="text-sm">
-            {m.repeat_on({ every: lower(repeatLabel(job.repeat)) })}
-          </span>
-          {job.repeat.nextJobId && (
-            <Link
-              to="/jobs/$jobId"
-              params={{ jobId: job.repeat.nextJobId }}
-              className={buttonVariants({
-                variant: 'link',
-                className: 'h-9 px-1',
-              })}
-            >
-              {m.repeat_next_created()}
-            </Link>
-          )}
+        <PanelBody className="flex flex-col items-start gap-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">
+              {m.repeat_on({ every: lower(repeatLabel(job.repeat)) })}
+            </span>
+            <NextLine
+              nextJobId={job.repeat.nextJobId}
+              date={nextJobDate(dated, job.repeat)}
+            />
+          </div>
           <Button
-            variant="ghost"
-            className="h-9"
+            variant="outline"
+            className="h-11 rounded-xl"
+            disabled={busy}
             onClick={() =>
-              void stopRepeat({
-                businessId: business._id,
-                jobId: job._id,
-              }).catch(fail)
+              void run(
+                () => stopRepeat({ businessId: business._id, jobId: job._id }),
+                m.repeat_stopped(),
+              )
             }
           >
             {m.repeat_stop()}
           </Button>
         </PanelBody>
+      ) : !pickJobDate(dated) ? (
+        <PanelBody className="text-sm text-muted-foreground">
+          {m.repeat_needs_date()}
+        </PanelBody>
       ) : (
-        <PanelBody className="flex flex-wrap gap-2">
-          {CHOICES.map((choice) => (
-            <Button
-              key={choice.key}
-              variant="outline"
-              className="h-11 rounded-xl"
-              onClick={() =>
-                void setRepeat({
-                  businessId: business._id,
-                  jobId: job._id,
-                  every: choice.every,
-                  unit: choice.unit,
-                }).catch(fail)
-              }
-            >
-              {REPEAT_LABEL[choice.key]()}
-            </Button>
-          ))}
+        <PanelBody className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            {m.setup_repeat_every()}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {REPEAT_CHOICES.map((choice) => (
+              <Button
+                key={choice.key}
+                variant="outline"
+                className="h-11 rounded-xl"
+                disabled={busy}
+                onClick={() => {
+                  const date = nextJobDate(dated, choice)
+                  if (!date) return toast.error(m.repeat_needs_date())
+                  void run(
+                    () =>
+                      setRepeat({
+                        businessId: business._id,
+                        jobId: job._id,
+                        every: choice.every,
+                        unit: choice.unit,
+                      }),
+                    m.repeat_started({ date: formatLongDay(date) }),
+                  )
+                }}
+              >
+                {REPEAT_LABEL[choice.key]()}
+              </Button>
+            ))}
+          </div>
         </PanelBody>
       )}
     </Panel>
+  )
+}
+
+/** What happens next: the next job exists already, it will get a date, or nothing can be made. */
+function NextLine({
+  nextJobId,
+  date,
+}: {
+  nextJobId?: Doc<'jobs'>['_id']
+  date: string | null
+}) {
+  if (nextJobId) {
+    return (
+      <Link
+        to="/jobs/$jobId"
+        params={{ jobId: nextJobId }}
+        className={buttonVariants({
+          variant: 'link',
+          className: 'h-9 justify-start px-0',
+        })}
+      >
+        {m.repeat_next_created()}
+      </Link>
+    )
+  }
+  return (
+    <span className="text-sm text-muted-foreground">
+      {date
+        ? m.repeat_next_date({ date: formatLongDay(date) })
+        : m.repeat_needs_date()}
+    </span>
   )
 }

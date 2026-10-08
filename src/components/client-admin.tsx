@@ -22,6 +22,9 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
+import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { useViewer } from '#/hooks/use-viewer'
+import { lower } from '#/i18n/words'
 import { m } from '#/paraglide/messages.js'
 import { searchClients } from '../../shared/search'
 
@@ -109,6 +112,7 @@ function MergePicker({
   client: Doc<'clients'>
   onDone: () => void
 }) {
+  const { business } = useViewer()
   const clients = useQuery(api.clients.list, { businessId })
   const merge = useMutation(api.clientsAdmin.merge)
   const navigate = useNavigate()
@@ -126,10 +130,23 @@ function MergePicker({
   const shown = query.trim()
     ? searchClients(candidates, query, 20)
     : candidates.slice(0, 20)
+  // Only a client in view can be merged into: what is chosen is what is seen.
+  const chosen = shown.find((item) => item._id === intoId)
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        {m.client_merge_body({ from: client.name })}
+        {m.client_merge_body({
+          from: client.name,
+          // The business's own words, each standing alone (D39).
+          what: [
+            business.words.job.plural,
+            m.client_payments(),
+            ...(business.modules.items ? [business.words.item.plural] : []),
+            ...(business.modules.reminders ? [m.reminder_list()] : []),
+          ]
+            .map(lower)
+            .join(', '),
+        })}
       </p>
       <InputGroup>
         <InputGroupInput
@@ -140,30 +157,39 @@ function MergePicker({
           onChange={(event) => setQuery(event.target.value)}
         />
       </InputGroup>
-      <div className="flex flex-col">
+      <ToggleGroup
+        aria-label={m.client_merge_title()}
+        value={intoId ? [intoId] : []}
+        onValueChange={(next: string[]) => {
+          // Tapping the chosen one again keeps it chosen.
+          if (next[0]) setIntoId(next[0] as Id<'clients'>)
+        }}
+        variant="outline"
+        size="xl"
+        orientation="vertical"
+        className="w-full"
+      >
         {shown.map((item) => (
-          <Button
+          <ToggleGroupItem
             key={item._id}
-            variant={intoId === item._id ? 'secondary' : 'ghost'}
-            aria-pressed={intoId === item._id}
-            className="h-12 justify-start rounded-xl text-base"
-            onClick={() => setIntoId(item._id)}
+            value={item._id}
+            className="justify-start"
           >
             {item.name}
-          </Button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
       <Button
         size="xl"
         variant="destructive"
-        disabled={busy || !intoId}
+        disabled={busy || !chosen}
         onClick={() =>
-          intoId &&
+          chosen &&
           void run(async () => {
-            await merge({ businessId, fromId: client._id, intoId })
+            await merge({ businessId, fromId: client._id, intoId: chosen._id })
             await navigate({
               to: '/clients/$clientId',
-              params: { clientId: intoId },
+              params: { clientId: chosen._id },
               replace: true,
             })
           })

@@ -8,3 +8,11 @@ export type ClientChoice =
   | { kind: 'none' }
 
 export type PaymentMethod = Doc<'payments'>['method']
+
+/** A client's item as "+" gets it: the folded words (model, plate) are what a word of the line is matched to. */
+export type ItemRef = {
+  id: string
+  clientId: string
+  name: string
+  keys: string
+}

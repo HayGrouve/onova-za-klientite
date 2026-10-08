@@ -7,17 +7,18 @@ import {
   businessMutation,
   businessQuery,
   getOwned,
+  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
 import { mergeExtra } from './lib/extra'
+import { listExtra, listFieldIds } from './lib/listFields'
 import { moveJobToStage } from './lib/moveJob'
 import {
   businessStages,
-  checkItems,
   checkLines,
   createJob,
-  syncJobItems,
+  setJobItems,
   vCreateJobArgs,
 } from './lib/jobWrite'
 import { recomputeJob } from './lib/recompute'
@@ -86,6 +87,8 @@ export const update = businessMutation({
     patch.searchText = await jobSearchText(ctx, next)
     await ctx.db.patch('jobs', job._id, patch)
     await recomputeJob(ctx, job._id)
+    // A repeating job without appointments takes its date from the due date.
+    if (args.dueDate !== undefined) await refreshRepeat(ctx, job._id)
     await logActivity(ctx, {
       type: 'job.edited',
       jobId: job._id,
@@ -164,19 +167,7 @@ export const setItems = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    const itemIds = await checkItems(
-      ctx,
-      job.clientId,
-      args.itemIds,
-      job.itemIds,
-    )
-    await ctx.db.patch('jobs', job._id, { itemIds })
-    await syncJobItems(ctx, job._id, itemIds)
-    await logActivity(ctx, {
-      type: 'job.itemsChanged',
-      jobId: job._id,
-      clientId: job.clientId,
-    })
+    await setJobItems(ctx, job, args.itemIds)
     return null
   },
 })
@@ -227,9 +218,12 @@ export const removeWriteOff = businessMutation({
 
 const LIST_LIMIT = 500
 
-/** Jobs of one stage group, newest first, plus the count of each group for the tabs. */
+/**
+ * Jobs of one stage group (or of every group, without one: the table's "all"
+ * tab), newest first, plus the count of each group for the tabs.
+ */
 export const list = businessQuery({
-  args: { group: vStageGroup },
+  args: { group: v.optional(vStageGroup) },
   returns: v.object({
     jobs: v.array(vJobRow),
     counts: v.object({
@@ -242,7 +236,7 @@ export const list = businessQuery({
   handler: async (ctx, { group }) => {
     const businessId = ctx.business._id
     const counts = { new: 0, in_progress: 0, done: 0, cancelled: 0 }
-    let selected: Array<Doc<'jobs'>> = []
+    const selected: Array<Doc<'jobs'>> = []
     for (const key of STAGE_GROUPS) {
       const jobs = await ctx.db
         .query('jobs')
@@ -251,7 +245,7 @@ export const list = businessQuery({
         )
         .take(LIST_LIMIT)
       counts[key] = jobs.length
-      if (key === group) selected = jobs
+      if (group === undefined || key === group) selected.push(...jobs)
     }
     const lookups = newLookups()
     const rows = []
@@ -343,9 +337,10 @@ export const board = businessQuery({
 
 /** Everything the job page shows. */
 export const get = businessQuery({
-  args: { jobId: v.id('jobs') },
+  // A string: the id comes from the address bar (see getOwnedFromUrl).
+  args: { jobId: v.string() },
   handler: async (ctx, { jobId }) => {
-    const job = await getOwned(ctx, 'jobs', jobId)
+    const job = await getOwnedFromUrl(ctx, 'jobs', jobId)
     const client = await ctx.db.get('clients', job.clientId)
     const stages = await ctx.db
       .query('stages')
@@ -358,9 +353,16 @@ export const get = businessQuery({
       .withIndex('by_job', (q) => q.eq('jobId', job._id))
       .collect()
     const items = []
+    const shownItemFields = await listFieldIds(ctx, ctx.business._id, 'item')
     for (const itemId of job.itemIds) {
       const item = await ctx.db.get('items', itemId)
-      if (item) items.push({ _id: item._id, name: item.name })
+      if (item) {
+        items.push({
+          _id: item._id,
+          name: item.name,
+          listExtra: listExtra(item.extra, shownItemFields),
+        })
+      }
     }
     const allocations = await ctx.db
       .query('allocations')
@@ -375,6 +377,7 @@ export const get = businessQuery({
         paymentId: payment._id,
         amountCents: allocation.amountCents,
         paymentAmountCents: payment.amountCents,
+        paymentAllocatedCents: payment.allocatedCents,
         date: payment.date,
         method: payment.method,
         label: payment.label,

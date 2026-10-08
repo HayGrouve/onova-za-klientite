@@ -2,6 +2,7 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon } from '@phosphor-icons/react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
+import { cn } from 'cn'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
@@ -10,6 +11,7 @@ import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { useSubmit } from '#/components/money/use-submit'
 import { SettingsPage } from '#/components/settings/settings-page'
+import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
 import { StageBadge } from '#/components/stage-badge'
 import { Button } from '#/components/ui/button'
 import {
@@ -28,13 +30,15 @@ import {
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
-import { GROUP_LABEL } from '#/i18n/groups'
+import { GROUP_LABEL, GROUP_MEANING } from '#/i18n/groups'
+import { lower } from '#/i18n/words'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import {
   STAGE_GROUPS,
   canRegroupStage,
   canRemoveStage,
+  groupedOrder,
 } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
 
@@ -69,11 +73,7 @@ function Choice<T extends string>({
       className="w-full flex-wrap"
     >
       {options.map((option) => (
-        <ToggleGroupItem
-          key={option.value}
-          value={option.value}
-          className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-        >
+        <ToggleGroupItem key={option.value} value={option.value}>
           {option.label}
         </ToggleGroupItem>
       ))}
@@ -87,80 +87,121 @@ function StagesSettings() {
     businessId: business._id,
   })
   const reorder = useMutation(api.stages.reorder)
-  const [panel, setPanel] = useState<{ stage?: Stage } | null>(null)
+  const [panel, setPanel] = useState<{
+    stage?: Stage
+    group?: StageGroup
+  } | null>(null)
   const owner = settings?.role === 'owner'
 
-  const move = (stages: Stage[], index: number, by: number) => {
-    const ids = stages.map((stage) => stage._id)
-    const [moved] = ids.splice(index, 1)
-    ids.splice(index + by, 0, moved)
+  // Stages move only inside their group, so each group stays together.
+  const move = (stages: Stage[], stageId: Stage['_id'], by: -1 | 1) => {
+    const ids = groupedOrder(stages)
+    const index = ids.indexOf(stageId)
+    ;[ids[index], ids[index + by]] = [ids[index + by], ids[index]]
     void reorder({ businessId: business._id, stageIds: ids }).catch(
       (error: unknown) => toast.error(errorMessage(error)),
     )
   }
 
   return (
-    <SettingsPage title={m.settings_stages()} help={m.stages_help()}>
+    <SettingsPage
+      title={m.settings_stages()}
+      help={m.stages_help()}
+      preview={
+        settings && (
+          <SettingsPreview>
+            <StagesPreview
+              stages={settings.stages}
+              job={business.words.job.singular}
+            />
+          </SettingsPreview>
+        )
+      }
+    >
       {!settings ? (
         <ListSkeleton />
       ) : (
         <>
-          <ListCard>
-            {settings.stages.map((stage, index) => (
-              <li key={stage._id} className="flex items-center gap-1 pr-2">
-                <button
-                  type="button"
-                  disabled={!owner}
-                  onClick={() => setPanel({ stage })}
-                  className="flex min-h-14 min-w-0 flex-1 items-center gap-3 pressable px-4 py-2 text-left"
-                >
-                  <StageBadge name={stage.name} group={stage.group} />
-                  <span className="flex min-w-0 flex-col text-sm text-muted-foreground">
-                    <span>{GROUP_LABEL[stage.group]()}</span>
-                    {stage.jobCount > 0 && (
-                      <span>
-                        {m.stages_jobs({
-                          jobs: business.words.job.plural,
-                          count: stage.jobCount,
-                        })}
-                      </span>
-                    )}
-                  </span>
-                </button>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label={m.stages_move_up()}
-                  disabled={!owner || index === 0}
-                  onClick={() => move(settings.stages, index, -1)}
-                >
-                  <ArrowUpIcon />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label={m.stages_move_down()}
-                  disabled={!owner || index === settings.stages.length - 1}
-                  onClick={() => move(settings.stages, index, 1)}
-                >
-                  <ArrowDownIcon />
-                </Button>
-              </li>
-            ))}
-          </ListCard>
-          {owner && (
-            <div className="px-4">
-              <Button
-                variant="outline"
-                size="xl"
-                className="shadow-xs"
-                onClick={() => setPanel({})}
-              >
-                <PlusIcon data-icon="inline-start" />
-                {m.stages_add()}
-              </Button>
-            </div>
-          )}
+          {STAGE_GROUPS.map((group) => {
+            const inGroup = settings.stages.filter(
+              (stage) => stage.group === group,
+            )
+            return (
+              <section key={group} className="flex flex-col gap-1.5">
+                <div className="flex items-end justify-between gap-3 px-4">
+                  <div className="flex min-w-0 flex-col">
+                    <h2 className="font-semibold">{GROUP_LABEL[group]()}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {GROUP_MEANING[group]()}
+                    </p>
+                  </div>
+                  {owner && (
+                    <Button
+                      variant="ghost"
+                      className="h-10 shrink-0 text-primary"
+                      onClick={() => setPanel({ group })}
+                    >
+                      <PlusIcon data-icon="inline-start" />
+                      {m.stages_add_short()}
+                    </Button>
+                  )}
+                </div>
+                {inGroup.length > 0 && (
+                  <ListCard>
+                    {inGroup.map((stage, index) => (
+                      <li
+                        key={stage._id}
+                        className="flex items-center gap-1 pr-2"
+                      >
+                        <button
+                          type="button"
+                          disabled={!owner}
+                          onClick={() => setPanel({ stage })}
+                          className="flex min-h-14 min-w-0 flex-1 items-center gap-3 pressable px-4 py-2 text-left"
+                        >
+                          <StageBadge name={stage.name} group={stage.group} />
+                          {stage.jobCount > 0 && (
+                            <span className="text-sm text-muted-foreground">
+                              {m.stages_jobs({
+                                jobs: business.words.job.plural,
+                                count: stage.jobCount,
+                              })}
+                            </span>
+                          )}
+                        </button>
+                        {inGroup.length > 1 && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon-lg"
+                              aria-label={m.stages_move_up()}
+                              disabled={!owner || index === 0}
+                              onClick={() =>
+                                move(settings.stages, stage._id, -1)
+                              }
+                            >
+                              <ArrowUpIcon />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-lg"
+                              aria-label={m.stages_move_down()}
+                              disabled={!owner || index === inGroup.length - 1}
+                              onClick={() =>
+                                move(settings.stages, stage._id, 1)
+                              }
+                            >
+                              <ArrowDownIcon />
+                            </Button>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ListCard>
+                )}
+              </section>
+            )
+          })}
           <Sheet
             open={panel !== null}
             onOpenChange={(open) => !open && setPanel(null)}
@@ -176,6 +217,7 @@ function StagesSettings() {
                 {panel && (
                   <StageForm
                     stage={panel.stage}
+                    group={panel.group}
                     stages={settings.stages}
                     onDone={() => setPanel(null)}
                   />
@@ -189,12 +231,45 @@ function StagesSettings() {
   )
 }
 
+/** The stages as a job page offers them, in order, the first one picked. */
+function StagesPreview({ stages, job }: { stages: Stage[]; job: string }) {
+  const ids = groupedOrder(stages)
+  const ordered = ids.flatMap(
+    (id) => stages.find((stage) => stage._id === id) ?? [],
+  )
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="font-medium">
+        {m.stages_preview_page({ job: lower(job) })}
+      </p>
+      <Flash
+        watch={ordered.map((stage) => [stage.name, stage.group])}
+        className="flex flex-wrap gap-1.5 py-1"
+      >
+        {ordered.map((stage, index) => (
+          <StageBadge
+            key={stage._id}
+            name={stage.name}
+            group={stage.group}
+            className={cn(
+              index === 0 && 'bg-primary text-primary-foreground ring-primary',
+            )}
+          />
+        ))}
+      </Flash>
+    </div>
+  )
+}
+
 function StageForm({
   stage,
+  group: initialGroup,
   stages,
   onDone,
 }: {
   stage?: Stage
+  /** The group a new stage starts in: the section it was added from. */
+  group?: StageGroup
   stages: Stage[]
   onDone: () => void
 }) {
@@ -204,7 +279,9 @@ function StageForm({
   const remove = useMutation(api.stages.remove)
   const { busy, run } = useSubmit(onDone)
   const [name, setName] = useState(stage?.name ?? '')
-  const [group, setGroup] = useState<StageGroup>(stage?.group ?? 'in_progress')
+  const [group, setGroup] = useState<StageGroup>(
+    stage?.group ?? initialGroup ?? 'in_progress',
+  )
   const [moveTo, setMoveTo] = useState<Id<'stages'> | null>(null)
 
   const regroupBlocked =

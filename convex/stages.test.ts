@@ -22,6 +22,33 @@ async function withJob() {
 }
 
 describe('stages', () => {
+  it('a regrouped stage moves to the end of its new group', async () => {
+    const { owner, businessId } = await withJob()
+    const waiting = await owner.mutation(api.stages.add, {
+      businessId,
+      name: 'Чака час',
+      group: 'new',
+    })
+    await owner.mutation(api.stages.update, {
+      businessId,
+      stageId: waiting,
+      group: 'in_progress',
+    })
+    const { stages } = await owner.query(api.businesses.settings, {
+      businessId,
+    })
+    const groups = stages.map((stage) => stage.group)
+    expect(groups).toEqual(
+      [...groups].sort(
+        (a, b) =>
+          ['new', 'in_progress', 'done', 'cancelled'].indexOf(a) -
+          ['new', 'in_progress', 'done', 'cancelled'].indexOf(b),
+      ),
+    )
+    const inProgress = stages.filter((stage) => stage.group === 'in_progress')
+    expect(inProgress.at(-1)?._id).toBe(waiting)
+  })
+
   it('a stage with jobs in it cannot be deleted until its jobs move', async () => {
     const { t, owner, businessId, stage, jobId } = await withJob()
     const extra = await owner.mutation(api.stages.add, {

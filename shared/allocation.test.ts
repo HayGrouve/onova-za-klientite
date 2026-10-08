@@ -5,6 +5,8 @@ import {
   jobBalanceCents,
   jobOwes,
   jobPriceCents,
+  jobProfitCents,
+  jobProfitIsFinal,
   splitPayment,
 } from './allocation'
 
@@ -71,6 +73,20 @@ describe('jobBalanceCents and jobOwes', () => {
         },
       ),
     )
+  })
+})
+
+describe('jobProfitCents and jobProfitIsFinal', () => {
+  it('is paid minus costs: a deposit with no costs is all profit so far', () => {
+    expect(jobProfitCents({ paidCents: 80000, costCents: 0 })).toBe(80000)
+    expect(jobProfitCents({ paidCents: 0, costCents: 65000 })).toBe(-65000)
+  })
+
+  it('is final only when the job is done or cancelled', () => {
+    expect(jobProfitIsFinal('new')).toBe(false)
+    expect(jobProfitIsFinal('in_progress')).toBe(false)
+    expect(jobProfitIsFinal('done')).toBe(true)
+    expect(jobProfitIsFinal('cancelled')).toBe(true)
   })
 })
 

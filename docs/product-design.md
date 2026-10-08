@@ -152,7 +152,7 @@ An 8-step wizard asks how people work, never what their profession is, and turns
 
 ## Settings page
 
-One settings page with short, separate sections. Nothing on it is required to start using the app.
+One settings page with short, separate sections. Nothing on it is required to start using the app. A section that changes how the app looks shows the change live, as setup's Job form does: beside the controls on a wide screen, in a short strip above them on a phone (D57).
 
 | Section | Contains | Level |
 | --- | --- | --- |

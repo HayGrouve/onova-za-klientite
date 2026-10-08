@@ -5,6 +5,7 @@ import {
   businessMutation,
   businessQuery,
   getOwned,
+  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
@@ -16,8 +17,10 @@ import {
   vCreateClientArgs,
 } from './lib/clientWrite'
 import { mergeExtra } from './lib/extra'
+import { listExtra, listFieldIds } from './lib/listFields'
 import { clientSearchText, jobSearchText } from './lib/search'
 import { optionalText, requiredText } from './lib/validate'
+import { vExtra } from './validators'
 import { jobRow, newLookups, timeline } from './lib/views'
 
 export const create = businessMutation({
@@ -102,6 +105,8 @@ export const list = businessQuery({
       creditCents: v.number(),
       owedCents: v.number(),
       openJobs: v.number(),
+      /** Values of the client fields marked "show in list". */
+      listExtra: v.optional(vExtra),
     }),
   ),
   handler: async (ctx) => {
@@ -131,6 +136,7 @@ export const list = businessQuery({
       for (const job of jobs)
         open.set(job.clientId, (open.get(job.clientId) ?? 0) + 1)
     }
+    const shown = await listFieldIds(ctx, businessId, 'client')
     return clients
       .filter((client) => client.mergedIntoId === undefined)
       .sort((a, b) =>
@@ -149,15 +155,17 @@ export const list = businessQuery({
         creditCents: client.creditCents,
         owedCents: owed.get(client._id) ?? 0,
         openJobs: open.get(client._id) ?? 0,
+        listExtra: listExtra(client.extra, shown),
       }))
   },
 })
 
 /** Everything the client page shows. */
 export const get = businessQuery({
-  args: { clientId: v.id('clients') },
+  // A string: the id comes from the address bar (see getOwnedFromUrl).
+  args: { clientId: v.string() },
   handler: async (ctx, { clientId }) => {
-    const client = await getOwned(ctx, 'clients', clientId)
+    const client = await getOwnedFromUrl(ctx, 'clients', clientId)
     const jobs = await ctx.db
       .query('jobs')
       .withIndex('by_client', (q) => q.eq('clientId', client._id))

@@ -1,4 +1,5 @@
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
+import { NotFoundPage } from '#/components/not-found'
 import { routeTree } from './routeTree.gen'
 
 export function getRouter() {
@@ -7,6 +8,10 @@ export function getRouter() {
     scrollRestoration: true,
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
+    // An address that matches no page shows one Bulgarian page of its own,
+    // outside the signed-in shell, at any depth.
+    notFoundMode: 'root',
+    defaultNotFoundComponent: NotFoundPage,
   })
 
   return router

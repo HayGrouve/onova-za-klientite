@@ -224,11 +224,7 @@ export function ExtraFieldsEditor({
                           option.id === value,
                       )
                       .map((option) => (
-                        <ToggleGroupItem
-                          key={option.id}
-                          value={option.id}
-                          className="aria-pressed:border-primary aria-pressed:bg-primary/8"
-                        >
+                        <ToggleGroupItem key={option.id} value={option.id}>
                           {option.name}
                         </ToggleGroupItem>
                       ))}

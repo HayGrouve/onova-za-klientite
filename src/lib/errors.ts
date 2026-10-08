@@ -11,8 +11,11 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   'payment.zero': m.error_payment_zero,
   'payment.exceeds': m.error_payment_exceeds,
   'payment.signMismatch': m.error_payment_signMismatch,
+  'payment.tooLow': m.error_payment_tooLow,
   'credit.notEnough': m.error_credit_notEnough,
   'job.otherClient': m.error_job_otherClient,
+  'item.otherClient': m.error_job_otherClient,
+  'item.otherJob': m.error_item_otherJob,
   'stage.hasJobs': m.error_stage_hasJobs,
   'job.noDate': m.error_job_noDate,
   'client.merged': m.error_client_merged,
@@ -36,4 +39,20 @@ export function errorCode(error: unknown): string | undefined {
 export function errorMessage(error: unknown): string {
   const code = errorCode(error)
   return (code && MESSAGES[code]?.()) || m.error_unknown()
+}
+
+/**
+ * A record that isn't there for this person: an id from another business
+ * (the server says `notFound`, D16), or an address that holds no id at all,
+ * which the server's argument check turns away before the function runs.
+ */
+export function isNotFound(error: unknown): boolean {
+  if (errorCode(error) === 'notFound') return true
+  return (
+    error instanceof Error &&
+    !(error instanceof ConvexError) &&
+    /ArgumentValidationError|does not match (the table name in )?validator/i.test(
+      error.message,
+    )
+  )
 }

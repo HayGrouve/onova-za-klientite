@@ -84,7 +84,11 @@ export function CostForm({
                   type="button"
                   variant="outline"
                   className="h-10 rounded-xl"
-                  onClick={() => setLabel(suggestion())}
+                  onClick={() => {
+                    setLabel(suggestion())
+                    // The label is picked: the amount is the next thing to type.
+                    document.getElementById('cost-amount')?.focus()
+                  }}
                 >
                   {suggestion()}
                 </Button>

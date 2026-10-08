@@ -39,7 +39,7 @@ function SettingsLayout() {
       {/* Only the open section fades in; the menu stays. */}
       <div
         key={pathname}
-        className="flex max-w-3xl min-w-0 animate-page flex-col"
+        className="flex max-w-5xl min-w-0 animate-page flex-col"
       >
         <Outlet />
       </div>

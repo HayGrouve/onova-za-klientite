@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
-import { isValidDate, sofiaTimeToUtc } from '../shared/dates'
+import { isValidDate, sofiaTimeToUtc, stampMoment } from '../shared/dates'
 import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
@@ -78,7 +78,7 @@ export const add = businessMutation({
       type: 'appointment.added',
       jobId: job._id,
       clientId: job.clientId,
-      data: { to: args.date, note: args.label },
+      data: { to: stampMoment(args.date, args.time), note: args.label },
     })
     return appointmentId
   },
@@ -100,7 +100,7 @@ export const update = businessMutation({
       type: 'appointment.changed',
       jobId: appointment.jobId,
       clientId: appointment.clientId,
-      data: { to: args.date, note: args.label },
+      data: { to: stampMoment(args.date, args.time), note: args.label },
     })
     return null
   },

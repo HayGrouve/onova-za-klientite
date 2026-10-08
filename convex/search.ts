@@ -4,8 +4,10 @@ import { internalMutation } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import { foldQuery } from '../shared/search'
 import { businessQuery } from './lib/auth'
+import { listExtra, listFieldIds } from './lib/listFields'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { jobRow, newLookups, vJobRow } from './lib/views'
+import { vExtra } from './validators'
 
 const PER_KIND = 8
 
@@ -20,6 +22,7 @@ type ItemHit = {
   name: string
   clientId: Id<'clients'>
   clientName: string
+  listExtra?: Doc<'items'>['extra']
 }
 
 /**
@@ -44,6 +47,7 @@ export const all = businessQuery({
         name: v.string(),
         clientId: v.id('clients'),
         clientName: v.string(),
+        listExtra: v.optional(vExtra),
       }),
     ),
   }),
@@ -53,6 +57,7 @@ export const all = businessQuery({
     const clients = new Map<string, ClientHit>()
     const jobs = new Map<string, Awaited<ReturnType<typeof jobRow>>>()
     const items = new Map<string, ItemHit>()
+    let shownItemFields: Set<string> | undefined
     const lookups = newLookups()
 
     for (const variant of variants) {
@@ -83,6 +88,7 @@ export const all = businessQuery({
           jobs.set(job._id, await jobRow(ctx, job, lookups))
       }
       if (ctx.business.modules.items) {
+        shownItemFields ??= await listFieldIds(ctx, businessId, 'item')
         const foundItems = await ctx.db
           .query('items')
           .withSearchIndex('search', (q) =>
@@ -97,6 +103,7 @@ export const all = businessQuery({
             name: item.name,
             clientId: item.clientId,
             clientName: owner?.name ?? '',
+            listExtra: listExtra(item.extra, shownItemFields),
           })
         }
       }
@@ -110,43 +117,59 @@ export const all = businessQuery({
 })
 
 const REBUILD_PAGE = 100
+/** The order records are rebuilt in: jobs read their client's name. */
+const REBUILD_NEXT = { clients: 'jobs', jobs: 'items', items: null } as const
 
 /**
- * Rebuilds every stored search key with the current fold, a page at a time:
- * `npx convex run search:rebuildAll '{"table":"clients"}'` (then jobs, items).
+ * Rebuilds every stored search key, in every business, with the current fold:
+ * `npx convex run search:rebuildAll '{}'` (add `--prod` for production).
+ * Run it after the fold in shared/search.ts changes; it is safe to run twice.
+ * It does clients, then jobs, then items, a page of 100 at a time, each page
+ * scheduling the next.
  */
 export const rebuildAll = internalMutation({
   args: {
-    table: v.union(v.literal('clients'), v.literal('jobs'), v.literal('items')),
+    table: v.optional(
+      v.union(v.literal('clients'), v.literal('jobs'), v.literal('items')),
+    ),
     cursor: v.optional(v.union(v.string(), v.null())),
   },
   returns: v.null(),
-  handler: async (ctx, { table, cursor }) => {
+  handler: async (ctx, args) => {
+    const table = args.table ?? 'clients'
     const page = await ctx.db
       .query(table)
-      .paginate({ cursor: cursor ?? null, numItems: REBUILD_PAGE })
+      .paginate({ cursor: args.cursor ?? null, numItems: REBUILD_PAGE })
     for (const doc of page.page) {
       if (table === 'clients') {
         const client = doc as Doc<'clients'>
-        await ctx.db.patch('clients', client._id, {
-          searchText: await clientSearchText(ctx, client),
-        })
+        const searchText = await clientSearchText(ctx, client)
+        // Unchanged rows aren't rewritten, so a second run wakes no query.
+        if (searchText !== client.searchText) {
+          await ctx.db.patch('clients', client._id, { searchText })
+        }
       } else if (table === 'jobs') {
         const job = doc as Doc<'jobs'>
-        await ctx.db.patch('jobs', job._id, {
-          searchText: await jobSearchText(ctx, job),
-        })
+        const searchText = await jobSearchText(ctx, job)
+        if (searchText !== job.searchText) {
+          await ctx.db.patch('jobs', job._id, { searchText })
+        }
       } else {
         const item = doc as Doc<'items'>
-        await ctx.db.patch('items', item._id, {
-          searchText: await itemSearchText(ctx, item),
-        })
+        const searchText = await itemSearchText(ctx, item)
+        if (searchText !== item.searchText) {
+          await ctx.db.patch('items', item._id, { searchText })
+        }
       }
     }
     if (!page.isDone) {
       await ctx.scheduler.runAfter(0, internal.search.rebuildAll, {
         table,
         cursor: page.continueCursor,
+      })
+    } else if (REBUILD_NEXT[table]) {
+      await ctx.scheduler.runAfter(0, internal.search.rebuildAll, {
+        table: REBUILD_NEXT[table],
       })
     }
     return null

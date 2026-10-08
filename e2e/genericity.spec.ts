@@ -63,9 +63,12 @@ async function shapeItem(page: Page, b: Business) {
     await sheet.getByRole('button', { name: 'Добави полето' }).click()
     await expect(sheet).toBeHidden()
   }
+  // The field's row in the list; the live preview beside it is inert.
   for (const field of b.item.fields) {
     await expect(
-      page.getByRole('main').getByText(field, { exact: true }),
+      page
+        .getByRole('main')
+        .getByRole('button', { name: new RegExp(`^${field}`) }),
     ).toBeVisible()
   }
 }

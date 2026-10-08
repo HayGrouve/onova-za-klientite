@@ -1,37 +1,19 @@
 import type { MutationCtx } from '../_generated/server'
 import type { Doc, Id } from '../_generated/dataModel'
-import {
-  addDays,
-  addMonths,
-  dateInSofia,
-  sofiaOffsetMinutes,
-  sofiaTimeToUtc,
-} from '../../shared/dates'
+import { sofiaOffsetMinutes, sofiaTimeToUtc } from '../../shared/dates'
+import { nextRepeatDate, pickJobDate } from '../../shared/repeat'
 import { defaultStage } from '../../shared/stages'
 import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
 import { recomputeJob } from './recompute'
 
-type Repeat = NonNullable<Doc<'jobs'>['repeat']>
-
-/** The job's date for repeating (Q6): its last appointment, else its due date. */
+/** The job's date for repeating (Q6, D41): see `pickJobDate`. */
 export async function jobDate(ctx: MutationCtx, job: Doc<'jobs'>) {
   const appointments = await ctx.db
     .query('appointments')
     .withIndex('by_job', (q) => q.eq('jobId', job._id))
     .collect()
-  const last = appointments
-    .filter((item) => item.cancelledAt === undefined)
-    .sort((a, b) => b.start - a.start)
-    .at(0)
-  if (last) return { date: dateInSofia(last.start), appointment: last }
-  return job.dueDate ? { date: job.dueDate } : null
-}
-
-export function nextDate(date: string, repeat: Pick<Repeat, 'every' | 'unit'>) {
-  return repeat.unit === 'week'
-    ? addDays(date, 7 * repeat.every)
-    : addMonths(date, repeat.every)
+  return pickJobDate({ appointments, dueDate: job.dueDate })
 }
 
 /** Keeps `nextRepeatOn` on the job's date while the series still waits for its next job. */
@@ -85,7 +67,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
   const stage = defaultStage(stages)
   if (!stage) return null
 
-  const date = nextDate(when.date, job.repeat)
+  const date = nextRepeatDate(when.date, job.repeat)
   const now = Date.now()
   const nextId = await ctx.db.insert('jobs', {
     businessId: business._id,

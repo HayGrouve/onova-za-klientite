@@ -21,6 +21,8 @@ import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { ListExtras } from '#/components/list-extras'
+import { AddressLink } from '#/components/address-link'
 import { ClientAdmin } from '#/components/client-admin'
 import { ClientForm } from '#/components/client-form'
 import { Columns } from '#/components/columns'
@@ -29,12 +31,13 @@ import { FileGallery } from '#/components/files/file-gallery'
 import { JobRow } from '#/components/job-row'
 import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
+import { PaymentSheet } from '#/components/money/payment-sheet'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { RefundForm } from '#/components/money/refund-form'
-import { RemovePayment } from '#/components/money/remove-payment'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { DetailError } from '#/components/not-found'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
@@ -45,17 +48,21 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
+import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/clients/$clientId')({
   staticData: { layout: 'wide' },
   component: ClientPage,
+  // A wrong address, or a record from another business, says so (D16).
+  errorComponent: ({ error }) => <DetailError error={error} kind="client" />,
 })
 
 function ClientPage() {
@@ -64,16 +71,19 @@ function ClientPage() {
   const today = useToday()
   const data = useQuery(api.clients.get, {
     businessId: business._id,
-    clientId: clientId as Id<'clients'>,
+    clientId,
   })
+  usePageTitle(
+    data && (data.client.isNoClient ? m.no_client() : data.client.name),
+  )
   const [panel, setPanel] = useState<
     | { kind: 'edit' }
     | { kind: 'payment' }
     | { kind: 'refund' }
-    | { kind: 'removePayment'; paymentId: Id<'payments'>; amountCents: number }
     | { kind: 'reminder' }
     | null
   >(null)
+  const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const close = () => setPanel(null)
   const reminders = useQuery(
     api.reminders.forClient,
@@ -86,6 +96,17 @@ function ClientPage() {
   if (!data) return <ListSkeleton />
   const { client } = data
   const phone = client.phones.at(0)?.e164
+  // A refund pays back client credit, or takes back part of what a job was paid (D26).
+  const refundSources = [
+    ...(client.creditCents > 0 ? [{ limitCents: client.creditCents }] : []),
+    ...data.jobs
+      .filter((job) => job.paidCents > 0)
+      .map((job) => ({
+        jobId: job._id,
+        title: job.title,
+        limitCents: job.paidCents,
+      })),
+  ]
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -203,7 +224,7 @@ function ClientPage() {
                     )}
                     {client.address && (
                       <ContactRow icon={MapPinIcon} label={m.client_address()}>
-                        {client.address}
+                        <AddressLink address={client.address} />
                       </ContactRow>
                     )}
                   </dl>
@@ -259,6 +280,20 @@ function ClientPage() {
                 title={words.job.plural}
                 icon={ClipboardTextIcon}
                 count={data.jobs.length || undefined}
+                action={
+                  <Link
+                    to="/new"
+                    search={{ clientId: client._id }}
+                    aria-label={m.new_job_label({ job: words.job.singular })}
+                    className={buttonVariants({
+                      variant: 'ghost',
+                      className: 'h-9 text-primary',
+                    })}
+                  >
+                    <PlusIcon data-icon="inline-start" />
+                    {words.job.singular}
+                  </Link>
+                }
               >
                 <PanelList>
                   {data.jobs.length === 0 ? (
@@ -292,7 +327,7 @@ function ClientPage() {
                       <PlusIcon data-icon="inline-start" />
                       {m.pay_add()}
                     </Button>
-                    {client.creditCents > 0 && (
+                    {refundSources.length > 0 && (
                       <Button
                         variant="outline"
                         size="xl"
@@ -308,34 +343,35 @@ function ClientPage() {
                   {data.payments.length === 0 ? (
                     <ListNote>{m.client_no_payments()}</ListNote>
                   ) : (
-                    data.payments.map((payment) => (
-                      <li key={payment._id}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPanel({
-                              kind: 'removePayment',
-                              paymentId: payment._id,
-                              amountCents: payment.amountCents,
-                            })
-                          }
-                          className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
-                        >
-                          <span className="flex flex-col">
-                            <span>
-                              {payment.label ?? METHOD_LABEL[payment.method]()}
+                    data.payments.map((payment) => {
+                      // The method is the title unless a label or a refund takes it.
+                      const refund = payment.amountCents < 0
+                      const titled =
+                        payment.label ?? (refund ? m.refund_add() : undefined)
+                      return (
+                        <li key={payment._id}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenPayment(payment._id)}
+                            className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
+                          >
+                            <span className="flex flex-col">
+                              <span>
+                                {titled ?? METHOD_LABEL[payment.method]()}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {formatDay(payment.date, today)}
+                                {titled &&
+                                  ` · ${METHOD_LABEL[payment.method]()}`}
+                              </span>
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {formatDay(payment.date, today)} ·{' '}
-                              {METHOD_LABEL[payment.method]()}
+                            <span className="font-medium tabular-nums">
+                              {formatMoney(payment.amountCents)}
                             </span>
-                          </span>
-                          <span className="font-medium tabular-nums">
-                            {formatMoney(payment.amountCents)}
-                          </span>
-                        </button>
-                      </li>
-                    ))
+                          </button>
+                        </li>
+                      )
+                    })
                   )}
                 </PanelList>
               </Panel>
@@ -368,9 +404,12 @@ function ClientPage() {
                       <Link
                         to="/items/$itemId"
                         params={{ itemId: item._id }}
-                        className="flex items-center justify-between gap-3 pressable px-4 py-3 font-medium"
+                        className="flex items-center justify-between gap-3 pressable px-4 py-3"
                       >
-                        {item.name}
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="font-medium">{item.name}</span>
+                          <ListExtras target="item" values={item.extra} />
+                        </span>
                         <CaretRightIcon
                           aria-hidden
                           className="size-4 shrink-0 text-muted-foreground/60"
@@ -407,6 +446,9 @@ function ClientPage() {
                       reminderId={reminder._id}
                       note={reminder.note}
                       detail={formatDay(reminder.date, today)}
+                      date={reminder.date}
+                      jobId={reminder.jobId}
+                      itemId={reminder.itemId}
                     />
                   ))}
                 </PanelList>
@@ -453,11 +495,9 @@ function ClientPage() {
                 ? m.pay_title()
                 : panel?.kind === 'refund'
                   ? m.refund_title()
-                  : panel?.kind === 'removePayment'
-                    ? m.pay_remove()
-                    : panel?.kind === 'reminder'
-                      ? m.reminder_add_title()
-                      : client.name}
+                  : panel?.kind === 'reminder'
+                    ? m.reminder_add_title()
+                    : client.name}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">
@@ -479,6 +519,7 @@ function ClientPage() {
                 }}
                 today={today}
                 depositsOn={business.depositsOnNewJob}
+                defaultMethod={defaultPaymentMethod(data.payments)}
                 onDone={close}
               />
             )}
@@ -486,7 +527,7 @@ function ClientPage() {
               <RefundForm
                 businessId={business._id}
                 clientId={client._id}
-                creditCents={client.creditCents}
+                sources={refundSources}
                 today={today}
                 onDone={close}
               />
@@ -499,17 +540,15 @@ function ClientPage() {
                 onDone={close}
               />
             )}
-            {panel?.kind === 'removePayment' && (
-              <RemovePayment
-                businessId={business._id}
-                paymentId={panel.paymentId}
-                amountCents={panel.amountCents}
-                onDone={close}
-              />
-            )}
           </div>
         </SheetContent>
       </Sheet>
+      <PaymentSheet
+        businessId={business._id}
+        paymentId={openPayment}
+        today={today}
+        onClose={() => setOpenPayment(null)}
+      />
     </div>
   )
 }

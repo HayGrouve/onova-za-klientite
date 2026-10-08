@@ -1,7 +1,8 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { QueryCtx } from '../_generated/server'
-import { vStageColor, vStageGroup } from '../validators'
+import { vExtra, vStageColor, vStageGroup } from '../validators'
+import { listExtra, listFieldIds } from './listFields'
 
 /** A job as lists show it: enough for a row, nothing more. */
 export const vJobRow = v.object({
@@ -27,11 +28,15 @@ export const vJobRow = v.object({
   nextAppointment: v.optional(
     v.object({ start: v.number(), allDay: v.boolean() }),
   ),
+  /** Values of the job fields marked "show in list". */
+  listExtra: v.optional(vExtra),
 })
 
 type Lookups = {
   clients: Map<Id<'clients'>, Doc<'clients'> | null>
   stages: Map<Id<'stages'>, Doc<'stages'> | null>
+  /** The job fields shown in lists, read once per query. */
+  listFields?: Set<string>
 }
 
 export function newLookups(): Lookups {
@@ -54,12 +59,17 @@ export async function jobRow(
   lookups: Lookups,
   now = Date.now(),
 ) {
+  lookups.listFields ??= await listFieldIds(ctx, job.businessId, 'job')
   const client = await cached(ctx, lookups.clients, 'clients', job.clientId)
   const stage = await cached(ctx, lookups.stages, 'stages', job.stageId)
-  const appointments = await ctx.db
-    .query('appointments')
-    .withIndex('by_job', (q) => q.eq('jobId', job._id))
-    .collect()
+  // A finished or cancelled job has nothing coming up, whatever is left on it.
+  const closed = job.stageGroup === 'done' || job.stageGroup === 'cancelled'
+  const appointments = closed
+    ? []
+    : await ctx.db
+        .query('appointments')
+        .withIndex('by_job', (q) => q.eq('jobId', job._id))
+        .collect()
   const next = appointments
     .filter(
       (item) =>
@@ -90,6 +100,7 @@ export async function jobRow(
     nextAppointment: next
       ? { start: next.start, allDay: next.allDay }
       : undefined,
+    listExtra: listExtra(job.extra, lookups.listFields),
   }
 }
 

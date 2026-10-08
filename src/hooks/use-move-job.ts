@@ -5,6 +5,7 @@ import type { Id } from '../../convex/_generated/dataModel'
 import { useViewer } from '#/hooks/use-viewer'
 import { errorMessage } from '#/lib/errors'
 import { boardColumn } from '../../shared/board'
+import { offersRuleReminder } from '../../shared/reminder-rule'
 import type { StageGroup } from '../../shared/stages'
 
 type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
@@ -13,7 +14,9 @@ type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
  * Moves a job to another stage, from the job page or the board. The board
  * shows the move at once and settles when the server answers. Resolves to
  * true when the move reached Done and the reminder rule should be offered
- * (Q5); a failure shows a toast and resolves to false.
+ * (Q5, never for a No client job); a failure shows a toast and resolves to
+ * false. `onMoved` runs once the server has taken the move, with that same
+ * answer, for a caller that confirms the move (the job page's undo toast).
  */
 export function useMoveJob() {
   const { business } = useViewer()
@@ -65,13 +68,15 @@ export function useMoveJob() {
   const cancel = useMutation(api.jobs.cancel)
 
   return async (
-    job: { _id: Id<'jobs'>; stageGroup: StageGroup },
+    job: { _id: Id<'jobs'>; stageGroup: StageGroup; isNoClient: boolean },
     /** The stage, or Cancelled when the business has no Cancelled stage left. */
     target: Stage | 'cancelled',
+    onMoved?: (offerRule: boolean) => void,
   ) => {
     try {
       if (target === 'cancelled') {
         await cancel({ businessId: business._id, jobId: job._id })
+        onMoved?.(false)
         return false
       }
       await changeStage({
@@ -79,12 +84,15 @@ export function useMoveJob() {
         jobId: job._id,
         stageId: target._id,
       })
-      return (
-        target.group === 'done' &&
-        job.stageGroup !== 'done' &&
-        business.modules.reminders &&
-        Boolean(business.reminderRule)
-      )
+      const offerRule = offersRuleReminder({
+        from: job.stageGroup,
+        to: target.group,
+        remindersOn: business.modules.reminders,
+        ruleOn: Boolean(business.reminderRule),
+        isNoClient: job.isNoClient,
+      })
+      onMoved?.(offerRule)
+      return offerRule
     } catch (error) {
       toast.error(errorMessage(error))
       return false

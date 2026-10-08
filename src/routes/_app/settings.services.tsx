@@ -9,7 +9,9 @@ import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { MoneyInput, moneyInputText } from '#/components/money/money-input'
 import { useSubmit } from '#/components/money/use-submit'
+import { ModuleOff } from '#/components/settings/module-off'
 import { SettingsPage } from '#/components/settings/settings-page'
+import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
 import { Button } from '#/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
@@ -21,6 +23,7 @@ import {
 } from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
+import { lower } from '#/i18n/words'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, parseMoney } from '../../../shared/money'
@@ -99,9 +102,30 @@ function ServicesSettings() {
   )
 
   return (
-    <SettingsPage title={m.settings_services()} help={m.services_help()}>
+    <SettingsPage
+      title={m.settings_services()}
+      help={m.services_help()}
+      preview={
+        <SettingsPreview>
+          <ServicesPreview
+            services={settings.modules.services ? active : []}
+            off={!settings.modules.services}
+            job={settings.words.job.singular}
+          />
+        </SettingsPreview>
+      }
+    >
       {!settings.modules.services && (
-        <p className="px-4 text-sm text-muted-foreground">{m.services_off()}</p>
+        <div className="px-4">
+          <ModuleOff
+            businessId={business._id}
+            modules={settings.modules}
+            module="services"
+            owner={owner}
+          >
+            {m.services_off()}
+          </ModuleOff>
+        </div>
       )}
       <ListCard>{active.map((service, index) => row(service, index))}</ListCard>
       {owner && (
@@ -149,6 +173,84 @@ function ServicesSettings() {
         </SheetContent>
       </Sheet>
     </SettingsPage>
+  )
+}
+
+/**
+ * What the list does: a "+" line naming a service gets its price, and a
+ * job's lines offer every service in one tap.
+ */
+function ServicesPreview({
+  services,
+  off,
+  job,
+}: {
+  services: Service[]
+  off: boolean
+  job: string
+}) {
+  // A comma would split the "+" line, so such a name can't be matched there.
+  const first = services.find((service) => !service.name.includes(','))
+  if (off || services.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {off ? m.services_preview_off() : m.services_preview_empty()}
+      </p>
+    )
+  }
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      {first && (
+        <div className="flex flex-col gap-2">
+          <p className="font-medium">{m.services_preview_line()}</p>
+          <div className="flex h-10 items-center rounded-xl border px-3 text-muted-foreground">
+            <span className="truncate">
+              {m.names_preview_client_name()}, {lower(first.name)}
+            </span>
+          </div>
+          <Flash
+            watch={[first.name, first.priceCents]}
+            className="flex flex-col divide-y divide-border/70 rounded-xl border"
+          >
+            <div className="flex justify-between gap-3 px-3 py-2">
+              <span className="text-muted-foreground">{m.new_what()}</span>
+              <span className="truncate font-medium">{first.name}</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 px-3 py-2">
+              <span className="text-muted-foreground">{m.new_price()}</span>
+              <span className="font-medium tabular-nums">
+                {formatMoney(first.priceCents)}{' '}
+                <span className="text-xs font-normal text-muted-foreground">
+                  {m.new_price_from_service()}
+                </span>
+              </span>
+            </div>
+          </Flash>
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        <p className="font-medium">
+          {m.services_preview_lines({ job: lower(job) })}
+        </p>
+        <Flash
+          watch={services.map((service) => [service.name, service.priceCents])}
+          className="flex flex-wrap gap-1.5 py-1"
+        >
+          {services.map((service) => (
+            <span
+              key={service._id}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-xs"
+            >
+              <PlusIcon aria-hidden className="size-3.5" />
+              {service.name}
+              <span className="text-muted-foreground tabular-nums">
+                {formatMoney(service.priceCents)}
+              </span>
+            </span>
+          ))}
+        </Flash>
+      </div>
+    </div>
   )
 }
 

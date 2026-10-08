@@ -11,8 +11,10 @@ import {
   monthOf,
   monthRange,
   nextSofiaTime,
+  parseMoment,
   sofiaOffsetMinutes,
   sofiaTimeToUtc,
+  stampMoment,
   todayInSofia,
   weekdayOf,
 } from './dates'
@@ -385,6 +387,68 @@ describe('nextSofiaTime', () => {
         },
       ),
       { numRuns: 500 },
+    )
+  })
+})
+
+describe('stampMoment and parseMoment', () => {
+  it('writes a date, or a date and time, the way the activity log keeps it', () => {
+    expect(stampMoment('2026-10-15')).toBe('2026-10-15')
+    expect(stampMoment('2026-10-08', { hour: 14, minute: 0 })).toBe(
+      '2026-10-08 14:00',
+    )
+    expect(stampMoment('2026-10-08', { hour: 9, minute: 5 })).toBe(
+      '2026-10-08 9:05',
+    )
+  })
+
+  it('reads them back', () => {
+    expect(parseMoment('2026-10-15')).toEqual({ date: '2026-10-15' })
+    expect(parseMoment('2026-10-08 14:00')).toEqual({
+      date: '2026-10-08',
+      time: { hour: 14, minute: 0 },
+    })
+    expect(parseMoment('2026-10-08 9:05')).toEqual({
+      date: '2026-10-08',
+      time: { hour: 9, minute: 5 },
+    })
+  })
+
+  it('reads nothing else as a moment', () => {
+    for (const text of [
+      '',
+      'Монтаж',
+      '2026-13-01',
+      '2026-02-30',
+      '2026-10-08 25:00',
+      '2026-10-08 14:60',
+      '2026-10-08T14:00',
+      '2026-10-08 14:00 extra',
+      'x 2026-10-08',
+    ]) {
+      expect(parseMoment(text), text).toBeUndefined()
+    }
+  })
+
+  it('round-trips any valid date and time', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 20_000 }),
+        fc.option(
+          fc.record({
+            hour: fc.integer({ min: 0, max: 23 }),
+            minute: fc.integer({ min: 0, max: 59 }),
+          }),
+          { nil: undefined },
+        ),
+        (offset, time) => {
+          const date = addDays('2000-01-01', offset)
+          expect(parseMoment(stampMoment(date, time))).toEqual({
+            date,
+            ...(time && { time }),
+          })
+        },
+      ),
     )
   })
 })

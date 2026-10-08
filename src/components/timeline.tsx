@@ -1,6 +1,8 @@
 import type { FunctionReturnType } from 'convex/server'
 import type { api } from '../../convex/_generated/api'
+import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
+import { formatActivityMoment } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../shared/money'
 import type { Words } from '../../shared/words'
@@ -16,8 +18,9 @@ const WHEN = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'Europe/Sofia',
 })
 
-function describe(item: TimelineItem, words: Words) {
+function describe(item: TimelineItem, words: Words, today: string) {
   const { data } = item
+  const when = formatActivityMoment(data.to ?? '', today)
   const amount = formatMoney(Math.abs(data.amountCents ?? 0))
   const name = data.name ?? ''
   switch (item.type) {
@@ -44,6 +47,8 @@ function describe(item: TimelineItem, words: Words) {
         ? m.event_payment_refund({ amount })
         : m.event_payment_added({ amount }) +
             (data.note ? ` (${data.note})` : '')
+    case 'payment.edited':
+      return m.event_payment_edited({ amount })
     case 'payment.removed':
       return m.event_payment_removed({ amount })
     case 'credit.used':
@@ -67,22 +72,26 @@ function describe(item: TimelineItem, words: Words) {
     case 'appointment.added':
       return m.event_appointment_added({
         appointment: words.appointment.singular,
-        date: data.to ?? '',
+        date: when,
       })
     case 'appointment.changed':
-      return m.event_appointment_changed({ date: data.to ?? '' })
+      return m.event_appointment_changed({ date: when })
     case 'appointment.cancelled':
       return m.event_appointment_cancelled()
     case 'reminder.added':
       return m.event_reminder_added({ note: data.note ?? '' })
     case 'reminder.closed':
       return m.event_reminder_closed({ note: data.note ?? '' })
+    case 'reminder.moved':
+      return m.event_reminder_moved({ note: data.note ?? '' })
+    case 'reminder.reopened':
+      return m.event_reminder_reopened({ note: data.note ?? '' })
     case 'job.repeatSet':
       return m.event_job_repeatSet()
     case 'job.repeatStopped':
       return m.event_job_repeatStopped()
     case 'job.repeated':
-      return m.event_job_repeated({ date: data.to ?? '' })
+      return m.event_job_repeated({ date: when })
     case 'file.added':
       return m.event_file_added({ name: name || m.files_photo() })
     case 'file.removed':
@@ -95,6 +104,7 @@ function describe(item: TimelineItem, words: Words) {
 /** A record's history from the activity log, newest first. */
 export function Timeline({ items }: { items: TimelineItem[] }) {
   const { business } = useViewer()
+  const today = useToday()
   return (
     <ol className="mr-4 ml-6 flex stagger flex-col gap-3 border-l-2 border-border/80 pl-4">
       {items.map((item) => (
@@ -103,7 +113,9 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
           // The dot sits on the line: 16px padding, half the 2px line, half the 10px dot.
           className="relative flex flex-col gap-0.5 before:absolute before:top-1.5 before:-left-[22px] before:size-2.5 before:rounded-full before:bg-primary/70 before:ring-3 before:ring-card first:before:bg-primary"
         >
-          <span className="text-sm">{describe(item, business.words)}</span>
+          <span className="text-sm">
+            {describe(item, business.words, today)}
+          </span>
           <span className="text-xs text-muted-foreground">
             {WHEN.format(item._creationTime)}
             {item.actorName && ` · ${item.actorName}`}

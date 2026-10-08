@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
 import { jobOwes } from '../shared/allocation'
-import { canRegroupStage, canRemoveStage } from '../shared/stages'
+import { canRegroupStage, canRemoveStage, groupedOrder } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
@@ -89,6 +89,13 @@ export const update = businessMutation({
       }
     }
     await ctx.db.patch('stages', stage._id, patch)
+    if (patch.group !== undefined) {
+      // A regrouped stage joins the end of its new group, so groups stay together.
+      const ids = groupedOrder(await stagesOf(ctx), stage._id)
+      for (const [order, stageId] of ids.entries()) {
+        await ctx.db.patch('stages', stageId, { order })
+      }
+    }
     await logActivity(ctx, {
       type: 'stage.edited',
       data: { from: stage.name, to: patch.name ?? stage.name, toId: stage._id },

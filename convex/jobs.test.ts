@@ -171,6 +171,64 @@ describe('jobs', () => {
     ).rejects.toThrow(/job.otherClient/)
   })
 
+  it('an item added from a job is linked to that job, next to the ones it has', async () => {
+    const { t, owner, businessId, clientId } = await withClient()
+    const first = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Daikin, хол',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Профилактика',
+      itemIds: [first],
+    })
+    const added = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Daikin, спалня',
+      jobId,
+    })
+    expect((await getDoc(t, 'jobs', jobId)).itemIds).toEqual([first, added])
+    const links = await t.run((ctx) =>
+      ctx.db
+        .query('jobItems')
+        .withIndex('by_job', (q) => q.eq('jobId', jobId))
+        .collect(),
+    )
+    expect(links.map((row) => row.itemId).sort()).toEqual([first, added].sort())
+    const item = await owner.query(api.items.get, {
+      businessId,
+      itemId: added,
+    })
+    expect(item.jobs.map((job) => job._id)).toEqual([jobId])
+  })
+
+  it("an item can't be added to another client's job", async () => {
+    const { t, owner, businessId, clientId } = await withClient()
+    const otherId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Мария',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: otherId,
+      title: 'Профилактика',
+    })
+    await expect(
+      owner.mutation(api.items.create, {
+        businessId,
+        clientId,
+        name: 'Daikin, хол',
+        jobId,
+      }),
+    ).rejects.toThrow(/job.otherClient/)
+    // Nothing was saved: the failed call rolled back.
+    const items = await t.run((ctx) => ctx.db.query('items').collect())
+    expect(items).toEqual([])
+  })
+
   it('item history survives a move to another client', async () => {
     const { t, owner, businessId, clientId } = await withClient()
     const itemId = await owner.mutation(api.items.create, {
@@ -259,6 +317,59 @@ describe('jobs after settings change', () => {
         name: 'Стол',
       }),
     ).rejects.toThrow(/client.noClient/)
+  })
+})
+
+describe('jobs list', () => {
+  async function withJobs() {
+    const ctx = await withClient()
+    const { owner, businessId, clientId, stage } = ctx
+    const create = (title: string) =>
+      owner.mutation(api.jobs.create, {
+        businessId,
+        clientId,
+        title,
+        typedPriceCents: 10000,
+      })
+    await create('Нова')
+    const done = await create('Готова')
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId: done,
+      stageId: stage('done'),
+    })
+    return ctx
+  }
+
+  it('one group lists only its jobs, and counts every group for the tabs', async () => {
+    const { owner, businessId } = await withJobs()
+    const result = await owner.query(api.jobs.list, {
+      businessId,
+      group: 'done',
+    })
+    expect(result.jobs.map((job) => job.title)).toEqual(['Готова'])
+    expect(result.counts).toEqual({
+      new: 1,
+      in_progress: 0,
+      done: 1,
+      cancelled: 0,
+    })
+  })
+
+  it('no group lists the jobs of every group, newest first, for the "all" tab', async () => {
+    const { owner, businessId } = await withJobs()
+    const result = await owner.query(api.jobs.list, { businessId })
+    expect(result.jobs.map((job) => job.title)).toEqual(['Готова', 'Нова'])
+    expect(result.counts.new + result.counts.done).toBe(2)
+  })
+
+  it('shows another business nothing', async () => {
+    const { t, businessId } = await withJobs()
+    const stranger = t.withIdentity(STRANGER)
+    await stranger.mutation(api.users.ensureCurrent, {})
+    await expect(
+      stranger.query(api.jobs.list, { businessId }),
+    ).rejects.toThrow()
   })
 })
 

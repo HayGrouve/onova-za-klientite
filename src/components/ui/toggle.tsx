@@ -10,8 +10,11 @@ const toggleVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        // Local change (ADR 0005): white on the tinted page.
-        outline: "border border-input bg-card hover:bg-muted",
+        // Local change (ADR 0005): white on the tinted page. A chosen option
+        // is filled with the primary tint (ToggleGroupItem adds a check), so
+        // every single-choice chip group shows its choice the same way.
+        outline:
+          "border border-input bg-card hover:bg-muted aria-pressed:border-primary aria-pressed:bg-primary/12 aria-pressed:text-primary aria-pressed:hover:bg-primary/18 aria-pressed:hover:text-primary",
       },
       size: {
         default:

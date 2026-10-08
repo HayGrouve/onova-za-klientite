@@ -8,6 +8,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
+import { ListExtras } from '#/components/list-extras'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { JobRow } from '#/components/job-row'
 import { ListSection } from '#/components/list-section'
@@ -17,6 +18,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from '#/components/ui/input-group'
+import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
@@ -38,6 +40,7 @@ function useDebounced(value: string, ms = 250) {
 }
 
 function SearchPage() {
+  usePageTitle(m.search_open())
   const { business } = useViewer()
   const today = useToday()
   const [query, setQuery] = useState('')
@@ -141,6 +144,7 @@ function SearchPage() {
                   <span className="text-sm text-muted-foreground">
                     {item.clientName}
                   </span>
+                  <ListExtras target="item" values={item.listExtra} />
                 </Link>
               </li>
             ))}
