@@ -3,6 +3,7 @@ import { ConvexReactClient } from 'convex/react'
 import { ConvexProviderWithClerk } from 'convex/react-clerk'
 import { clerkPublishableKey, convexUrl } from '#/lib/env'
 import { clerkLocalization } from '#/integrations/clerk-localization'
+import { SnapshotWiper } from '#/components/offline/snapshot-wiper'
 import { CenteredMessage } from '#/components/centered-message'
 import { m } from '#/paraglide/messages.js'
 
@@ -55,6 +56,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       }
     >
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        <SnapshotWiper />
         {children}
       </ConvexProviderWithClerk>
     </ClerkProvider>
