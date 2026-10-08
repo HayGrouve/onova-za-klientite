@@ -7,6 +7,7 @@ import {
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { summaryBody, summaryTitle } from './pushText'
+import { isWorker, seesAppointment, seesJob } from './scope'
 import type { SummaryCounts } from './pushText'
 
 const SUMMARY_HOUR = 7
@@ -23,11 +24,13 @@ export function nextSummaryTime(now: number): number {
 /**
  * What Today would list, as counts (convex/today.ts has the same rules):
  * appointments that aren't cancelled, New and In progress jobs past their due
- * date (Q17), and open reminders due today or earlier.
+ * date (Q17), and open reminders due today or earlier. A Worker's counts
+ * cover only their own work, and no reminders (D89).
  */
 export async function summaryCounts(
   ctx: QueryCtx,
   business: Doc<'businesses'>,
+  member: Doc<'memberships'>,
   today: string,
   include: { overdue: boolean; reminders: boolean },
 ): Promise<SummaryCounts> {
@@ -49,6 +52,7 @@ export async function summaryCounts(
     if (item.cancelledAt !== undefined) continue
     const job = item.jobId ? await ctx.db.get('jobs', item.jobId) : null
     if (job?.stageGroup === 'cancelled') continue
+    if (!seesAppointment(member, item, job)) continue
     appointments += 1
   }
 
@@ -65,12 +69,12 @@ export async function summaryCounts(
             .lt('dueDate', today),
         )
         .collect()
-      overdue += late.length
+      overdue += late.filter((job) => seesJob(member, job)).length
     }
   }
 
   let reminders = 0
-  if (include.reminders && business.modules.reminders) {
+  if (include.reminders && business.modules.reminders && !isWorker(member)) {
     reminders = (
       await ctx.db
         .query('reminders')
@@ -133,7 +137,7 @@ export async function collectDueSummaries(
     if (now - scheduledFor > STALE_AFTER_MS) continue
     const business = await ctx.db.get('businesses', member.businessId)
     if (!business) continue
-    const counts = await summaryCounts(ctx, business, today, {
+    const counts = await summaryCounts(ctx, business, member, today, {
       overdue: member.notify.overdue,
       reminders: member.notify.remindersDue,
     })

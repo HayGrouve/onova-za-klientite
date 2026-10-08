@@ -5,12 +5,12 @@ import {
   businessMutation,
   businessQuery,
   getOwned,
-  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
 import { mergeExtra } from './lib/extra'
 import { setJobItems } from './lib/jobWrite'
+import { getVisibleFromUrl, isWorker, seesEvent, seesJob } from './lib/scope'
 import { itemSearchText } from './lib/search'
 import { requiredText } from './lib/validate'
 import {
@@ -115,12 +115,16 @@ export const move = businessMutation({
   },
 })
 
-/** Everything the item page shows, history included. */
+/**
+ * Everything the item page shows, history included. A Worker sees it only
+ * through one of their jobs, and then only those jobs and their history (D89).
+ */
 export const get = businessQuery({
   // A string: the id comes from the address bar (see getOwnedFromUrl).
   args: { itemId: v.string() },
   handler: async (ctx, { itemId }) => {
-    const item = await getOwnedFromUrl(ctx, 'items', itemId)
+    const item = await getVisibleFromUrl(ctx, 'items', itemId)
+    const worker = isWorker(ctx.member)
     const client = await ctx.db.get('clients', item.clientId)
     const links = await ctx.db
       .query('jobItems')
@@ -130,29 +134,41 @@ export const get = businessQuery({
     const jobs = []
     for (const link of links) {
       const job = await ctx.db.get('jobs', link.jobId)
-      if (job) jobs.push(await jobRow(ctx, job, lookups))
+      if (job && seesJob(ctx.member, job)) {
+        jobs.push(await jobRow(ctx, job, lookups))
+      }
     }
     jobs.sort((a, b) => b._creationTime - a._creationTime)
-    const events = await ctx.db
-      .query('activity')
-      .withIndex('by_item', (q) => q.eq('itemId', item._id))
-      .collect()
+    const jobIds = new Set<string>(jobs.map((job) => job._id))
+    const events = (
+      await ctx.db
+        .query('activity')
+        .withIndex('by_item', (q) => q.eq('itemId', item._id))
+        .collect()
+    ).filter(
+      (event) =>
+        seesEvent(ctx.member, event) &&
+        (!worker || (event.jobId !== undefined && jobIds.has(event.jobId))),
+    )
     return {
       item,
       client: client && { _id: client._id, name: client.name },
       fields: await activeFields(ctx, ctx.business._id, 'item'),
       jobs,
-      reminders: await openRemindersOn(ctx, ctx.business, { itemId: item._id }),
+      reminders: worker
+        ? []
+        : await openRemindersOn(ctx, ctx.business, { itemId: item._id }),
       timeline: await timeline(ctx, events),
     }
   },
 })
 
-/** A client's items, for linking them to a job. */
+/** A client's items, for linking them to a job: a Manager's job (D89). */
 export const byClient = businessQuery({
   args: { clientId: v.id('clients') },
   returns: v.array(v.object({ _id: v.id('items'), name: v.string() })),
   handler: async (ctx, { clientId }) => {
+    requireRole(ctx.member, 'manager')
     const client = await getOwned(ctx, 'clients', clientId)
     const items = await ctx.db
       .query('items')

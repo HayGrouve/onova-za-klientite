@@ -36,6 +36,7 @@ import type * as lib_moveJob from "../lib/moveJob.js";
 import type * as lib_pushText from "../lib/pushText.js";
 import type * as lib_recompute from "../lib/recompute.js";
 import type * as lib_repeat from "../lib/repeat.js";
+import type * as lib_scope from "../lib/scope.js";
 import type * as lib_search from "../lib/search.js";
 import type * as lib_seedAccess from "../lib/seedAccess.js";
 import type * as lib_summary from "../lib/summary.js";
@@ -95,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   "lib/pushText": typeof lib_pushText;
   "lib/recompute": typeof lib_recompute;
   "lib/repeat": typeof lib_repeat;
+  "lib/scope": typeof lib_scope;
   "lib/search": typeof lib_search;
   "lib/seedAccess": typeof lib_seedAccess;
   "lib/summary": typeof lib_summary;

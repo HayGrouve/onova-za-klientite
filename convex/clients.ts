@@ -1,12 +1,12 @@
 import { v } from 'convex/values'
-import type { Doc } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
+import { isOpenGroup } from '../shared/stages'
 import { owedCents } from '../shared/board'
 import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
   getOwned,
-  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
@@ -20,6 +20,14 @@ import {
 import { mergeExtra } from './lib/extra'
 import { listExtra, listFieldIds } from './lib/listFields'
 import { clientSearchText, jobSearchText } from './lib/search'
+import {
+  getVisibleFromUrl,
+  isWorker,
+  seesEvent,
+  visibleJobsOfClient,
+  workerJobs,
+} from './lib/scope'
+import type { ScopedCtx } from './lib/scope'
 import { optionalText, requiredText } from './lib/validate'
 import { vExtra } from './validators'
 import {
@@ -99,7 +107,10 @@ export const update = businessMutation({
   },
 })
 
-/** Every client, by name, with what they owe and hold in credit. "No client" comes last. */
+/**
+ * Every client, by name, with what they owe and hold in credit. "No client"
+ * comes last. A Worker gets only the clients of their jobs, without money (D89).
+ */
 export const list = businessQuery({
   args: {},
   returns: v.array(
@@ -118,6 +129,7 @@ export const list = businessQuery({
   ),
   handler: async (ctx) => {
     const businessId = ctx.business._id
+    if (isWorker(ctx.member)) return await workerClients(ctx)
     const clients = await ctx.db
       .query('clients')
       .withIndex('by_business_name', (q) => q.eq('businessId', businessId))
@@ -167,16 +179,52 @@ export const list = businessQuery({
   },
 })
 
-/** Everything the client page shows. */
+/** The clients of a Worker's jobs, as `list` shows them, with no money. */
+async function workerClients(ctx: ScopedCtx) {
+  const jobs = await workerJobs(ctx)
+  const open = new Map<string, number>()
+  for (const job of jobs) {
+    const count = isOpenGroup(job.stageGroup) ? 1 : 0
+    open.set(job.clientId, (open.get(job.clientId) ?? 0) + count)
+  }
+  const shown = await listFieldIds(ctx, ctx.business._id, 'client')
+  const rows = []
+  for (const [clientId, openJobs] of open) {
+    const client = await ctx.db.get('clients', clientId as Id<'clients'>)
+    if (!client || client.mergedIntoId !== undefined) continue
+    rows.push({
+      _id: client._id,
+      name: client.name,
+      kind: client.kind,
+      isNoClient: client.isNoClient,
+      phone: client.phones.at(0)?.e164,
+      creditCents: 0,
+      owedCents: 0,
+      openJobs,
+      listExtra: listExtra(client.extra, shown),
+    })
+  }
+  return rows.sort((a, b) =>
+    a.isNoClient === b.isNoClient
+      ? a.name.localeCompare(b.name, 'bg')
+      : a.isNoClient
+        ? 1
+        : -1,
+  )
+}
+
+/**
+ * Everything the client page shows. A Worker sees it only through one of
+ * their jobs, and then only those jobs, their items and their history (D89).
+ */
 export const get = businessQuery({
   // A string: the id comes from the address bar (see getOwnedFromUrl).
   args: { clientId: v.string() },
   handler: async (ctx, { clientId }) => {
-    const client = await getOwnedFromUrl(ctx, 'clients', clientId)
-    const jobs = await ctx.db
-      .query('jobs')
-      .withIndex('by_client', (q) => q.eq('clientId', client._id))
-      .collect()
+    const client = await getVisibleFromUrl(ctx, 'clients', clientId)
+    const worker = isWorker(ctx.member)
+    const jobs = await visibleJobsOfClient(ctx, client._id)
+    const jobIds = new Set<string>(jobs.map((job) => job._id))
     const lookups = newLookups()
     const jobRows = []
     for (const job of jobs.sort((a, b) => b._creationTime - a._creationTime)) {
@@ -188,23 +236,36 @@ export const get = businessQuery({
           .withIndex('by_client', (q) => q.eq('clientId', client._id))
           .collect()
       : []
-    const payments = await ctx.db
-      .query('payments')
-      .withIndex('by_client', (q) => q.eq('clientId', client._id))
-      .collect()
-    const events = await ctx.db
-      .query('activity')
-      .withIndex('by_client', (q) => q.eq('clientId', client._id))
-      .collect()
+    const itemIds = worker
+      ? new Set<string>(jobs.flatMap((job) => job.itemIds))
+      : undefined
+    const payments = worker
+      ? []
+      : await ctx.db
+          .query('payments')
+          .withIndex('by_client', (q) => q.eq('clientId', client._id))
+          .collect()
+    const events = (
+      await ctx.db
+        .query('activity')
+        .withIndex('by_client', (q) => q.eq('clientId', client._id))
+        .collect()
+    ).filter(
+      (event) =>
+        seesEvent(ctx.member, event) &&
+        (!worker || (event.jobId !== undefined && jobIds.has(event.jobId))),
+    )
     const mergedInto = client.mergedIntoId
       ? await ctx.db.get('clients', client.mergedIntoId)
       : null
     return {
-      client,
+      client: worker ? { ...client, creditCents: 0 } : client,
       mergedIntoName: mergedInto?.name,
       jobs: jobRows,
-      owedCents: owedCents(jobRows),
-      items: items.map(({ _id, name, extra }) => ({ _id, name, extra })),
+      owedCents: worker ? 0 : owedCents(jobRows),
+      items: items
+        .filter((item) => !itemIds || itemIds.has(item._id))
+        .map(({ _id, name, extra }) => ({ _id, name, extra })),
       payments: payments
         .sort(
           (a, b) =>
@@ -230,9 +291,9 @@ export const get = businessQuery({
           }),
         ),
       fields: await activeFields(ctx, ctx.business._id, 'client'),
-      reminders: await openRemindersOn(ctx, ctx.business, {
-        clientId: client._id,
-      }),
+      reminders: worker
+        ? []
+        : await openRemindersOn(ctx, ctx.business, { clientId: client._id }),
       timeline: await timeline(ctx, events),
     }
   },

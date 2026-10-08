@@ -5,11 +5,14 @@ import type { Doc, Id } from './_generated/dataModel'
 import { foldQuery } from '../shared/search'
 import { businessQuery } from './lib/auth'
 import { listExtra, listFieldIds } from './lib/listFields'
+import { isWorker, seesClient, seesItem, seesJob } from './lib/scope'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { jobRow, newLookups, vJobRow } from './lib/views'
 import { vExtra } from './validators'
 
 const PER_KIND = 8
+/** A Worker sees only part of the matches, so more are read to find theirs. */
+const WORKER_READ = 64
 
 type ClientHit = {
   _id: Id<'clients'>
@@ -27,7 +30,8 @@ type ItemHit = {
 
 /**
  * One box over clients, jobs and items (CONTEXT "Search"). Each folded variant
- * of the query is searched and the results merged, best match first.
+ * of the query is searched and the results merged, best match first. A
+ * Worker finds only their jobs and those jobs' clients and items (D89).
  */
 export const all = businessQuery({
   args: { query: v.string() },
@@ -59,6 +63,7 @@ export const all = businessQuery({
     const items = new Map<string, ItemHit>()
     let shownItemFields: Set<string> | undefined
     const lookups = newLookups()
+    const read = isWorker(ctx.member) ? WORKER_READ : PER_KIND
 
     for (const variant of variants) {
       const foundClients = await ctx.db
@@ -66,10 +71,11 @@ export const all = businessQuery({
         .withSearchIndex('search', (q) =>
           q.search('searchText', variant).eq('businessId', businessId),
         )
-        .take(PER_KIND)
+        .take(read)
       for (const client of foundClients) {
         if (client.mergedIntoId !== undefined || clients.has(client._id))
           continue
+        if (!(await seesClient(ctx, client._id))) continue
         clients.set(client._id, {
           _id: client._id,
           name: client.name,
@@ -82,8 +88,10 @@ export const all = businessQuery({
         .withSearchIndex('search', (q) =>
           q.search('searchText', variant).eq('businessId', businessId),
         )
-        .take(PER_KIND)
-      for (const job of foundJobs) {
+        .take(read)
+      for (const job of foundJobs.filter((found) =>
+        seesJob(ctx.member, found),
+      )) {
         if (!jobs.has(job._id))
           jobs.set(job._id, await jobRow(ctx, job, lookups))
       }
@@ -94,9 +102,10 @@ export const all = businessQuery({
           .withSearchIndex('search', (q) =>
             q.search('searchText', variant).eq('businessId', businessId),
           )
-          .take(PER_KIND)
+          .take(read)
         for (const item of foundItems) {
           if (items.has(item._id)) continue
+          if (!(await seesItem(ctx, item._id))) continue
           const owner = await ctx.db.get('clients', item.clientId)
           items.set(item._id, {
             _id: item._id,
@@ -108,10 +117,12 @@ export const all = businessQuery({
         }
       }
     }
+    // As many as anyone else would get: PER_KIND for each folded variant.
+    const most = PER_KIND * variants.length
     return {
-      clients: [...clients.values()],
-      jobs: [...jobs.values()],
-      items: [...items.values()],
+      clients: [...clients.values()].slice(0, most),
+      jobs: [...jobs.values()].slice(0, most),
+      items: [...items.values()].slice(0, most),
     }
   },
 })

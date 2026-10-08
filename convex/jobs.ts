@@ -7,7 +7,6 @@ import {
   businessMutation,
   businessQuery,
   getOwned,
-  getOwnedFromUrl,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
@@ -22,6 +21,7 @@ import {
   vCreateJobArgs,
 } from './lib/jobWrite'
 import { patchJob } from './lib/ledger'
+import { getVisibleFromUrl, isWorker, seesEvent, seesJob } from './lib/scope'
 import type { JobPatch } from './lib/ledger'
 import { jobDate, refreshRepeat, setJobRepeat } from './lib/repeat'
 import { jobSearchText } from './lib/search'
@@ -242,12 +242,14 @@ export const list = businessQuery({
     const counts = { new: 0, in_progress: 0, done: 0, cancelled: 0 }
     const selected: Array<Doc<'jobs'>> = []
     for (const key of STAGE_GROUPS) {
-      const jobs = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_group_due', (q) =>
-          q.eq('businessId', businessId).eq('stageGroup', key),
-        )
-        .take(LIST_LIMIT)
+      const jobs = (
+        await ctx.db
+          .query('jobs')
+          .withIndex('by_business_group_due', (q) =>
+            q.eq('businessId', businessId).eq('stageGroup', key),
+          )
+          .take(LIST_LIMIT)
+      ).filter((job) => seesJob(ctx.member, job))
       counts[key] = jobs.length
       if (group === undefined || key === group) selected.push(...jobs)
     }
@@ -290,17 +292,21 @@ export const board = businessQuery({
     const businessId = ctx.business._id
     const lookups = newLookups()
     const now = Date.now()
+    const worker = isWorker(ctx.member)
     const columns = []
     for (const group of STAGE_GROUPS) {
-      const jobs = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_group_due', (q) =>
-          q.eq('businessId', businessId).eq('stageGroup', group),
-        )
-        .take(LIST_LIMIT)
+      const jobs = (
+        await ctx.db
+          .query('jobs')
+          .withIndex('by_business_group_due', (q) =>
+            q.eq('businessId', businessId).eq('stageGroup', group),
+          )
+          .take(LIST_LIMIT)
+      ).filter((job) => seesJob(ctx.member, job))
       let column = boardColumn(group, jobs)
       let olderOwing: typeof jobs = []
-      if (!isOpenGroup(group)) {
+      // A Worker's own jobs are few, so their closed ones come from `jobs`.
+      if (!isOpenGroup(group) && !worker) {
         // A long history outgrows one read, so the latest closed jobs come
         // from their own index, and what Done still owes from the owes index.
         const latest = await ctx.db
@@ -341,6 +347,8 @@ export const board = businessQuery({
       }
       columns.push({
         ...column,
+        // A Worker sees no totals (D89).
+        owedCents: worker ? 0 : column.owedCents,
         group,
         jobs: await rows(column.jobs),
         olderOwing: await rows(olderOwing),
@@ -362,7 +370,8 @@ export const get = businessQuery({
   // A string: the id comes from the address bar (see getOwnedFromUrl).
   args: { jobId: v.string() },
   handler: async (ctx, { jobId }) => {
-    const job = await getOwnedFromUrl(ctx, 'jobs', jobId)
+    const job = await getVisibleFromUrl(ctx, 'jobs', jobId)
+    const worker = isWorker(ctx.member)
     const client = await ctx.db.get('clients', job.clientId)
     const stages = await ctx.db
       .query('stages')
@@ -398,24 +407,32 @@ export const get = businessQuery({
         _id: allocation._id,
         paymentId: payment._id,
         amountCents: allocation.amountCents,
-        paymentAmountCents: payment.amountCents,
-        paymentAllocatedCents: payment.allocatedCents,
+        // A Worker sees this job's share, never what the rest went to (D89).
+        paymentAmountCents: worker
+          ? allocation.amountCents
+          : payment.amountCents,
+        paymentAllocatedCents: worker
+          ? allocation.amountCents
+          : payment.allocatedCents,
         date: payment.date,
         method: payment.method,
         label: payment.label,
       })
     }
     payments.sort((a, b) => b.date.localeCompare(a.date))
-    const costs = ctx.business.modules.costs
-      ? await ctx.db
-          .query('costs')
-          .withIndex('by_job', (q) => q.eq('jobId', job._id))
-          .collect()
-      : []
-    const events = await ctx.db
-      .query('activity')
-      .withIndex('by_job', (q) => q.eq('jobId', job._id))
-      .collect()
+    const costs =
+      ctx.business.modules.costs && !worker
+        ? await ctx.db
+            .query('costs')
+            .withIndex('by_job', (q) => q.eq('jobId', job._id))
+            .collect()
+        : []
+    const events = (
+      await ctx.db
+        .query('activity')
+        .withIndex('by_job', (q) => q.eq('jobId', job._id))
+        .collect()
+    ).filter((event) => seesEvent(ctx.member, event))
     return {
       job,
       client: client && {
@@ -423,7 +440,7 @@ export const get = businessQuery({
         name: client.name,
         isNoClient: client.isNoClient,
         phones: client.phones,
-        creditCents: client.creditCents,
+        creditCents: worker ? 0 : client.creditCents,
       },
       stages: stages.map(({ _id, name, color, group }) => ({
         _id,

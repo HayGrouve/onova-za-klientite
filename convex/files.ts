@@ -10,6 +10,7 @@ import {
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
+import { seesItem, seesJob } from './lib/scope'
 import { optionalText } from './lib/validate'
 
 const MB = 1024 * 1024
@@ -183,13 +184,16 @@ export const list = businessQuery({
     const { target } = args
     let files: Doc<'files'>[]
     if (target.kind === 'job') {
-      await getOwned(ctx, 'jobs', target.jobId)
+      const job = await getOwned(ctx, 'jobs', target.jobId)
+      if (!seesJob(ctx.member, job)) fail('notFound', { table: 'jobs' })
       files = await ctx.db
         .query('files')
         .withIndex('by_job', (q) => q.eq('jobId', target.jobId))
         .order('desc')
         .collect()
     } else if (target.kind === 'client') {
+      // A client's own files aren't about one job, so not a Worker's (D89).
+      requireRole(ctx.member, 'manager')
       await getOwned(ctx, 'clients', target.clientId)
       files = await ctx.db
         .query('files')
@@ -202,7 +206,8 @@ export const list = businessQuery({
         : null
       files = logo ? [logo] : []
     } else {
-      await getOwned(ctx, 'items', target.itemId)
+      const item = await getOwned(ctx, 'items', target.itemId)
+      if (!(await seesItem(ctx, item._id))) fail('notFound', { table: 'items' })
       files = await ctx.db
         .query('files')
         .withIndex('by_item', (q) => q.eq('itemId', target.itemId))

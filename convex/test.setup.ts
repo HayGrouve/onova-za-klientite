@@ -127,3 +127,33 @@ export function storeBlob(t: TestConvex, bytes: number, contentType: string) {
     return id
   })
 }
+
+/** A second member of the owner's business, as a worker or a manager. */
+export async function addMember(
+  t: TestConvex,
+  b: TestBusiness,
+  role: 'manager' | 'worker',
+) {
+  const identity = {
+    ...STRANGER,
+    subject: `user_${role}`,
+    tokenIdentifier: `https://clerk.test|user_${role}`,
+  }
+  const member = t.withIdentity(identity)
+  await member.mutation(api.users.ensureCurrent, {})
+  const membershipId = await t.run(async (ctx) => {
+    const user = (await ctx.db
+      .query('users')
+      .withIndex('by_token', (q) =>
+        q.eq('tokenIdentifier', identity.tokenIdentifier),
+      )
+      .unique())!
+    return await ctx.db.insert('memberships', {
+      businessId: b.businessId,
+      userId: user._id,
+      role,
+      notify: { morningSummary: false, remindersDue: false, overdue: false },
+    })
+  })
+  return { member, membershipId }
+}

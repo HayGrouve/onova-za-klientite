@@ -52,6 +52,8 @@ export const context = businessQuery({
     ),
   }),
   handler: async (ctx) => {
+    // Only a Manager adds a job, and this lists every client (D89).
+    requireRole(ctx.member, 'manager')
     const clients = await ctx.db
       .query('clients')
       .withIndex('by_business_name', (q) =>
