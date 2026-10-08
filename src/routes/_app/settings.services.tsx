@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
-import { MoneyInput, moneyInputText } from '#/components/money/money-input'
+import { MoneyInput } from '#/components/money/money-input'
 import { useSubmit } from '#/components/money/use-submit'
 import { ModuleOff } from '#/components/settings/module-off'
 import { SettingsPage } from '#/components/settings/settings-page'
@@ -26,7 +26,7 @@ import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
-import { formatMoney, parseMoney } from '../../../shared/money'
+import { formatMoney, moneyInputText, parseMoney } from '../../../shared/money'
 
 export const Route = createFileRoute('/_app/settings/services')({
   component: ServicesSettings,

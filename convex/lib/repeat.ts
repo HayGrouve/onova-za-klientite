@@ -5,7 +5,33 @@ import { nextRepeatDate, pickJobDate } from '../../shared/repeat'
 import { defaultStage } from '../../shared/stages'
 import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
+import { fail } from './errors'
 import { insertJob } from './ledger'
+
+/**
+ * Sets how often a job repeats (Q6), every 1–52 weeks or months, and creates
+ * the next job when it is due. The caller has checked the job has a date.
+ */
+export async function setJobRepeat(
+  ctx: BusinessMutationCtx,
+  job: Doc<'jobs'>,
+  repeat: { every: number; unit: 'week' | 'month' },
+) {
+  const { every, unit } = repeat
+  if (!Number.isInteger(every) || every < 1 || every > 52) {
+    fail('invalid', { field: 'every' })
+  }
+  await ctx.db.patch('jobs', job._id, {
+    repeat: { every, unit, nextJobId: job.repeat?.nextJobId },
+  })
+  await refreshRepeat(ctx, job._id)
+  await logActivity(ctx, {
+    type: 'job.repeatSet',
+    jobId: job._id,
+    clientId: job.clientId,
+    data: { to: `${every} ${unit}` },
+  })
+}
 
 /** The job's date for repeating (Q6, D41): see `pickJobDate`. */
 export async function jobDate(ctx: MutationCtx, job: Doc<'jobs'>) {

@@ -40,3 +40,24 @@ export function calendarDate(value: string, field: string): string {
 export function optionalDate(value: string | undefined, field: string) {
   return value === undefined ? undefined : calendarDate(value, field)
 }
+
+/** A clock time in Sofia: whole hours 0–23 and minutes 0–59. */
+export function clockTime<T extends { hour: number; minute: number }>(
+  time: T | undefined,
+  field: string,
+): T | undefined {
+  if (
+    time &&
+    !(
+      Number.isInteger(time.hour) &&
+      time.hour >= 0 &&
+      time.hour <= 23 &&
+      Number.isInteger(time.minute) &&
+      time.minute >= 0 &&
+      time.minute <= 59
+    )
+  ) {
+    fail('invalid', { field })
+  }
+  return time
+}

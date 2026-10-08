@@ -1,5 +1,6 @@
 import { useBlocker } from '@tanstack/react-router'
 import { useCallback, useRef, useState } from 'react'
+import type { ComponentProps } from 'react'
 import { DiscardSheet } from '#/components/discard-sheet'
 
 /**
@@ -39,9 +40,16 @@ export function useSheetGuard() {
 /**
  * Guards a page that holds a form: leaving it, or closing the tab, with
  * unsaved changes asks first. Call `release` just before navigating away
- * after a save. Render `prompt` on the page.
+ * after a save. Render `prompt` on the page. `words` replaces the question's
+ * default wording.
  */
-export function usePageGuard(dirty: boolean) {
+export function usePageGuard(
+  dirty: boolean,
+  words?: Pick<
+    ComponentProps<typeof DiscardSheet>,
+    'title' | 'body' | 'discardLabel' | 'keepLabel'
+  >,
+) {
   const released = useRef(false)
   const blocker = useBlocker({
     shouldBlockFn: useCallback(() => dirty && !released.current, [dirty]),
@@ -56,6 +64,7 @@ export function usePageGuard(dirty: boolean) {
       open={blocker.status === 'blocked'}
       onKeep={() => blocker.reset?.()}
       onDiscard={() => blocker.proceed?.()}
+      {...words}
     />
   )
   return { release, prompt }

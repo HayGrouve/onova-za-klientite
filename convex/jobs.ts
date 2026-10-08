@@ -23,11 +23,11 @@ import {
 } from './lib/jobWrite'
 import { patchJob } from './lib/ledger'
 import type { JobPatch } from './lib/ledger'
-import { jobDate, refreshRepeat } from './lib/repeat'
+import { jobDate, refreshRepeat, setJobRepeat } from './lib/repeat'
 import { jobSearchText } from './lib/search'
 import { cents, optionalDate, optionalText, requiredText } from './lib/validate'
 import { jobRow, newLookups, timeline, vJobRow } from './lib/views'
-import { vExtra, vJobLine, vStageGroup } from './validators'
+import { vExtra, vJobLine, vRepeatUnit, vStageGroup } from './validators'
 
 const vClearableString = v.optional(v.union(v.string(), v.null()))
 
@@ -422,30 +422,14 @@ export const setRepeat = businessMutation({
   args: {
     jobId: v.id('jobs'),
     every: v.number(),
-    unit: v.union(v.literal('week'), v.literal('month')),
+    unit: vRepeatUnit,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    if (!Number.isInteger(args.every) || args.every < 1 || args.every > 52) {
-      fail('invalid', { field: 'every' })
-    }
     if (!(await jobDate(ctx, job))) fail('job.noDate')
-    await ctx.db.patch('jobs', job._id, {
-      repeat: {
-        every: args.every,
-        unit: args.unit,
-        nextJobId: job.repeat?.nextJobId,
-      },
-    })
-    await refreshRepeat(ctx, job._id)
-    await logActivity(ctx, {
-      type: 'job.repeatSet',
-      jobId: job._id,
-      clientId: job.clientId,
-      data: { to: `${args.every} ${args.unit}` },
-    })
+    await setJobRepeat(ctx, job, args)
     return null
   },
 })

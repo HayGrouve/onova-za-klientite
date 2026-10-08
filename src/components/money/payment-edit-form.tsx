@@ -5,7 +5,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { MethodPicker } from '#/components/money/method-picker'
 import type { PaymentMethod } from '#/components/money/method-picker'
-import { MoneyInput, moneyInputText } from '#/components/money/money-input'
+import { MoneyInput } from '#/components/money/money-input'
 import { useSubmit } from '#/components/money/use-submit'
 import { Button } from '#/components/ui/button'
 import {
@@ -18,7 +18,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
 import { m } from '#/paraglide/messages.js'
-import { formatMoney, parseMoney } from '../../../shared/money'
+import { formatMoney, moneyInputText, parseMoney } from '../../../shared/money'
 
 export type PaymentData = FunctionReturnType<typeof api.payments.get>
 

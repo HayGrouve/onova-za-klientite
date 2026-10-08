@@ -5,14 +5,6 @@ import {
   InputGroupText,
 } from '#/components/ui/input-group'
 import { useWide } from '#/hooks/use-wide'
-import { formatMoney } from '../../../shared/money'
-
-/** The digits of an amount for an input: 1200,5 → "1200,50", without the € sign. */
-export function moneyInputText(cents: number | null | undefined) {
-  return cents === null || cents === undefined
-    ? ''
-    : formatMoney(cents).replace(/\s?€/, '')
-}
 
 export function MoneyInput({
   id,

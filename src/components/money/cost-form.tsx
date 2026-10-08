@@ -2,7 +2,7 @@ import { useMutation } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
-import { MoneyInput, moneyInputText } from '#/components/money/money-input'
+import { MoneyInput } from '#/components/money/money-input'
 import { useSubmit } from '#/components/money/use-submit'
 import { Button } from '#/components/ui/button'
 import {
@@ -15,7 +15,7 @@ import { Input } from '#/components/ui/input'
 import { ConfirmAction } from '#/components/confirm-action'
 import { Spinner } from '#/components/ui/spinner'
 import { m } from '#/paraglide/messages.js'
-import { parseMoney } from '../../../shared/money'
+import { moneyInputText, parseMoney } from '../../../shared/money'
 
 const JOB_SUGGESTIONS = [
   m.cost_suggest_materials,

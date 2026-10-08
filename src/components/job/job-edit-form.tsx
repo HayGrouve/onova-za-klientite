@@ -26,11 +26,7 @@ import { Spinner } from '#/components/ui/spinner'
 import { Textarea } from '#/components/ui/textarea'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
-import { formatMoney, parseMoney } from '../../../shared/money'
-
-function moneyText(cents: number | undefined) {
-  return cents === undefined ? '' : formatMoney(cents).replace(/\s?€/, '')
-}
+import { moneyInputText, parseMoney } from '../../../shared/money'
 
 /** Title, due date, address, notes, typed price and extra fields of a job. */
 export function JobEditForm({
@@ -52,7 +48,7 @@ export function JobEditForm({
   const [dueDate, setDueDate] = useState(job.dueDate ?? '')
   const [address, setAddress] = useState(job.address ?? '')
   const [notes, setNotes] = useState(job.notes ?? '')
-  const [price, setPrice] = useState(moneyText(job.typedPriceCents))
+  const [price, setPrice] = useState(moneyInputText(job.typedPriceCents))
   const [extra, setExtra] = useState<ExtraValues>(job.extra)
   const [saving, setSaving] = useState(false)
   const [tried, setTried] = useState(false)
@@ -68,7 +64,7 @@ export function JobEditForm({
     dueDate !== (job.dueDate ?? '') ||
     address !== (job.address ?? '') ||
     notes !== (job.notes ?? '') ||
-    price !== moneyText(job.typedPriceCents) ||
+    price !== moneyInputText(job.typedPriceCents) ||
     JSON.stringify(extra) !== JSON.stringify(job.extra)
   useEffect(() => {
     onDirtyChange?.(dirty)
