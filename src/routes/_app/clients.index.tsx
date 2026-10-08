@@ -7,7 +7,6 @@ import {
   UserCircleDashedIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
-import { cn } from 'cn'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -55,6 +54,25 @@ export const Route = createFileRoute('/_app/clients/')({
   component: ClientsPage,
 })
 
+/** "+ Client": the one way to add from this page. */
+function AddClientLink({ primary = false }: { primary?: boolean }) {
+  const { words } = useViewer().business
+  return (
+    <Link
+      to="/clients/new"
+      aria-label={m.clients_add({ client: words.client.singular })}
+      className={buttonVariants({
+        variant: primary ? 'default' : 'outline',
+        size: 'xl',
+        className: primary ? undefined : 'shadow-xs',
+      })}
+    >
+      <PlusIcon data-icon="inline-start" />
+      {words.client.singular}
+    </Link>
+  )
+}
+
 function ClientsPage() {
   const { business } = useViewer()
   const clients = useQuery(api.clients.list, { businessId: business._id })
@@ -85,27 +103,17 @@ function ClientsPage() {
     <>
       <div className="flex items-center justify-between gap-3 pr-4">
         <PageTitle>{words.client.plural}</PageTitle>
-        <Link
-          to="/clients/new"
-          className={cn(
-            buttonVariants({
-              variant: 'outline',
-              size: 'xl',
-              className: 'shadow-xs',
-            }),
-          )}
-        >
-          <PlusIcon data-icon="inline-start" />
-          {m.clients_add()}
-        </Link>
+        {/* Empty, the one action is in the empty state below. */}
+        {(!clients || real.length > 0) && <AddClientLink />}
       </div>
       {!clients ? (
         <ListSkeleton />
       ) : real.length === 0 ? (
         <EmptyState
           icon={UsersIcon}
-          title={m.clients_empty_title({ clients: words.client.plural })}
+          title={m.clients_empty_title()}
           body={m.clients_empty_body()}
+          action={<AddClientLink primary />}
         />
       ) : (
         <>

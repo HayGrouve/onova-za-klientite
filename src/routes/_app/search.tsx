@@ -1,6 +1,7 @@
 import {
   ClipboardTextIcon,
   MagnifyingGlassIcon,
+  PlusIcon,
   StackIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
@@ -12,6 +13,7 @@ import { InitialsAvatar } from '#/components/initials-avatar'
 import { JobRow } from '#/components/job-row'
 import { ListSection } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { buttonVariants } from '#/components/ui/button'
 import {
   InputGroup,
   InputGroupAddon,
@@ -34,6 +36,13 @@ export const Route = createFileRoute('/_app/search')({
   staticData: { layout: 'wide' },
   component: SearchPage,
 })
+
+/** The words typed become the new client's phone if they read as one, else its name. */
+function prefillClient(query: string) {
+  const isPhone =
+    /^[\d\s+()-]+$/.test(query) && /\d{5}/.test(query.replace(/\D/g, ''))
+  return isPhone ? { phone: query } : { name: query }
+}
 
 function SearchPage() {
   usePageTitle(m.search_open())
@@ -89,7 +98,7 @@ function SearchPage() {
         {/* Mounted empty, then filled, so a screen reader announces the answer. */}
         <div role="status">
           {empty && (
-            <p className="animate-rise py-6 text-center text-muted-foreground">
+            <p className="animate-rise pt-6 pb-3 text-center text-muted-foreground">
               {m.search_none()}
             </p>
           )}
@@ -100,6 +109,19 @@ function SearchPage() {
           )}
         </div>
       </div>
+      {empty && (
+        <div className="flex animate-rise justify-center px-4">
+          <Link
+            to="/clients/new"
+            search={prefillClient(debounced)}
+            aria-label={m.clients_add({ client: words.client.singular })}
+            className={buttonVariants({ variant: 'outline', size: 'xl' })}
+          >
+            <PlusIcon data-icon="inline-start" />
+            {words.client.singular}
+          </Link>
+        </div>
+      )}
       {debounced && !results && <ListSkeleton />}
       {/* A wide screen shows the kinds of result side by side. */}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(22rem,1fr))] lg:items-start">

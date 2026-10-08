@@ -7,14 +7,24 @@ import { ListSkeleton } from '#/components/list-skeleton'
 import { PageTitle } from '#/components/page'
 import { usePageGuard } from '#/hooks/use-discard-guard'
 import { useViewer } from '#/hooks/use-viewer'
+import { textParam } from '../../../shared/sort'
+
+type NewClientSearch = { name?: string; phone?: string }
 
 export const Route = createFileRoute('/_app/clients/new')({
+  // Search with no results offers a client started from what was typed.
+  validateSearch: (search: Record<string, unknown>): NewClientSearch => {
+    const name = textParam(search.name)
+    const phone = textParam(search.phone)
+    return { ...(name && { name }), ...(phone && { phone }) }
+  },
   component: NewClientPage,
 })
 
 function NewClientPage() {
   const { business } = useViewer()
   const navigate = useNavigate()
+  const { name, phone } = Route.useSearch()
   const [dirty, setDirty] = useState(false)
   const guard = usePageGuard(dirty)
   const fields = useQuery(api.fields.list, {
@@ -31,6 +41,8 @@ function NewClientPage() {
           <ClientForm
             businessId={business._id}
             fields={fields}
+            initialName={name}
+            initialPhone={phone}
             onDirtyChange={setDirty}
             onSaved={(clientId) => {
               guard.release()

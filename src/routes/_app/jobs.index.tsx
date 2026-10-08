@@ -211,6 +211,14 @@ function JobsList({
   const counts = useLatest(data?.counts)
   const { words } = business
   const sort = sortFromSearch(search)
+  // Every tab empty: the business has no jobs yet, which says more than "nothing here".
+  const noJobsAtAll =
+    data !== undefined &&
+    data.counts.new +
+      data.counts.in_progress +
+      data.counts.done +
+      data.counts.cancelled ===
+      0
   const found = data && filterJobs(data.jobs, filter, today)
   const jobs =
     found &&
@@ -239,7 +247,7 @@ function JobsList({
               <TabsTrigger
                 key={key}
                 value={key}
-                className="h-full gap-1 rounded-full px-1 text-[0.8125rem]"
+                className="h-full gap-1 rounded-full px-1 text-[0.8125rem] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
               >
                 {GROUP_LABEL[key]()}
                 {counts && counts[key] > 0 && (
@@ -252,7 +260,7 @@ function JobsList({
             {table && (
               <TabsTrigger
                 value="all"
-                className="h-full gap-1 rounded-full px-3 text-[0.8125rem]"
+                className="h-full gap-1 rounded-full px-3 text-[0.8125rem] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
               >
                 {m.jobs_group_all()}
                 {counts && (
@@ -283,13 +291,21 @@ function JobsList({
       {!jobs ? (
         <ListSkeleton />
       ) : jobs.length === 0 ? (
-        <EmptyState
-          icon={ClipboardTextIcon}
-          title={group === 'all' ? m.jobs_group_all() : GROUP_LABEL[group]()}
-          body={
-            data.jobs.length > 0 ? m.jobs_filter_none() : m.jobs_group_empty()
-          }
-        />
+        noJobsAtAll ? (
+          <EmptyState
+            icon={ClipboardTextIcon}
+            title={m.jobs_empty_title()}
+            body={m.jobs_empty_body()}
+          />
+        ) : (
+          <EmptyState
+            icon={ClipboardTextIcon}
+            title={group === 'all' ? m.jobs_group_all() : GROUP_LABEL[group]()}
+            body={
+              data.jobs.length > 0 ? m.jobs_filter_none() : m.jobs_group_empty()
+            }
+          />
+        )
       ) : table ? (
         <JobsTable
           jobs={jobs}
