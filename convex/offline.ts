@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { addDays, isValidDate, sofiaTimeToUtc } from '../shared/dates'
 import { businessQuery } from './lib/auth'
 import { fail } from './lib/errors'
+import { isWorker, seesAppointment, seesJob, workerJobs } from './lib/scope'
 
 const MAX_JOBS = 300
 const MAX_CLIENTS = 2000
@@ -9,7 +10,8 @@ const MAX_CLIENTS = 2000
 /**
  * What must survive a basement with no signal (ADR 0010): today's and open
  * jobs with their details, and clients with their contacts. The browser keeps
- * the latest copy in IndexedDB and shows it read-only when offline.
+ * the latest copy in IndexedDB and shows it read-only when offline. A Worker
+ * keeps only their own jobs, appointments and clients (D89).
  */
 export const snapshot = businessQuery({
   args: { today: v.string() },
@@ -45,6 +47,10 @@ export const snapshot = businessQuery({
       )
       .take(MAX_JOBS)
 
+    const visibleJobs = [...jobs, ...unpaidDone].filter((job) =>
+      seesJob(ctx.member, job),
+    )
+
     const from = sofiaTimeToUtc(today, 0, 0)
     const to = sofiaTimeToUtc(addDays(today, 8), 0, 0)
     const appointments = (
@@ -55,13 +61,25 @@ export const snapshot = businessQuery({
         )
         .collect()
     ).filter((item) => item.cancelledAt === undefined)
+    const visibleAppointments = []
+    for (const item of appointments) {
+      const job = item.jobId ? await ctx.db.get('jobs', item.jobId) : null
+      if (seesAppointment(ctx.member, item, job)) visibleAppointments.push(item)
+    }
+    const workerClientIds = isWorker(ctx.member)
+      ? new Set<string>((await workerJobs(ctx)).map((job) => job.clientId))
+      : null
 
     const clients = (
       await ctx.db
         .query('clients')
         .withIndex('by_business_name', (q) => q.eq('businessId', business._id))
         .take(MAX_CLIENTS)
-    ).filter((client) => client.mergedIntoId === undefined)
+    ).filter(
+      (client) =>
+        client.mergedIntoId === undefined &&
+        (!workerClientIds || workerClientIds.has(client._id)),
+    )
     const clientName = new Map(
       clients.map((client) => [client._id as string, client.name]),
     )
@@ -70,7 +88,7 @@ export const snapshot = businessQuery({
       businessName: business.name,
       words: business.words,
       today,
-      jobs: [...jobs, ...unpaidDone].map((job) => {
+      jobs: visibleJobs.map((job) => {
         const stage = stageById.get(job.stageId)
         return {
           _id: job._id,
@@ -93,7 +111,7 @@ export const snapshot = businessQuery({
           balanceCents: job.balanceCents,
         }
       }),
-      appointments: appointments.map((item) => ({
+      appointments: visibleAppointments.map((item) => ({
         _id: item._id,
         jobId: item.jobId,
         start: item.start,

@@ -30,6 +30,7 @@ import {
   spendCredit,
 } from './lib/ledger'
 import type { PaymentFields } from './lib/ledger'
+import { isWorker, seesJob } from './lib/scope'
 import { calendarDate, cents, optionalText } from './lib/validate'
 import { vPaymentMethod } from './validators'
 
@@ -43,12 +44,7 @@ const paymentFields = {
 
 /** A worker may record a payment on a job assigned to them, and nothing else (Level 2). */
 function requireJobMoneyAccess(ctx: BusinessMutationCtx, job: Doc<'jobs'>) {
-  if (
-    ctx.member.role === 'worker' &&
-    !job.assigneeIds.includes(ctx.member._id)
-  ) {
-    fail('auth.forbidden')
-  }
+  if (!seesJob(ctx.member, job)) fail('auth.forbidden')
 }
 
 /** A payment's fields from the arguments, checked. */
@@ -297,7 +293,8 @@ async function loadEditState(ctx: QueryCtx, payment: Doc<'payments'>) {
 
 /**
  * One payment with how it was split across jobs, and the amounts an edit may
- * use. A worker may look only at a payment on a job assigned to them.
+ * use. A Worker may look only at a payment on a job assigned to them, and
+ * sees only the share that went to their jobs (D89).
  */
 export const get = businessQuery({
   args: { paymentId: v.id('payments') },
@@ -330,15 +327,31 @@ export const get = businessQuery({
   handler: async (ctx, args) => {
     const payment = await getOwned(ctx, 'payments', args.paymentId)
     const { state, jobs } = await loadEditState(ctx, payment)
-    if (
-      ctx.member.role === 'worker' &&
-      ![...jobs.values()].some((job) =>
-        job.assigneeIds.includes(ctx.member._id),
-      )
-    ) {
-      fail('auth.forbidden')
-    }
     const sign = Math.sign(payment.amountCents)
+    const allocations = state.jobs.map((job) => ({
+      jobId: job.jobId,
+      title: jobs.get(job.jobId)?.title ?? '',
+      amountCents: sign * job.allocatedCents,
+    }))
+    if (isWorker(ctx.member)) {
+      const own = allocations.filter((allocation) => {
+        const job = jobs.get(allocation.jobId)
+        return job !== undefined && seesJob(ctx.member, job)
+      })
+      if (own.length === 0) fail('auth.forbidden')
+      return {
+        _id: payment._id,
+        clientId: payment.clientId,
+        amountCents: own.reduce((sum, item) => sum + item.amountCents, 0),
+        date: payment.date,
+        method: payment.method,
+        label: payment.label,
+        note: payment.note,
+        allocations: own,
+        prepaidCents: 0,
+        range: { minCents: 0, maxCents: null, why: 'none' as const },
+      }
+    }
     return {
       _id: payment._id,
       clientId: payment.clientId,
@@ -347,11 +360,7 @@ export const get = businessQuery({
       method: payment.method,
       label: payment.label,
       note: payment.note,
-      allocations: state.jobs.map((job) => ({
-        jobId: job.jobId,
-        title: jobs.get(job.jobId)?.title ?? '',
-        amountCents: sign * job.allocatedCents,
-      })),
+      allocations,
       prepaidCents: paymentPrepaidCents(state),
       range: paymentAmountRange(state),
     }

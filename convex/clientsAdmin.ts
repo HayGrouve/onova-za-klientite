@@ -23,6 +23,8 @@ export const findByPhones = businessQuery({
     v.object({ _id: v.id('clients'), name: v.string(), phone: v.string() }),
   ),
   handler: async (ctx, { phones, exceptClientId }) => {
+    // Only a Manager saves a client, and this names other clients (D89).
+    requireRole(ctx.member, 'manager')
     const found = new Map<
       string,
       { _id: Id<'clients'>; name: string; phone: string }
