@@ -149,3 +149,12 @@ export type LoggedActivity = {
 /** A stored event, read as its type's details. */
 export const asLogged = (event: { type: ActivityType; data: object }) =>
   event as LoggedActivity
+
+/**
+ * Who made a change, for a history line. A person without a name is stored
+ * under their email address; the part before the "@" says enough.
+ */
+export function actorLabel(name: string): string {
+  const at = name.indexOf('@')
+  return at > 0 ? name.slice(0, at) : name
+}

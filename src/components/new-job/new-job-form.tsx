@@ -17,7 +17,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import type { FunctionArgs } from 'convex/server'
 import { cn } from 'cn'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -49,7 +49,7 @@ import { lower } from '#/i18n/words'
 import { runChange } from '#/lib/change'
 import { recordTiming } from '#/lib/timing'
 import { m } from '#/paraglide/messages.js'
-import { todayInSofia } from '../../../shared/dates'
+import { clockInSofia, todayInSofia } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 import { readDraft, saveArgs, startFixes } from '../../../shared/new-job-draft'
 import type { ClientChoice, DraftFixes } from '../../../shared/new-job-draft'
@@ -174,6 +174,10 @@ export function NewJobForm({
   const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
   const [fixing, setFixing] = useState<Fixable | null>(null)
+  // The title's box was opened by a failed save, not by a tap on "Fix".
+  const [titleOpenedByError, setTitleOpenedByError] = useState(false)
+  // A save is under way or done: a second Enter or tap must not make a second job.
+  const submitting = useRef(false)
   // Fixes made by hand. A fix holds until the line reads that field differently.
   const [fixes, setFixes] = useState<DraftFixes>(() => startFixes(start))
   const [depositMethod, setDepositMethod] = useState<PaymentMethod>('cash')
@@ -183,6 +187,8 @@ export function NewJobForm({
   const { words } = business
   const parsed = parseLine(text, {
     today,
+    // A bare time ("11:00") means the next time the clock reads it.
+    now: clockInSofia(Date.now()),
     clients,
     services,
     noClientName: m.no_client(),
@@ -215,6 +221,12 @@ export function NewJobForm({
   const toggleItem = (itemId: string) => setFixes(draft.fix.item(itemId))
   const setDate = (value: typeof chosenDate) => setFixes(draft.fix.date(value))
   const onText = (value: string) => setText(value)
+  // Once the line itself reads a title, the box a failed save opened has
+  // nothing left to say: the read-out shows it. A hand fix keeps its box.
+  if (fixing === 'title' && titleOpenedByError && parsed.title.trim()) {
+    setFixing(null)
+    setTitleOpenedByError(false)
+  }
   // Back where "+" was opened: the item or the client (the new job is in its
   // list), otherwise Today.
   const leave = () =>
@@ -265,6 +277,7 @@ export function NewJobForm({
   }, [failure])
 
   const submit = async (markDone = false) => {
+    if (submitting.current) return
     setTried(true)
     const args = saveArgs(draft, {
       flow: business.jobFlow,
@@ -275,13 +288,16 @@ export function NewJobForm({
     })
     if (!args) {
       // A missing title opens its input; a missing client shows its picker.
-      if (draft.missing.title) setFixing('title')
+      if (draft.missing.title) {
+        setFixing('title')
+        setTitleOpenedByError(true)
+      }
       setFailure({ id: Date.now(), client: draft.missing.client })
       return
     }
+    submitting.current = true
     setSaving(true)
     const ran = await runChange(async () => {
-      const jobTitle = args.title
       // The draft's ids came from the server's own lists, so they are its ids.
       const { jobId } = await save({
         businessId: business._id,
@@ -289,7 +305,7 @@ export function NewJobForm({
       })
       recordTiming('newJob', Date.now() - startedAt)
       // Today may not list a far-off job, so the toast names it and opens it.
-      toast.success(m.new_saved_job({ title: jobTitle }), {
+      toast.success(m.new_saved_job({ title: args.title }), {
         duration: 8000,
         action: {
           label: m.new_open(),
@@ -297,10 +313,22 @@ export function NewJobForm({
             void navigate({ to: '/jobs/$jobId', params: { jobId } }),
         },
       })
-      guard.release()
-      await leave()
     })
-    if (!ran.done) setSaving(false)
+    if (!ran.done) {
+      submitting.current = false
+      setSaving(false)
+      return
+    }
+    // The job is saved. Going back is a separate step: if it fails the job
+    // still exists, so the line is cleared and the form takes a new one.
+    try {
+      await guard.releaseWhile(leave)
+    } catch {
+      setText('')
+      setTried(false)
+      submitting.current = false
+      setSaving(false)
+    }
   }
 
   const sourceLabel =

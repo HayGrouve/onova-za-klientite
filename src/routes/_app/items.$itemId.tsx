@@ -37,6 +37,7 @@ import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../../shared/dates'
 import { asCandidate, searchClients } from '../../../shared/search'
 import { lastDoneAt } from '../../../shared/stages'
+import type { MorePart } from '../../../shared/more-summary'
 
 export const Route = createFileRoute('/_app/items/$itemId')({
   staticData: { layout: 'wide' },
@@ -60,17 +61,15 @@ function ItemPage() {
   // "When did I last do this one?": the latest job that reached Done.
   const lastDone = lastDoneAt(data.jobs)
   // The folded parts, by name, with how many each holds.
-  const counted = (title: string, count: number) =>
-    count > 0 ? `${title}: ${count}` : title
-  const moreSummary = [
+  const moreSummary: MorePart[] = [
     ...(business.modules.reminders
-      ? [counted(m.reminder_list(), data.reminders.length)]
+      ? [{ name: m.reminder_list(), count: data.reminders.length }]
       : []),
-    m.job_files(),
+    { name: m.job_files() },
     ...(data.timeline.length > 0
-      ? [counted(m.item_history(), data.timeline.length)]
+      ? [{ name: m.item_history(), count: data.timeline.length }]
       : []),
-    ...(client ? [m.item_move()] : []),
+    ...(client ? [{ name: m.item_move() }] : []),
   ]
 
   return (

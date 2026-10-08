@@ -39,9 +39,10 @@ export function useSheetGuard() {
 
 /**
  * Guards a page that holds a form: leaving it, or closing the tab, with
- * unsaved changes asks first. Call `release` just before navigating away
- * after a save. Render `prompt` on the page. `words` replaces the question's
- * default wording.
+ * unsaved changes asks first. After a save, navigate away inside
+ * `releaseWhile`, so the guard stands down only for that one navigation and
+ * is back on if it fails. Render `prompt` on the page. `words` replaces the
+ * question's default wording.
  */
 export function usePageGuard(
   dirty: boolean,
@@ -56,8 +57,13 @@ export function usePageGuard(
     enableBeforeUnload: dirty,
     withResolver: true,
   })
-  const release = useCallback(() => {
+  const releaseWhile = useCallback(async <T,>(action: () => Promise<T> | T) => {
     released.current = true
+    try {
+      return await action()
+    } finally {
+      released.current = false
+    }
   }, [])
   const prompt = (
     <DiscardSheet
@@ -67,5 +73,5 @@ export function usePageGuard(
       {...words}
     />
   )
-  return { release, prompt }
+  return { releaseWhile, prompt }
 }

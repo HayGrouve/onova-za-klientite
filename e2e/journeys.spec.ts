@@ -66,9 +66,9 @@ test('the job shows its money, and a payment moves the balance', async ({
 
   await page.getByRole('button', { name: 'Плащане', exact: true }).click()
   await page.getByLabel('Сума', { exact: true }).fill('200')
-  await page.getByRole('button', { name: 'Запиши плащането' }).click()
+  await page.getByRole('button', { name: 'Прегледай' }).click()
   // The review step shows what is recorded and asks once more.
-  await page.getByRole('button', { name: 'Запиши плащането' }).click()
+  await page.getByRole('button', { name: /^Запиши 200/ }).click()
 
   await expect(figure(page, 'Платено')).toContainText('500')
   await expect(figure(page, 'Остатък')).toContainText('450')

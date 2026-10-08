@@ -4,21 +4,13 @@ import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatActivityMoment } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
-import { asLogged } from '../../shared/activity'
+import { asLogged, actorLabel } from '../../shared/activity'
 import type { LoggedActivity } from '../../shared/activity'
+import { formatDateTime } from '../../shared/dates'
 import { formatMoney } from '../../shared/money'
 import type { Words } from '../../shared/words'
 
 type TimelineItem = FunctionReturnType<typeof api.jobs.get>['timeline'][number]
-
-const WHEN = new Intl.DateTimeFormat('bg-BG', {
-  day: 'numeric',
-  month: 'numeric',
-  year: '2-digit',
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: 'Europe/Sofia',
-})
 
 function describe(event: LoggedActivity, words: Words, today: string): string {
   const amountOf = (data: { amountCents?: number }) =>
@@ -140,8 +132,8 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
             {describe(asLogged(item), business.words, today)}
           </span>
           <span className="text-xs break-words text-muted-foreground">
-            {WHEN.format(item._creationTime)}
-            {item.actorName && ` · ${item.actorName}`}
+            {formatDateTime(item._creationTime)}
+            {item.actorName && ` · ${actorLabel(item.actorName)}`}
           </span>
         </li>
       ))}

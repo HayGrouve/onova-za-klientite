@@ -45,18 +45,19 @@ function NewItemPage() {
             fields={fields}
             onDirtyChange={setDirty}
             onSaved={(itemId) => {
-              guard.release()
-              void (jobId
-                ? navigate({
-                    to: '/jobs/$jobId',
-                    params: { jobId },
-                    replace: true,
-                  })
-                : navigate({
-                    to: '/items/$itemId',
-                    params: { itemId },
-                    replace: true,
-                  }))
+              void guard.releaseWhile(() =>
+                jobId
+                  ? navigate({
+                      to: '/jobs/$jobId',
+                      params: { jobId },
+                      replace: true,
+                    })
+                  : navigate({
+                      to: '/items/$itemId',
+                      params: { itemId },
+                      replace: true,
+                    }),
+              )
             }}
           />
         )}

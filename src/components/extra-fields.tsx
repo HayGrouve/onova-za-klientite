@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, moneyInputText, parseMoney } from '../../shared/money'
+import { parseDecimal } from '../../shared/quantity'
 
 type FieldDoc = Doc<'fields'>
 export type ExtraValues = Record<string, string | number | boolean>
@@ -81,10 +82,7 @@ export function ExtraFieldsView({
 
 /** The number a person typed, `undefined` for nothing, `null` for text that is not a number. */
 function parseNumber(text: string): number | undefined | null {
-  const clean = text.replace(/\s/g, '').replace(',', '.')
-  if (clean === '') return undefined
-  const number = Number(clean)
-  return Number.isFinite(number) ? number : null
+  return text.trim() === '' ? undefined : parseDecimal(text)
 }
 
 /**
@@ -107,19 +105,25 @@ function NumberInput({
   kind: 'number' | 'money'
   onValue: (value: number | undefined) => void
 }) {
-  const [text, setText] = useState(() =>
-    typeof value !== 'number'
+  const shown = (stored: unknown) =>
+    typeof stored !== 'number'
       ? ''
       : kind === 'money'
-        ? moneyInputText(value)
-        : String(value),
-  )
+        ? moneyInputText(stored)
+        : String(stored)
+  const [text, setText] = useState(() => shown(value))
   const parse = (input: string) =>
     kind === 'money'
       ? input.trim() === ''
         ? undefined
         : (parseMoney(input) ?? null)
       : parseNumber(input)
+  // The value can change from outside (a reset, a record swapped in). What was
+  // typed follows it, unless it already reads as that value, or is not a
+  // number yet (then the last good value is still the one stored).
+  const typed = parse(text)
+  const stored = typeof value === 'number' ? value : undefined
+  if (typed !== null && typed !== stored) setText(shown(value))
   const invalid = parse(text) === null
   const message =
     kind === 'money' ? m.field_money_invalid() : m.field_number_invalid()
