@@ -1,7 +1,13 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { QueryCtx } from '../_generated/server'
-import { vExtra, vStageColor, vStageGroup } from '../validators'
+import {
+  vActivityData,
+  vActivityType,
+  vExtra,
+  vStageColor,
+  vStageGroup,
+} from '../validators'
 import { listExtra, listFieldIds } from './listFields'
 import { isOpenGroup } from '../../shared/stages'
 
@@ -107,18 +113,10 @@ export async function jobRow(
 export const vActivityItem = v.object({
   _id: v.id('activity'),
   _creationTime: v.number(),
-  type: v.string(),
+  type: vActivityType,
   actorName: v.string(),
   jobId: v.optional(v.id('jobs')),
-  data: v.object({
-    from: v.optional(v.string()),
-    to: v.optional(v.string()),
-    amountCents: v.optional(v.number()),
-    note: v.optional(v.string()),
-    name: v.optional(v.string()),
-    fromId: v.optional(v.string()),
-    toId: v.optional(v.string()),
-  }),
+  data: vActivityData,
 })
 
 /** A record's timeline, newest first, with who did each change. */

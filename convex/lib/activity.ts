@@ -1,17 +1,18 @@
-import type { Infer } from 'convex/values'
+import type { ActivityType, WithDetails } from '../../shared/activity'
 import type { Id } from '../_generated/dataModel'
-import type { vActivityData, vActivityType } from '../validators'
 import type { BusinessMutationCtx } from './auth'
 
+/** An event of one type, with that type's details and the records it is about. */
 type ActivityEvent = {
-  type: Infer<typeof vActivityType>
-  jobId?: Id<'jobs'>
-  clientId?: Id<'clients'>
-  itemId?: Id<'items'>
-  paymentId?: Id<'payments'>
-  costId?: Id<'costs'>
-  data?: Infer<typeof vActivityData>
-}
+  [TType in ActivityType]: {
+    type: TType
+    jobId?: Id<'jobs'>
+    clientId?: Id<'clients'>
+    itemId?: Id<'items'>
+    paymentId?: Id<'payments'>
+    costId?: Id<'costs'>
+  } & WithDetails<TType>
+}[ActivityType]
 
 /** Records one change for the timelines. Every mutation calls this. */
 export async function logActivity(

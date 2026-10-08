@@ -4,6 +4,8 @@ import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatActivityMoment } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
+import { asLogged } from '../../shared/activity'
+import type { LoggedActivity } from '../../shared/activity'
 import { formatMoney } from '../../shared/money'
 import type { Words } from '../../shared/words'
 
@@ -18,53 +20,55 @@ const WHEN = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'Europe/Sofia',
 })
 
-function describe(item: TimelineItem, words: Words, today: string): string {
-  const { data } = item
-  const when = formatActivityMoment(data.to ?? '', today)
-  const amount = formatMoney(Math.abs(data.amountCents ?? 0))
-  const name = data.name ?? ''
-  switch (item.type) {
+function describe(event: LoggedActivity, words: Words, today: string): string {
+  const amountOf = (data: { amountCents?: number }) =>
+    formatMoney(Math.abs(data.amountCents ?? 0))
+  const fileName = (data: { name?: string }) => data.name || m.files_photo()
+  switch (event.type) {
     case 'job.created':
-      return m.event_job_created({ name })
+      return m.event_job_created({ name: event.data.name ?? '' })
     case 'job.edited':
       return m.event_job_edited()
     case 'job.stageChanged':
-      return m.event_job_stageChanged({ to: data.to ?? '' })
+      return m.event_job_stageChanged({ to: event.data.to ?? '' })
     case 'job.linesChanged':
       return m.event_job_linesChanged()
     case 'job.itemsChanged':
       return m.event_job_itemsChanged()
     case 'job.writtenOff':
-      return m.event_job_writtenOff({ amount })
+      return m.event_job_writtenOff({ amount: amountOf(event.data) })
     case 'job.writeOffRemoved':
-      return m.event_job_writeOffRemoved({ amount })
+      return m.event_job_writeOffRemoved({ amount: amountOf(event.data) })
     case 'job.cancelled':
-      return data.note
-        ? `${m.event_job_cancelled()}: ${data.note}`
+      return event.data.note
+        ? `${m.event_job_cancelled()}: ${event.data.note}`
         : m.event_job_cancelled()
     case 'payment.added':
-      return (data.amountCents ?? 0) < 0
-        ? m.event_payment_refund({ amount })
-        : m.event_payment_added({ amount }) +
-            (data.note ? ` (${data.note})` : '')
+      return (event.data.amountCents ?? 0) < 0
+        ? m.event_payment_refund({ amount: amountOf(event.data) })
+        : m.event_payment_added({ amount: amountOf(event.data) }) +
+            (event.data.note ? ` (${event.data.note})` : '')
     case 'payment.edited':
-      return m.event_payment_edited({ amount })
+      return m.event_payment_edited({ amount: amountOf(event.data) })
     case 'payment.removed':
-      return m.event_payment_removed({ amount })
+      return m.event_payment_removed({ amount: amountOf(event.data) })
     case 'credit.used':
-      return m.event_credit_used({ amount })
+      return m.event_credit_used({ amount: amountOf(event.data) })
     case 'cost.added':
-      return m.event_cost_added({ name, amount })
+      return m.event_cost_added({
+        name: event.data.name ?? '',
+        amount: amountOf(event.data),
+      })
     case 'cost.edited':
-      return m.event_cost_edited({ amount })
+      return m.event_cost_edited({ amount: amountOf(event.data) })
     case 'cost.removed':
-      return m.event_cost_removed({ name })
+      return m.event_cost_removed({ name: event.data.name ?? '' })
     case 'client.created':
-      return m.event_client_created({ name })
+      return m.event_client_created({ name: event.data.name ?? '' })
     case 'client.edited':
       return m.event_client_edited()
     case 'item.created':
-      return m.event_item_created({ name })
+      return m.event_item_created({ name: event.data.name ?? '' })
     case 'item.edited':
       return m.event_item_edited()
     case 'item.moved':
@@ -72,32 +76,36 @@ function describe(item: TimelineItem, words: Words, today: string): string {
     case 'appointment.added':
       return m.event_appointment_added({
         appointment: words.appointment.singular,
-        date: when,
+        date: formatActivityMoment(event.data.to ?? '', today),
       })
     case 'appointment.changed':
-      return m.event_appointment_changed({ date: when })
+      return m.event_appointment_changed({
+        date: formatActivityMoment(event.data.to ?? '', today),
+      })
     case 'appointment.cancelled':
       return m.event_appointment_cancelled()
     case 'reminder.added':
-      return m.event_reminder_added({ note: data.note ?? '' })
+      return m.event_reminder_added({ note: event.data.note ?? '' })
     case 'reminder.closed':
-      return m.event_reminder_closed({ note: data.note ?? '' })
+      return m.event_reminder_closed({ note: event.data.note ?? '' })
     case 'reminder.moved':
-      return m.event_reminder_moved({ note: data.note ?? '' })
+      return m.event_reminder_moved({ note: event.data.note ?? '' })
     case 'reminder.reopened':
-      return m.event_reminder_reopened({ note: data.note ?? '' })
+      return m.event_reminder_reopened({ note: event.data.note ?? '' })
     case 'job.repeatSet':
       return m.event_job_repeatSet()
     case 'job.repeatStopped':
       return m.event_job_repeatStopped()
     case 'job.repeated':
-      return m.event_job_repeated({ date: when })
+      return m.event_job_repeated({
+        date: formatActivityMoment(event.data.to ?? '', today),
+      })
     case 'file.added':
-      return m.event_file_added({ name: name || m.files_photo() })
+      return m.event_file_added({ name: fileName(event.data) })
     case 'file.removed':
-      return m.event_file_removed({ name: name || m.files_photo() })
+      return m.event_file_removed({ name: fileName(event.data) })
     case 'client.merged':
-      return m.event_client_merged({ name: data.from ?? '' })
+      return m.event_client_merged({ name: event.data.from ?? '' })
     case 'client.anonymized':
       return m.event_client_anonymized()
     // Settings changes belong to no job, client or item, so no timeline
@@ -129,7 +137,7 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
           className="relative flex flex-col gap-0.5 before:absolute before:top-1.5 before:-left-[22px] before:size-2.5 before:rounded-full before:bg-primary/70 before:ring-3 before:ring-card first:before:bg-primary"
         >
           <span className="text-sm break-words">
-            {describe(item, business.words, today)}
+            {describe(asLogged(item), business.words, today)}
           </span>
           <span className="text-xs break-words text-muted-foreground">
             {WHEN.format(item._creationTime)}
