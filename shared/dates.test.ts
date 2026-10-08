@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  formatDateTime,
   addDays,
   addMonths,
   dateInSofia,
@@ -461,5 +462,25 @@ describe('isValidMonth', () => {
     expect(isValidMonth('2026-00')).toBe(false)
     expect(isValidMonth('2026-1')).toBe(false)
     expect(isValidMonth('2026-10-01')).toBe(false)
+  })
+})
+
+describe('formatDateTime', () => {
+  it('reads a summer moment on the 24-hour clock, with its minutes', () => {
+    expect(formatDateTime(Date.UTC(2026, 9, 8, 0, 1))).toBe('8.10.2026, 03:01')
+    expect(formatDateTime(Date.UTC(2026, 9, 8, 12, 0))).toBe('8.10.2026, 15:00')
+  })
+
+  it('reads a winter moment, and crosses midnight into the next Sofia day', () => {
+    expect(formatDateTime(Date.UTC(2026, 0, 5, 22, 30))).toBe('6.1.2026, 00:30')
+    expect(formatDateTime(Date.UTC(2026, 0, 5, 12, 5))).toBe('5.1.2026, 14:05')
+  })
+
+  it('follows the clock change', () => {
+    // 2026-03-29 01:00 UTC is when summer time starts: 03:00 -> 04:00.
+    expect(formatDateTime(Date.UTC(2026, 2, 29, 0, 59))).toBe(
+      '29.3.2026, 02:59',
+    )
+    expect(formatDateTime(Date.UTC(2026, 2, 29, 1, 0))).toBe('29.3.2026, 04:00')
   })
 })
