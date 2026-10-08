@@ -20,12 +20,14 @@ function Harness() {
         onPointerDown={(event) => press(event, 'job-1')}
         data-testid="card"
       />
+      <div id="card2" onPointerDown={(event) => press(event, 'job-2')} />
       <div id="zone" data-drop="zone:a" />
       <div id="column" data-drop="column:done" />
       {drag && (
         <div
           id="float"
           ref={floatRef}
+          data-item={String(drag.item)}
           data-over={drag.over ?? ''}
           style={{ transform: `translate3d(${drag.left}px, ${drag.top}px, 0)` }}
         />
@@ -34,14 +36,14 @@ function Harness() {
   )
 }
 
-function pointer(type: string, init: { x: number; y: number }) {
+function pointer(type: string, init: { x: number; y: number }, pointerId = 1) {
   const event = new MouseEvent(type, {
     bubbles: true,
     button: 0,
     clientX: init.x,
     clientY: init.y,
   })
-  Object.assign(event, { pointerId: 1, pointerType: 'mouse' })
+  Object.assign(event, { pointerId, pointerType: 'mouse' })
   return event
 }
 
@@ -134,5 +136,52 @@ describe('useCardDrag', () => {
     })
     expect(onDrop).not.toHaveBeenCalled()
     expect(container.querySelector('#float')).toBeNull()
+  })
+
+  it('ignores a second press while a drag is in flight', () => {
+    const card = container.querySelector('#card') as HTMLElement
+    const other = container.querySelector('#card2') as HTMLElement
+    const html = document.documentElement
+    act(() => {
+      card.dispatchEvent(pointer('pointerdown', { x: 10, y: 10 }))
+      window.dispatchEvent(pointer('pointermove', { x: 30, y: 30 }))
+    })
+    expect(html.classList.contains('dragging-card')).toBe(true)
+
+    // A second finger presses another card and moves: it must not take over.
+    under = container.querySelector('#zone')
+    act(() => {
+      other.dispatchEvent(pointer('pointerdown', { x: 200, y: 200 }, 2))
+      window.dispatchEvent(pointer('pointermove', { x: 230, y: 230 }, 2))
+    })
+    const float = container.querySelector('#float') as HTMLElement
+    expect(float.dataset.item).toBe('job-1')
+    act(() => {
+      window.dispatchEvent(pointer('pointerup', { x: 230, y: 230 }, 2))
+    })
+    expect(onDrop).not.toHaveBeenCalled()
+    expect(container.querySelector('#float')).not.toBeNull()
+
+    // The first gesture still ends cleanly and takes its own drop.
+    act(() => {
+      window.dispatchEvent(pointer('pointermove', { x: 40, y: 40 }))
+      window.dispatchEvent(pointer('pointerup', { x: 40, y: 40 }))
+    })
+    expect(onDrop).toHaveBeenCalledTimes(1)
+    expect(onDrop).toHaveBeenCalledWith('job-1', 'zone:a')
+    expect(container.querySelector('#float')).toBeNull()
+    expect(html.classList.contains('dragging-card')).toBe(false)
+  })
+
+  it('ends a press its own pointer never released when it presses again', () => {
+    const card = container.querySelector('#card') as HTMLElement
+    const html = document.documentElement
+    act(() => {
+      card.dispatchEvent(pointer('pointerdown', { x: 10, y: 10 }))
+      window.dispatchEvent(pointer('pointermove', { x: 30, y: 30 }))
+      card.dispatchEvent(pointer('pointerdown', { x: 10, y: 10 }))
+    })
+    expect(container.querySelector('#float')).toBeNull()
+    expect(html.classList.contains('dragging-card')).toBe(false)
   })
 })

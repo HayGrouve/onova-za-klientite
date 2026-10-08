@@ -37,13 +37,19 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
   const dropRef = useRef(onDrop)
   dropRef.current = onDrop
   const dragged = useRef(false)
-  const cleanupRef = useRef<() => void>(undefined)
-  useEffect(() => () => cleanupRef.current?.(), [])
+  // The gesture in flight, if any: how to end it, and whose finger it is.
+  const cleanupRef = useRef<{ end: () => void; pointerId: number }>(undefined)
+  useEffect(() => () => cleanupRef.current?.end(), [])
 
   const press = useCallback(
     (event: ReactPointerEvent<HTMLElement>, item: T) => {
       if (event.button !== 0) return
       if ((event.target as HTMLElement).closest('[data-no-drag]')) return
+      const inFlight = cleanupRef.current
+      // A second finger doesn't take over a gesture in flight. The same
+      // pointer pressing again means the last release was missed.
+      if (inFlight && inFlight.pointerId !== event.pointerId) return
+      inFlight?.end()
       const rect = event.currentTarget.getBoundingClientRect()
       const { pointerId } = event
       const start = { x: event.clientX, y: event.clientY }
@@ -152,7 +158,7 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
       window.addEventListener('pointercancel', end)
       window.addEventListener('keydown', onKey)
       document.addEventListener('touchmove', onTouchMove, { passive: false })
-      cleanupRef.current = end
+      cleanupRef.current = { end, pointerId }
     },
     [],
   )
