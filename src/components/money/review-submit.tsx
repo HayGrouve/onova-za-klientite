@@ -53,9 +53,12 @@ export function ReviewSubmit({
   useEffect(() => {
     if (!review.reviewing) return
     back.current?.focus()
-    setArmed(false)
     const timer = window.setTimeout(() => setArmed(true), ARM_MS)
-    return () => window.clearTimeout(timer)
+    // Disarmed on the way out, so the next review starts disabled too.
+    return () => {
+      window.clearTimeout(timer)
+      setArmed(false)
+    }
   }, [review.reviewing])
 
   if (!review.reviewing) {

@@ -71,13 +71,15 @@ export function RepeatSection({
               label={m.repeat_stop()}
               question={m.repeat_stop_question()}
               busy={busy}
-              onConfirm={() =>
+              onConfirm={() => {
+                // Stopped, it shows the one "Repeat" line again, not the intervals.
+                setChoosing(false)
                 void run(
                   () =>
                     stopRepeat({ businessId: business._id, jobId: job._id }),
                   m.repeat_stopped(),
                 )
-              }
+              }}
             />
           </div>
         </PanelBody>
@@ -114,7 +116,6 @@ export function RepeatSection({
                 onClick={() => {
                   const date = nextJobDate(dated, choice)
                   if (!date) return toast.error(m.repeat_needs_date())
-                  setChoosing(false)
                   void run(
                     () =>
                       setRepeat({

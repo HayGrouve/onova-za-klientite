@@ -301,7 +301,8 @@ function MovePicker({
   const { busy, run } = useSubmit(onDone)
   const [query, setQuery] = useState('')
   const [toId, setToId] = useState<Id<'clients'> | null>(null)
-  const [asking, setAsking] = useState(false)
+  // The client the question is about: picking another one drops it.
+  const [askingFor, setAskingFor] = useState<Id<'clients'> | null>(null)
   if (!clients) return <ListSkeleton />
   const candidates = clients
     .filter((client) => !client.isNoClient && client._id !== from?._id)
@@ -350,7 +351,7 @@ function MovePicker({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      {asking && chosen ? (
+      {chosen && askingFor === chosen._id ? (
         <ConfirmQuestion
           tone="default"
           question={
@@ -376,10 +377,10 @@ function MovePicker({
               m.item_moved(),
             )
           }
-          onCancel={() => setAsking(false)}
+          onCancel={() => setAskingFor(null)}
         />
       ) : (
-        <Button size="xl" disabled={!chosen} onClick={() => setAsking(true)}>
+        <Button size="xl" disabled={!chosen} onClick={() => setAskingFor(toId)}>
           {m.item_move_confirm()}
         </Button>
       )}
