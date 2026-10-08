@@ -11,7 +11,7 @@ import {
 import { createClient } from './lib/clientWrite'
 import { fail } from './lib/errors'
 import { businessStages, createJob } from './lib/jobWrite'
-import { recomputeMoney } from './lib/recompute'
+import { payJob } from './lib/ledger'
 import { refreshRepeat } from './lib/repeat'
 import { calendarDate, cents, optionalText } from './lib/validate'
 import { vPaymentMethod } from './validators'
@@ -190,31 +190,11 @@ export const save = businessMutation({
     if (args.deposit) {
       const amountCents = cents(args.deposit.amountCents, 'deposit')
       if (amountCents === 0) fail('payment.zero')
-      const job = (await ctx.db.get('jobs', jobId))!
-      const paymentId = await ctx.db.insert('payments', {
-        businessId: ctx.business._id,
-        clientId,
+      const paymentId = await payJob(ctx, jobId, {
         amountCents,
         date: calendarDate(args.deposit.date, 'depositDate'),
         method: args.deposit.method,
         label: optionalText(args.deposit.label, 'label', 100),
-        allocatedCents: 0,
-        createdBy: ctx.member._id,
-      })
-      const toJob = Math.min(amountCents, Math.max(job.balanceCents, 0))
-      if (toJob > 0) {
-        await ctx.db.insert('allocations', {
-          businessId: ctx.business._id,
-          paymentId,
-          jobId,
-          clientId,
-          amountCents: toJob,
-        })
-      }
-      await recomputeMoney(ctx, {
-        paymentIds: [paymentId],
-        jobIds: [jobId],
-        clientIds: [clientId],
       })
       await logActivity(ctx, {
         type: 'payment.added',

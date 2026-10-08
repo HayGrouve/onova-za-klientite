@@ -5,7 +5,7 @@ import { nextRepeatDate, pickJobDate } from '../../shared/repeat'
 import { defaultStage } from '../../shared/stages'
 import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
-import { recomputeJob } from './recompute'
+import { insertJob } from './ledger'
 
 /** The job's date for repeating (Q6, D41): see `pickJobDate`. */
 export async function jobDate(ctx: MutationCtx, job: Doc<'jobs'>) {
@@ -69,7 +69,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
 
   const date = nextRepeatDate(when.date, job.repeat)
   const now = Date.now()
-  const nextId = await ctx.db.insert('jobs', {
+  const nextId = await insertJob(ctx, {
     businessId: business._id,
     clientId: job.clientId,
     title: job.title,
@@ -88,11 +88,6 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     nextRepeatOn: date,
     seriesId: job.seriesId ?? job._id,
     extra: job.extra,
-    priceCents: 0,
-    paidCents: 0,
-    costCents: 0,
-    balanceCents: 0,
-    owes: false,
     searchText: job.searchText,
     createdBy: job.createdBy,
   })
@@ -123,7 +118,6 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
       assigneeIds: source.assigneeIds,
     })
   }
-  await recomputeJob(ctx, nextId)
   await ctx.db.patch('jobs', job._id, {
     repeat: { ...job.repeat, nextJobId: nextId },
     nextRepeatOn: undefined,

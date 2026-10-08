@@ -2,7 +2,7 @@ import { enterGroup } from '../../shared/stages'
 import type { Doc } from '../_generated/dataModel'
 import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
-import { recomputeJob } from './recompute'
+import { patchJob } from './ledger'
 import { optionalText } from './validate'
 
 /** Shared by stage changes, cancelling and deleting a stage with "move jobs to". */
@@ -14,7 +14,7 @@ export async function moveJobToStage(
 ) {
   const from = await ctx.db.get('stages', job.stageId)
   const now = Date.now()
-  await ctx.db.patch('jobs', job._id, {
+  await patchJob(ctx, job._id, {
     ...enterGroup(
       job,
       stage.group,
@@ -24,7 +24,6 @@ export async function moveJobToStage(
     stageId: stage._id,
     stageChangedAt: now,
   })
-  await recomputeJob(ctx, job._id)
   await logActivity(ctx, {
     type: stage.group === 'cancelled' ? 'job.cancelled' : 'job.stageChanged',
     jobId: job._id,

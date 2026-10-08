@@ -199,20 +199,9 @@ describe('isJobLate', () => {
 describe('enterGroup', () => {
   const job = {
     stageGroup: 'in_progress' as StageGroup,
-    balanceCents: 5000,
     doneAt: undefined as number | undefined,
     cancelReason: undefined as string | undefined,
   }
-
-  it('owes its balance outside Cancelled, and never in Cancelled', () => {
-    expect(enterGroup(job, 'done', 1).owes).toBe(true)
-    expect(enterGroup(job, 'new', 1).owes).toBe(true)
-    expect(enterGroup(job, 'cancelled', 1).owes).toBe(false)
-    expect(
-      enterGroup({ ...job, stageGroup: 'cancelled' }, 'done', 1).owes,
-    ).toBe(true)
-    expect(enterGroup({ ...job, balanceCents: 0 }, 'done', 1).owes).toBe(false)
-  })
 
   it('records when Done was reached, and keeps it on a move within Done', () => {
     expect(enterGroup(job, 'done', 7).doneAt).toBe(7)
@@ -233,20 +222,15 @@ describe('enterGroup', () => {
     expect(enterGroup(cancelled, 'new', 1).cancelReason).toBeUndefined()
   })
 
-  it('always lands in the group it was given', () => {
+  it('always lands in the group it was given, with doneAt only in Done', () => {
     fc.assert(
       fc.property(
         fc.constantFrom(...STAGE_GROUPS),
         fc.constantFrom(...STAGE_GROUPS),
-        fc.integer({ min: -10000, max: 10000 }),
-        (from, to, balanceCents) => {
-          const entered = enterGroup(
-            { ...job, stageGroup: from, balanceCents },
-            to,
-            1,
-          )
+        (from, to) => {
+          const entered = enterGroup({ ...job, stageGroup: from }, to, 1)
           expect(entered.stageGroup).toBe(to)
-          expect(entered.owes).toBe(balanceCents > 0 && to !== 'cancelled')
+          expect(entered.doneAt !== undefined).toBe(to === 'done')
         },
       ),
     )

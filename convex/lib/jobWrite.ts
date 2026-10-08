@@ -9,7 +9,7 @@ import { getOwned } from './auth'
 import type { BusinessMutationCtx } from './auth'
 import { fail } from './errors'
 import { mergeExtra } from './extra'
-import { recomputeJob } from './recompute'
+import { insertJob } from './ledger'
 import { jobSearchText } from './search'
 import { cents, optionalDate, optionalText, requiredText } from './validate'
 
@@ -161,20 +161,14 @@ export async function createJob(ctx: BusinessMutationCtx, args: CreateJobArgs) {
     assigneeIds: [],
     source: args.source ?? 'manual',
     extra,
-    priceCents: 0,
-    paidCents: 0,
-    costCents: 0,
-    balanceCents: 0,
-    owes: false,
     searchText: '',
     createdBy: ctx.member._id,
   }
-  const jobId = await ctx.db.insert('jobs', {
+  const jobId = await insertJob(ctx, {
     ...job,
     searchText: await jobSearchText(ctx, job),
   })
   await syncJobItems(ctx, jobId, itemIds)
-  await recomputeJob(ctx, jobId)
   await logActivity(ctx, {
     type: 'job.created',
     jobId,

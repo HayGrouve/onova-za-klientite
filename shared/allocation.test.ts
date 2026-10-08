@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   checkAllocations,
   jobBalanceCents,
+  creditForJob,
   jobOwedCents,
   jobOwes,
   jobPriceCents,
@@ -62,6 +63,14 @@ describe('jobBalanceCents and jobOwes', () => {
     expect(jobOwedCents({ owes: true, balanceCents: 4200 })).toBe(4200)
     expect(jobOwedCents({ owes: false, balanceCents: 4200 })).toBe(0)
     expect(jobOwedCents({ owes: false, balanceCents: -300 })).toBe(0)
+  })
+
+  it('puts on a job no more credit than there is, or than it owes', () => {
+    const job = { owes: true, balanceCents: 5000 }
+    expect(creditForJob(2000, job)).toBe(2000)
+    expect(creditForJob(9000, job)).toBe(5000)
+    expect(creditForJob(9000, { ...job, owes: false })).toBe(0)
+    expect(creditForJob(-100, job)).toBe(0)
   })
 
   it('keeps price = paid + balance + write-off', () => {

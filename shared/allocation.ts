@@ -48,6 +48,14 @@ export function jobOwedCents(job: {
   return job.owes ? job.balanceCents : 0
 }
 
+/** What the client's credit can put on a job: no more than either holds. */
+export function creditForJob(
+  creditCents: number,
+  job: { owes: boolean; balanceCents: number },
+): number {
+  return Math.max(Math.min(creditCents, jobOwedCents(job)), 0)
+}
+
 /** Fills the open jobs in the given order (oldest first). The rest is credit. */
 export function splitPayment<TId extends string>(
   amountCents: number,

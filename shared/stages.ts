@@ -1,4 +1,3 @@
-import { jobOwes } from './allocation'
 import { isOverdue } from './dates'
 
 /** The four fixed buckets every stage belongs to. Lists and money read these, never stage names. */
@@ -20,25 +19,20 @@ export function isJobLate(
 }
 
 /**
- * What changes on a job when it enters a stage of `group`: whether it owes,
- * when it reached Done (kept on a move within Done), and its cancel reason
- * (kept only in Cancelled, a new one winning). The one rule for a stage
- * change, a cancel, a regrouped stage and the board's instant move.
+ * What changes on a job when it enters a stage of `group`: when it reached
+ * Done (kept on a move within Done) and its cancel reason (kept only in
+ * Cancelled, a new one winning). Whether it owes follows from the group too:
+ * see `jobOwes`. The one rule for a stage change, a cancel, a regrouped stage
+ * and the board's instant move.
  */
 export function enterGroup(
-  job: {
-    stageGroup: StageGroup
-    balanceCents: number
-    doneAt?: number
-    cancelReason?: string
-  },
+  job: { stageGroup: StageGroup; doneAt?: number; cancelReason?: string },
   group: StageGroup,
   now: number,
   cancelReason?: string,
 ) {
   return {
     stageGroup: group,
-    owes: jobOwes(job.balanceCents, group),
     doneAt:
       group === 'done'
         ? job.stageGroup === 'done'

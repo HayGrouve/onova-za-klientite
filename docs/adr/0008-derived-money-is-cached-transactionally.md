@@ -16,4 +16,5 @@ The design doc says price, balance, client credit and profit are calculated, nev
 ## Consequences
 
 - Any new mutation that touches lines, payments, allocations or costs must call the recompute function. The cache check in tests catches a missed call.
+- Amended (8 Oct 2026): mutations no longer call recompute themselves. Every write to payments, allocations, costs and the job fields money is computed from goes through `convex/lib/ledger.ts` (`insertJob`, `patchJob`, `recordPayment`, `payJob`, `spendCredit`, `rewritePayment`, `removePayment`, the cost writers and `moveClientMoney`). Each of these refreshes what it touched. An ESLint rule rejects raw writes to those tables, and imports of `recompute`, anywhere else in `convex/`.
 - A one-off internal function can rebuild every cache if a bug ever corrupts one.

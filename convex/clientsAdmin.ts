@@ -10,7 +10,7 @@ import {
 } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
 import { fail } from './lib/errors'
-import { recomputeClient } from './lib/recompute'
+import { moveClientMoney } from './lib/ledger'
 import { clientSearchText, jobSearchText } from './lib/search'
 
 /** Clients that already have one of these phones: the duplicate warning. */
@@ -98,9 +98,8 @@ export const merge = businessMutation({
 
     const jobs = await byClient('jobs')
     await moveRows(ctx, 'jobs', jobs, intoId)
+    await moveClientMoney(ctx, fromId, intoId)
     for (const table of [
-      'payments',
-      'allocations',
       'items',
       'reminders',
       'appointments',
@@ -139,8 +138,6 @@ export const merge = businessMutation({
         searchText: await jobSearchText(ctx, moved),
       })
     }
-    await recomputeClient(ctx, fromId)
-    await recomputeClient(ctx, intoId)
     await logActivity(ctx, {
       type: 'client.merged',
       clientId: intoId,

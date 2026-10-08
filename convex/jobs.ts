@@ -21,7 +21,8 @@ import {
   setJobItems,
   vCreateJobArgs,
 } from './lib/jobWrite'
-import { recomputeJob } from './lib/recompute'
+import { patchJob } from './lib/ledger'
+import type { JobPatch } from './lib/ledger'
 import { jobDate, refreshRepeat } from './lib/repeat'
 import { jobSearchText } from './lib/search'
 import { cents, optionalDate, optionalText, requiredText } from './lib/validate'
@@ -53,7 +54,7 @@ export const update = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    const patch: Partial<Doc<'jobs'>> = {}
+    const patch: JobPatch = {}
     if (args.title !== undefined)
       patch.title = requiredText(args.title, 'title')
     if (args.typedPriceCents !== undefined) {
@@ -85,8 +86,7 @@ export const update = businessMutation({
     }
     const next = { ...job, ...patch }
     patch.searchText = await jobSearchText(ctx, next)
-    await ctx.db.patch('jobs', job._id, patch)
-    await recomputeJob(ctx, job._id)
+    await patchJob(ctx, job._id, patch)
     // A repeating job without appointments takes its date from the due date.
     if (args.dueDate !== undefined) await refreshRepeat(ctx, job._id)
     await logActivity(ctx, {
@@ -149,8 +149,7 @@ export const setLines = businessMutation({
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
     const lines = await checkLines(ctx, args.lines)
-    await ctx.db.patch('jobs', job._id, { lines })
-    await recomputeJob(ctx, job._id)
+    await patchJob(ctx, job._id, { lines })
     await logActivity(ctx, {
       type: 'job.linesChanged',
       jobId: job._id,
@@ -183,10 +182,9 @@ export const writeOff = businessMutation({
     const already = job.writeOff?.amountCents ?? 0
     const amountCents = already + job.balanceCents
     if (job.balanceCents <= 0) fail('payment.zero')
-    await ctx.db.patch('jobs', job._id, {
+    await patchJob(ctx, job._id, {
       writeOff: { amountCents, note, at: Date.now(), by: ctx.member._id },
     })
-    await recomputeJob(ctx, job._id)
     await logActivity(ctx, {
       type: 'job.writtenOff',
       jobId: job._id,
@@ -204,8 +202,7 @@ export const removeWriteOff = businessMutation({
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
     if (!job.writeOff) return null
-    await ctx.db.patch('jobs', job._id, { writeOff: undefined })
-    await recomputeJob(ctx, job._id)
+    await patchJob(ctx, job._id, { writeOff: undefined })
     await logActivity(ctx, {
       type: 'job.writeOffRemoved',
       jobId: job._id,

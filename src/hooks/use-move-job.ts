@@ -4,7 +4,7 @@ import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { useViewer } from '#/hooks/use-viewer'
 import { errorMessage } from '#/lib/errors'
-import { jobOwedCents } from '../../shared/allocation'
+import { jobOwedCents, jobOwes } from '../../shared/allocation'
 import { boardColumn } from '../../shared/board'
 import { offersRuleReminder } from '../../shared/reminder-rule'
 import { enterGroup } from '../../shared/stages'
@@ -32,14 +32,13 @@ export function useMoveJob() {
       if (!board || !stage || !moving) return
       // The same rule the server applies: Cancelled never owes, Done
       // records when it was reached.
-      const { owes, doneAt } = enterGroup(moving, stage.group, Date.now())
       const moved = {
         ...moving,
         stageId: stage._id,
         stageName: stage.name,
         stageGroup: stage.group,
-        owes,
-        doneAt,
+        owes: jobOwes(moving.balanceCents, stage.group),
+        doneAt: enterGroup(moving, stage.group, Date.now()).doneAt,
       }
       store.setQuery(
         api.jobs.board,

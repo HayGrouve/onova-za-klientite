@@ -16,7 +16,7 @@ How to run, test and verify this repo. The product rules are in `docs/product-de
 | Folder | Holds | Rule |
 | --- | --- | --- |
 | `shared/` | Pure TS: money, allocation, stages, fields, words, search, phones, dates, setup, the one-line parser | No Convex or browser imports. Tests first |
-| `convex/` | Schema and functions. `convex/lib/` holds the auth wrappers, `getOwned`, the activity log and recompute | Every public function uses a business wrapper (ADR 0006) |
+| `convex/` | Schema and functions. `convex/lib/` holds the auth wrappers, `getOwned`, the activity log and the ledger (every money write, ADR 0008) | Every public function uses a business wrapper (ADR 0006) |
 | `src/routes/` | TanStack file routes. `_app.tsx` is the signed-in shell | `src/routeTree.gen.ts` is generated: commit it, never edit it |
 | `src/components/ui/` | shadcn components | Add with `npx shadcn@latest add`, never by hand |
 | `messages/` | `bg.json`, every UI string (Paraglide) | No Cyrillic anywhere in `src/`, comments included (ADR 0009). `src/paraglide/` is generated and ignored |
