@@ -1,6 +1,7 @@
 import { jobOwedCents } from './allocation'
 import { monthOf } from './dates'
 import { foldName, nameMatches } from './search'
+import { textParam } from './sort'
 import { isOpenGroup } from './stages'
 import type { StageGroup } from './stages'
 
@@ -77,6 +78,37 @@ export type JobFilter = {
   owing?: boolean
   /** Only jobs whose due date falls in the current Sofia calendar month. */
   dueThisMonth?: boolean
+}
+
+/** The filter as the jobs list's address holds it, so Back returns to it. */
+export type JobFilterSearch = { q?: string; owing?: true; due?: 'month' }
+
+/** The filter's part of an address, with anything it doesn't know left out. */
+export function parseFilterSearch(
+  search: Record<string, unknown>,
+): JobFilterSearch {
+  const q = textParam(search.q)
+  return {
+    ...(q !== undefined && { q }),
+    ...(search.owing === true && { owing: true as const }),
+    ...(search.due === 'month' && { due: 'month' as const }),
+  }
+}
+
+export function filterFromSearch(search: JobFilterSearch): JobFilter {
+  return {
+    text: search.q,
+    owing: search.owing,
+    dueThisMonth: search.due === 'month',
+  }
+}
+
+export function filterToSearch(filter: JobFilter): JobFilterSearch {
+  return {
+    ...(hasText(filter.text) && { q: filter.text }),
+    ...(filter.owing && { owing: true as const }),
+    ...(filter.dueThisMonth && { due: 'month' as const }),
+  }
 }
 
 const hasText = (text: string | undefined): text is string =>

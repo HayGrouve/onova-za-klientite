@@ -227,6 +227,17 @@ export function digitsOf(text: string): string {
 
 export type ClientCandidate = { id: string; name: string; phones: string[] }
 
+/** A row of the clients list (its first phone only) as search reads it. */
+export function asCandidate<
+  T extends { _id: string; name: string; phone?: string },
+>(client: T): T & ClientCandidate {
+  return {
+    ...client,
+    id: client._id,
+    phones: client.phone ? [client.phone] : [],
+  }
+}
+
 /** Clients whose name matches, or whose phone holds the typed digits (3 or more). */
 export function searchClients<T extends ClientCandidate>(
   clients: T[],

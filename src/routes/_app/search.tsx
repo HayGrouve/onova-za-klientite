@@ -23,16 +23,13 @@ import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 import { formatPhone } from '../../../shared/phone-format'
+import { textParam } from '../../../shared/sort'
 
 export const Route = createFileRoute('/_app/search')({
   // The words live in the address, so Back from a result returns to them.
   validateSearch: (search: Record<string, unknown>): { q?: string } => {
-    // The address parser reads "12" as a number.
-    const q =
-      typeof search.q === 'string' || typeof search.q === 'number'
-        ? String(search.q)
-        : ''
-    return q.trim() ? { q } : {}
+    const q = textParam(search.q)
+    return q !== undefined ? { q } : {}
   },
   staticData: { layout: 'wide' },
   component: SearchPage,

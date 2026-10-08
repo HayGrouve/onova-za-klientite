@@ -36,8 +36,8 @@ type Step =
 
 // Setup step 8 lands here too.
 function ImportPage() {
-  const { business, businesses } = useViewer()
-  const role = businesses.find((item) => item._id === business._id)?.role
+  const { business } = useViewer()
+  const { role } = business
   const fields = useQuery(api.fields.list, {
     businessId: business._id,
     target: 'client',

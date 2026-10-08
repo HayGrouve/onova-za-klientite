@@ -21,7 +21,7 @@ import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
 import { m } from '#/paraglide/messages.js'
-import { searchClients } from '../../shared/search'
+import { asCandidate, searchClients } from '../../shared/search'
 
 /** Merge a duplicate into another client, or anonymize on request (GDPR). */
 export function ClientAdmin({
@@ -110,11 +110,7 @@ function MergePicker({
   if (!clients) return <ListSkeleton />
   const candidates = clients
     .filter((item) => !item.isNoClient && item._id !== client._id)
-    .map((item) => ({
-      ...item,
-      id: item._id,
-      phones: item.phone ? [item.phone] : [],
-    }))
+    .map(asCandidate)
   const shown = query.trim()
     ? searchClients(candidates, query, 20)
     : candidates.slice(0, 20)

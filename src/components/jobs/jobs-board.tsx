@@ -37,10 +37,16 @@ import { GROUP_LABEL } from '#/i18n/groups'
 import { m } from '#/paraglide/messages.js'
 import { jobOwedCents } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
-import { filterJobs, isFiltering, owedCents } from '../../../shared/board'
+import {
+  filterJobs,
+  filterToSearch,
+  isFiltering,
+  owedCents,
+} from '../../../shared/board'
 import type { JobFilter } from '../../../shared/board'
 import { STAGE_GROUPS, isJobLate } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
+import { hasRole } from '../../../shared/roles'
 
 type Board = FunctionReturnType<typeof api.jobs.board>
 type Card = Board['columns'][number]['jobs'][number]
@@ -69,10 +75,9 @@ export function JobsBoard({
   filter: JobFilter
   today: string
 }) {
-  const { business, businesses } = useViewer()
-  const role = businesses.find((item) => item._id === business._id)?.role
+  const { business } = useViewer()
   // Level 2: a Worker cannot change stages, so their cards don't move.
-  const canMove = role === 'owner' || role === 'manager'
+  const canMove = hasRole(business.role, 'manager')
   const board = useQuery(api.jobs.board, { businessId: business._id })
   const { move, announce } = useMoveJob()
   const [ruleFor, setRuleFor] = useState<Card | null>(null)
@@ -455,9 +460,7 @@ function Column({
             search={{
               view: 'table',
               group,
-              ...(filter.text?.trim() && { q: filter.text }),
-              ...(filter.owing && { owing: true as const }),
-              ...(filter.dueThisMonth && { due: 'month' as const }),
+              ...filterToSearch(filter),
             }}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >

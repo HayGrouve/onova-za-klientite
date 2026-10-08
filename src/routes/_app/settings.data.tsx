@@ -29,9 +29,8 @@ export const Route = createFileRoute('/_app/settings/data')({
 })
 
 function DataSettings() {
-  const { business, businesses } = useViewer()
-  const owner =
-    businesses.find((item) => item._id === business._id)?.role === 'owner'
+  const { business } = useViewer()
+  const owner = business.role === 'owner'
   return (
     <SettingsPage title={m.settings_data()}>
       <ListCard>

@@ -94,6 +94,8 @@ const vViewer = v.union(
         ),
         reminderRule: v.optional(v.object({ months: v.number() })),
         setupDone: v.boolean(),
+        /** The viewer's Role in this business. */
+        role: vRole,
       }),
     ),
   }),
@@ -118,9 +120,10 @@ export const viewer = query({
     }
     loaded.sort((a, b) => a.business.name.localeCompare(b.business.name, 'bg'))
 
-    const active =
-      loaded.find(({ business }) => business._id === user.activeBusinessId)
-        ?.business ?? loaded.at(0)?.business
+    const activeEntry =
+      loaded.find(({ business }) => business._id === user.activeBusinessId) ??
+      loaded.at(0)
+    const active = activeEntry?.business
 
     return {
       user: { name: user.name, email: user.email, imageUrl: user.imageUrl },
@@ -140,6 +143,7 @@ export const viewer = query({
             repeatDefault: active.repeatDefault,
             reminderRule: active.reminderRule,
             setupDone: active.setup.completedAt !== undefined,
+            role: activeEntry.role,
           }
         : null,
     }

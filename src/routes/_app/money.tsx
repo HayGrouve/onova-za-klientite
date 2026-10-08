@@ -42,15 +42,14 @@ import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
-import { addMonths, monthOf } from '../../../shared/dates'
+import { addMonths, isValidMonth, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 import { telHref } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/money')({
   // The month is in the address, so Back returns to the month that was open.
   validateSearch: (search: Record<string, unknown>): { month?: string } =>
-    typeof search.month === 'string' &&
-    /^\d{4}-(0[1-9]|1[0-2])$/.test(search.month)
+    typeof search.month === 'string' && isValidMonth(search.month)
       ? { month: search.month }
       : {},
   staticData: { layout: 'wide' },

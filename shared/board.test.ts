@@ -1,6 +1,14 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { boardColumn, filterJobs, isFiltering, owedCents } from './board'
+import {
+  boardColumn,
+  filterFromSearch,
+  filterJobs,
+  filterToSearch,
+  isFiltering,
+  owedCents,
+  parseFilterSearch,
+} from './board'
 import type { BoardJob, FilterableJob } from './board'
 
 const job = (
@@ -246,5 +254,28 @@ describe('owedCents', () => {
     expect(owedCents(cards)).toBe(6000)
     expect(owedCents(cards.slice(1))).toBe(300)
     expect(owedCents([])).toBe(0)
+  })
+})
+
+describe('the filter in the address', () => {
+  it('reads only what it knows, and words even when they look like a number', () => {
+    expect(
+      parseFilterSearch({ q: 12, owing: true, due: 'month', view: 'table' }),
+    ).toEqual({ q: '12', owing: true, due: 'month' })
+    expect(parseFilterSearch({ q: '  ', owing: 'yes', due: 'week' })).toEqual(
+      {},
+    )
+  })
+
+  it('goes to the address and back unchanged', () => {
+    for (const filter of [
+      {},
+      { text: 'гардероб', owing: true, dueThisMonth: true },
+      { owing: true },
+    ]) {
+      const search = filterToSearch(filter)
+      expect(parseFilterSearch(search)).toEqual(search)
+      expect(isFiltering(filterFromSearch(search))).toBe(isFiltering(filter))
+    }
   })
 })

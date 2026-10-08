@@ -74,6 +74,11 @@ export function daysBetween(from: string, to: string): number {
   return toDayNumber(to) - toDayNumber(from)
 }
 
+/** A calendar month as "YYYY-MM". */
+export function isValidMonth(month: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(month)
+}
+
 export function monthOf(date: string): string {
   return date.slice(0, 7)
 }

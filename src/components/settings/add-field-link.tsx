@@ -8,11 +8,10 @@ type Target = 'client' | 'job' | 'item'
 
 /** A small "+ field" link under a form's extra fields: adds a field right where it is needed. */
 export function AddFieldLink({ target }: { target: Target }) {
-  const { business, businesses } = useViewer()
+  const { business } = useViewer()
   const [open, setOpen] = useState(false)
   // Fields are business settings: only the owner adds them.
-  if (businesses.find((item) => item._id === business._id)?.role !== 'owner')
-    return null
+  if (business.role !== 'owner') return null
   return (
     <>
       <Button

@@ -1,3 +1,4 @@
+import { hasRole } from '../../shared/roles'
 import { v } from 'convex/values'
 import {
   customCtx,
@@ -89,11 +90,9 @@ export const businessMutation = customMutation(mutation, {
   }),
 })
 
-const ROLE_RANK: Record<Role, number> = { worker: 0, manager: 1, owner: 2 }
-
 /** Throws unless the member's role is at least `role`. */
 export function requireRole(member: Doc<'memberships'>, role: Role) {
-  if (ROLE_RANK[member.role] < ROLE_RANK[role]) fail('auth.forbidden')
+  if (!hasRole(member.role, role)) fail('auth.forbidden')
 }
 
 type BusinessScoped = TableNames extends infer T

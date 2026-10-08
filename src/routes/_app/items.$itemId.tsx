@@ -34,7 +34,7 @@ import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../../shared/dates'
-import { searchClients } from '../../../shared/search'
+import { asCandidate, searchClients } from '../../../shared/search'
 import { lastDoneAt } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/items/$itemId')({
@@ -245,11 +245,7 @@ function MovePicker({
   if (!clients) return <ListSkeleton />
   const candidates = clients
     .filter((client) => !client.isNoClient && client._id !== currentClientId)
-    .map((client) => ({
-      ...client,
-      id: client._id,
-      phones: client.phone ? [client.phone] : [],
-    }))
+    .map(asCandidate)
   const shown = query.trim()
     ? searchClients(candidates, query, 20)
     : candidates.slice(0, 20)

@@ -48,8 +48,8 @@ function SettingsLayout() {
 }
 
 function SettingsMenu() {
-  const { business, businesses } = useViewer()
-  const role = businesses.find((item) => item._id === business._id)?.role
+  const { business } = useViewer()
+  const { role } = business
   const { add, busy } = useAddBusiness()
   const item =
     'flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-foreground/80 transition-colors outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50'

@@ -51,8 +51,8 @@ function IconTile({ icon: IconComponent }: { icon: Icon }) {
 }
 
 function SettingsIndex() {
-  const { business, businesses } = useViewer()
-  const role = businesses.find((item) => item._id === business._id)?.role
+  const { business } = useViewer()
+  const { role } = business
   const wide = useWide()
   const navigate = useNavigate()
   // A wide screen has the sections in the side menu, so it opens the first.
