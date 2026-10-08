@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
 import {
   STRANGER,
+  addMember,
   expectCachesFresh,
   setupBusiness,
   setupConvex,
 } from './test.setup'
-import type { TestBusiness, TestConvex } from './test.setup'
+import type { TestConvex } from './test.setup'
 
 const row = (name: string, phones: string[] = [], extra = {}) => ({
   name,
@@ -22,36 +23,6 @@ async function clientCount(t: TestConvex) {
         (client) => !client.isNoClient,
       ).length,
   )
-}
-
-/** A second member of the owner's business, with the given role. */
-async function addMember(
-  t: TestConvex,
-  b: TestBusiness,
-  role: 'manager' | 'worker',
-) {
-  const identity = {
-    ...STRANGER,
-    subject: `user_${role}`,
-    tokenIdentifier: `https://clerk.test|user_${role}`,
-  }
-  const member = t.withIdentity(identity)
-  await member.mutation(api.users.ensureCurrent, {})
-  await t.run(async (ctx) => {
-    const user = (await ctx.db
-      .query('users')
-      .withIndex('by_token', (q) =>
-        q.eq('tokenIdentifier', identity.tokenIdentifier),
-      )
-      .unique())!
-    await ctx.db.insert('memberships', {
-      businessId: b.businessId,
-      userId: user._id,
-      role,
-      notify: { morningSummary: false, remindersDue: false, overdue: false },
-    })
-  })
-  return member
 }
 
 describe('import.clients', () => {
@@ -188,8 +159,8 @@ describe('import.clients', () => {
   it('is for managers and owners, not workers', async () => {
     const t = setupConvex()
     const b = await setupBusiness(t)
-    const worker = await addMember(t, b, 'worker')
-    const manager = await addMember(t, b, 'manager')
+    const { member: worker } = await addMember(t, b, 'worker')
+    const { member: manager } = await addMember(t, b, 'manager')
     const args = { businessId: b.businessId, skipDuplicates: false }
     await expect(
       worker.mutation(api.import.clients, { ...args, rows: [row('А')] }),

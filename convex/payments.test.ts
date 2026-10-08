@@ -5,13 +5,14 @@ import { api } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import {
   STRANGER,
+  addMember,
   expectCachesFresh,
   getDoc,
   lastActivity,
   setupBusiness,
   setupConvex,
 } from './test.setup'
-import type { TestBusiness, TestConvex } from './test.setup'
+import type { TestConvex } from './test.setup'
 
 const DATE = '2026-10-06'
 
@@ -298,36 +299,6 @@ describe('payment edge cases', () => {
     ).rejects.toThrow(/payment.exceeds/)
   })
 })
-
-/** A second member of the owner's business, as a worker or a manager. */
-async function addMember(
-  t: TestConvex,
-  b: TestBusiness,
-  role: 'manager' | 'worker',
-) {
-  const identity = {
-    ...STRANGER,
-    subject: `user_${role}`,
-    tokenIdentifier: `https://clerk.test|user_${role}`,
-  }
-  const member = t.withIdentity(identity)
-  await member.mutation(api.users.ensureCurrent, {})
-  const membershipId = await t.run(async (ctx) => {
-    const user = (await ctx.db
-      .query('users')
-      .withIndex('by_token', (q) =>
-        q.eq('tokenIdentifier', identity.tokenIdentifier),
-      )
-      .unique())!
-    return await ctx.db.insert('memberships', {
-      businessId: b.businessId,
-      userId: user._id,
-      role,
-      notify: { morningSummary: false, remindersDue: false, overdue: false },
-    })
-  })
-  return { member, membershipId }
-}
 
 async function allocationsOf(t: TestConvex, paymentId: Id<'payments'>) {
   return await t.run(async (ctx) =>
