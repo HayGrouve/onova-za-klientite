@@ -26,11 +26,6 @@ export function ConfirmAction({
   className?: string
 }) {
   const [asking, setAsking] = useState(false)
-  const cancel = useRef<HTMLButtonElement>(null)
-  // Focus lands on "Cancel", so a double tap or a second Enter is safe.
-  useEffect(() => {
-    if (asking) cancel.current?.focus()
-  }, [asking])
 
   if (!asking) {
     return (
@@ -46,6 +41,43 @@ export function ConfirmAction({
       </Button>
     )
   }
+  return (
+    <ConfirmQuestion
+      question={question}
+      confirmLabel={confirmLabel}
+      busy={busy}
+      onConfirm={onConfirm}
+      onCancel={() => setAsking(false)}
+    />
+  )
+}
+
+/**
+ * The asking half of `ConfirmAction`, for a caller whose own control (a chip,
+ * a row) starts the question.
+ */
+export function ConfirmQuestion({
+  question,
+  confirmLabel,
+  cancelLabel = m.cancel(),
+  busy = false,
+  onConfirm,
+  onCancel,
+}: {
+  question: React.ReactNode
+  confirmLabel: React.ReactNode
+  /** "Cancel" unless that word could be read as the action itself. */
+  cancelLabel?: React.ReactNode
+  busy?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const cancel = useRef<HTMLButtonElement>(null)
+  // Focus lands on "Cancel", so a double tap or a second Enter is safe.
+  useEffect(() => {
+    cancel.current?.focus()
+  }, [])
+
   return (
     <div role="group" className="flex flex-col gap-3">
       <p className="text-sm text-pretty">{question}</p>
@@ -66,9 +98,9 @@ export function ConfirmAction({
           type="button"
           size="xl"
           variant="outline"
-          onClick={() => setAsking(false)}
+          onClick={onCancel}
         >
-          {m.cancel()}
+          {cancelLabel}
         </Button>
       </div>
     </div>
