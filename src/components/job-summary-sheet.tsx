@@ -213,7 +213,9 @@ function SummaryBody({
         </div>
         <a
           href={viberTextHref(summaryText(input))}
-          className={buttonVariants({ variant: 'outline', className: 'h-11' })}
+          className={cn(
+            buttonVariants({ variant: 'outline', className: 'h-11' }),
+          )}
         >
           {/* Viber's own purple, as on the client page. */}
           <ChatCircleIcon

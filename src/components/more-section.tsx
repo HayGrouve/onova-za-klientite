@@ -26,7 +26,7 @@ function text(parts: MorePart[]) {
   const named = shown
     .map((part) => (part.count ? `${part.name}: ${part.count}` : part.name))
     .join(' · ')
-  return hidden > 0 ? `${named} ${m.more_rest({ count: hidden })}` : named
+  return hidden > 0 ? `${named} · ${m.more_rest({ count: hidden })}` : named
 }
 
 /**
