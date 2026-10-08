@@ -51,9 +51,7 @@ export function MoreSection({
       onOpenChange={change}
       className="flex flex-col gap-4"
     >
-      <CollapsibleTrigger
-        className="mx-4 flex min-h-14 animate-rise items-center gap-3 surface pressable px-4 py-2 text-left"
-      >
+      <CollapsibleTrigger className="mx-4 flex min-h-14 animate-rise items-center gap-3 surface pressable px-4 py-2 text-left">
         <DotsThreeOutlineIcon
           aria-hidden
           weight="fill"

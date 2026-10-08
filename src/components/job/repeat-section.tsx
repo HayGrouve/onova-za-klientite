@@ -1,6 +1,7 @@
 import { RepeatIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
@@ -46,6 +47,8 @@ export function RepeatSection({
   const setRepeat = useMutation(api.jobs.setRepeat)
   const stopRepeat = useMutation(api.jobs.stopRepeat)
   const { busy, run } = useSubmit()
+  // How often is asked only once someone means to repeat the job.
+  const [choosing, setChoosing] = useState(false)
   const active = job.repeat && job.repeat.stoppedAt === undefined
   const dated = { appointments, dueDate: job.dueDate }
 
@@ -82,6 +85,20 @@ export function RepeatSection({
         <PanelBody className="text-sm text-muted-foreground">
           {m.repeat_needs_date()}
         </PanelBody>
+      ) : !choosing ? (
+        <PanelBody className="flex items-center justify-between gap-3 py-2 pr-2">
+          <span className="text-sm text-muted-foreground">
+            {m.repeat_off()}
+          </span>
+          <Button
+            variant="ghost"
+            className="h-9 text-primary"
+            onClick={() => setChoosing(true)}
+          >
+            <RepeatIcon data-icon="inline-start" />
+            {m.repeat_start()}
+          </Button>
+        </PanelBody>
       ) : (
         <PanelBody className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
@@ -97,6 +114,7 @@ export function RepeatSection({
                 onClick={() => {
                   const date = nextJobDate(dated, choice)
                   if (!date) return toast.error(m.repeat_needs_date())
+                  setChoosing(false)
                   void run(
                     () =>
                       setRepeat({
@@ -112,6 +130,13 @@ export function RepeatSection({
                 {REPEAT_LABEL[choice.key]()}
               </Button>
             ))}
+            <Button
+              variant="ghost"
+              className="h-11 rounded-xl"
+              onClick={() => setChoosing(false)}
+            >
+              {m.cancel()}
+            </Button>
           </div>
         </PanelBody>
       )}
