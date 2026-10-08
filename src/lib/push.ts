@@ -127,3 +127,32 @@ export async function unsubscribePush(): Promise<string | null> {
   await subscription.unsubscribe()
   return endpoint
 }
+
+/**
+ * Before signing out: take this device off the server and unsubscribe the
+ * browser, so the next person on the phone doesn't get this account's pushes
+ * (the server row would otherwise outlive the session). It never throws and
+ * waits at most `timeoutMs`: signing out must still happen offline.
+ */
+export async function dropPushOnSignOut(
+  removeOnServer: (endpoint: string) => Promise<unknown>,
+  find: () => Promise<Pick<
+    PushSubscription,
+    'endpoint' | 'unsubscribe'
+  > | null> = currentSubscription,
+  timeoutMs = 4000,
+): Promise<void> {
+  const work = (async () => {
+    const subscription = await find()
+    if (!subscription) return
+    // The server first: it needs the session that is about to end.
+    await removeOnServer(subscription.endpoint).catch(() => undefined)
+    await subscription.unsubscribe()
+  })().catch(() => undefined)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const limit = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs)
+  })
+  await Promise.race([work, limit])
+  clearTimeout(timer)
+}

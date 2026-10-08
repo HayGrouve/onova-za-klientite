@@ -13,6 +13,7 @@ const ERRORS = {
   type: m.import_error_type,
   empty: m.import_error_empty,
   unreadable: m.import_error_read,
+  big: m.import_error_too_big,
 }
 
 const optionClass =
