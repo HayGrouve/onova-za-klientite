@@ -99,6 +99,7 @@ export default defineSchema({
   })
     .index('by_business_name', ['businessId', 'name'])
     .index('by_business_credit', ['businessId', 'creditCents'])
+    .index('by_merged_into', ['mergedIntoId'])
     .searchIndex('search', {
       searchField: 'searchText',
       filterFields: ['businessId'],
@@ -163,6 +164,8 @@ export default defineSchema({
         unit: vRepeatUnit,
         nextJobId: v.optional(v.id('jobs')),
         stoppedAt: v.optional(v.number()),
+        /** The day of the month a monthly series keeps (shared/repeat.ts). */
+        anchorDay: v.optional(v.number()),
       }),
     ),
     nextRepeatOn: v.optional(v.string()),

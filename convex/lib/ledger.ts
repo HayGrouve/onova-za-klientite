@@ -189,8 +189,8 @@ export async function rewritePayment(
 }
 
 /**
- * Removes a payment entered by mistake, with its allocations. The client's credit can go negative only if that credit was
- * already spent elsewhere; it is shown as it is.
+ * Removes a payment entered by mistake, with its allocations. It does not
+ * check that a job or the credit stays above zero: `payments.remove` does.
  */
 export async function removePayment(
   ctx: MutationCtx,

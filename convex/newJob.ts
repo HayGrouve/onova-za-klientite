@@ -5,7 +5,7 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
-  getOwned,
+  getLiveClient,
   requireRole,
 } from './lib/auth'
 import { createClient } from './lib/clientWrite'
@@ -161,7 +161,7 @@ export const save = businessMutation({
 
     let clientId
     if (args.client.kind === 'existing') {
-      clientId = (await getOwned(ctx, 'clients', args.client.clientId))._id
+      clientId = (await getLiveClient(ctx, args.client.clientId))._id
     } else if (args.client.kind === 'none') {
       const noClientId = ctx.business.noClientId
       if (!noClientId) fail('notFound', { table: 'clients' })

@@ -6,6 +6,7 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
+  getLiveClient,
   getOwned,
   requireRole,
 } from './lib/auth'
@@ -52,7 +53,7 @@ async function resolveTarget(
     return { jobId: job._id, clientId: job.clientId }
   }
   if (target.kind === 'client') {
-    const client = await getOwned(ctx, 'clients', target.clientId)
+    const client = await getLiveClient(ctx, target.clientId)
     return { clientId: client._id }
   }
   if (target.kind === 'logo') return {}

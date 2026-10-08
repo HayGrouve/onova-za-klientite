@@ -54,6 +54,47 @@ describe('payments', () => {
     await expectCachesFresh(t)
   })
 
+  it('a Worker cannot take more than the job still owes; a Manager still can', async () => {
+    const { t, owner, businessId, clientId, jobIds, ...b } = await withJobs([
+      10000,
+    ])
+    const { member: worker, membershipId } = await addMember(
+      t,
+      { owner, businessId, ...b },
+      'worker',
+    )
+    const { member: manager } = await addMember(
+      t,
+      { owner, businessId, ...b },
+      'manager',
+    )
+    await t.run((ctx) =>
+      ctx.db.patch('jobs', jobIds[0], { assigneeIds: [membershipId] }),
+    )
+    const pay = (who: typeof worker, amountCents: number) =>
+      who.mutation(api.payments.addFromJob, {
+        businessId,
+        jobId: jobIds[0],
+        amountCents,
+        date: DATE,
+        method: 'cash',
+      })
+    await expect(pay(worker, 10001)).rejects.toThrow(/payment.exceeds/)
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(0)
+    await pay(worker, 6000)
+    // 40 € left: one cent more is refused, the rest is accepted.
+    await expect(pay(worker, 4001)).rejects.toThrow(/payment.exceeds/)
+    await pay(worker, 4000)
+    // Paid in full: a Worker can add nothing more.
+    await expect(pay(worker, 1)).rejects.toThrow(/payment.exceeds/)
+    expect((await getDoc(t, 'jobs', jobIds[0])).balanceCents).toBe(0)
+    expect((await getDoc(t, 'clients', clientId)).creditCents).toBe(0)
+    // A Manager may take more: the rest is client credit.
+    await pay(manager, 2500)
+    expect((await getDoc(t, 'clients', clientId)).creditCents).toBe(2500)
+    await expectCachesFresh(t)
+  })
+
   it('a payment from a client is split across their jobs, oldest first', async () => {
     const { t, owner, businessId, clientId, jobIds } = await withJobs([
       10000, 20000, 30000,
@@ -194,6 +235,64 @@ describe('payments', () => {
     expect((await getDoc(t, 'jobs', jobIds[0])).balanceCents).toBe(20000)
     expect((await lastActivity(t)).type).toBe('payment.removed')
     await expectCachesFresh(t)
+  })
+
+  it('refuses to delete a payment that was refunded against, and offers its refund first', async () => {
+    const { t, owner, businessId, clientId, jobIds } = await withJobs([10000])
+    const paymentId = await owner.mutation(api.payments.addFromJob, {
+      businessId,
+      jobId: jobIds[0],
+      amountCents: 10000,
+      date: DATE,
+      method: 'cash',
+    })
+    const refundId = await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      jobId: jobIds[0],
+      amountCents: 10000,
+      date: DATE,
+      method: 'cash',
+    })
+    expect(
+      (await owner.query(api.payments.get, { businessId, paymentId }))
+        .removable,
+    ).toBe(false)
+    await expect(
+      owner.mutation(api.payments.remove, { businessId, paymentId }),
+    ).rejects.toThrow(/payment.refunded/)
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(0)
+    // Take the refund away first, and the payment can go.
+    await owner.mutation(api.payments.remove, {
+      businessId,
+      paymentId: refundId,
+    })
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(10000)
+    await owner.mutation(api.payments.remove, { businessId, paymentId })
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(0)
+    await expectCachesFresh(t)
+  })
+
+  it('refuses to delete a payment whose credit was paid back', async () => {
+    const { t, owner, businessId, clientId } = await withJobs([])
+    const paymentId = await owner.mutation(api.payments.addFromClient, {
+      businessId,
+      clientId,
+      amountCents: 5000,
+      date: DATE,
+      method: 'bank',
+    })
+    await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      amountCents: 2000,
+      date: DATE,
+      method: 'cash',
+    })
+    await expect(
+      owner.mutation(api.payments.remove, { businessId, paymentId }),
+    ).rejects.toThrow(/payment.refunded/)
+    expect((await getDoc(t, 'clients', clientId)).creditCents).toBe(3000)
   })
 
   it('every cache equals a recomputation after any sequence of money changes', async () => {
@@ -941,9 +1040,10 @@ describe('editing keeps the money invariants', () => {
     },
   )
   // Refused steps are part of the domain.
-  const REFUSED = /credit.notEnough|payment.zero|payment.exceeds|payment.tooLow/
+  const REFUSED =
+    /credit.notEnough|payment.zero|payment.exceeds|payment.tooLow|payment.refunded/
 
-  it('after any sequence the caches are fresh, and an edit never takes a job or the credit below zero', async () => {
+  it('after any sequence the caches are fresh, and an edit or a delete never takes a job or the credit below zero', async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(step, { maxLength: 10 }), async (steps) => {
         const { t, owner, businessId, clientId, jobIds } = await withJobs([
@@ -1028,6 +1128,7 @@ describe('editing keeps the money invariants', () => {
                 paymentId,
               })
               paymentIds.splice(paymentIds.indexOf(paymentId), 1)
+              return true
             }
             return false
           }

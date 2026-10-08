@@ -6,7 +6,7 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
-  getOwned,
+  getLiveClient,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
@@ -57,7 +57,7 @@ export const update = businessMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
-    const client = await getOwned(ctx, 'clients', args.clientId)
+    const client = await getLiveClient(ctx, args.clientId)
     if (client.isNoClient) fail('client.noClient')
     const patch: Partial<Doc<'clients'>> = {}
     if (args.name !== undefined)

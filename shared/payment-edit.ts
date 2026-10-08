@@ -91,6 +91,21 @@ export function paymentAmountRange<TId extends string>(
 }
 
 /**
+ * Whether a payment can be deleted without taking a job's paid total or the
+ * client's credit below zero (D26). It can't once money was refunded against
+ * it. A refund can always be deleted: that only gives the money back.
+ */
+export function paymentRemovable<TId extends string>(
+  state: PaymentEditState<TId>,
+): boolean {
+  if (state.kind === 'refund') return true
+  if (state.jobs.some((job) => job.paidCents < job.allocatedCents)) {
+    return false
+  }
+  return paymentPrepaidCents(state) <= Math.max(state.clientCreditCents, 0)
+}
+
+/**
  * Where the money of an edited payment goes, with no checks (see
  * `planPaymentEdit`).
  * - A payment over several jobs keeps its split.

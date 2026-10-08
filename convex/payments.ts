@@ -10,6 +10,7 @@ import {
 import {
   paymentAmountRange,
   paymentPrepaidCents,
+  paymentRemovable,
   planPaymentEdit,
 } from '../shared/payment-edit'
 import type { PaymentEditState } from '../shared/payment-edit'
@@ -17,6 +18,7 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
+  getLiveClient,
   getOwned,
   requireRole,
 } from './lib/auth'
@@ -69,7 +71,8 @@ async function openJobs(ctx: BusinessMutationCtx, clientId: Id<'clients'>) {
 
 /**
  * Paying from a job allocates to that job, up to its balance. Any rest is
- * kept as client credit.
+ * kept as client credit, except from a Worker, who may not take more than the
+ * balance.
  */
 export const addFromJob = businessMutation({
   args: { jobId: v.id('jobs'), ...paymentFields },
@@ -79,6 +82,11 @@ export const addFromJob = businessMutation({
     requireJobMoneyAccess(ctx, job)
     const amountCents = cents(args.amountCents, 'amountCents')
     if (amountCents === 0) fail('payment.zero')
+    // A Worker takes money on site for the job, up to what it owes. Prepaid
+    // credit is a Manager's to hold (D89).
+    if (isWorker(ctx.member) && amountCents > jobOwedCents(job)) {
+      fail('payment.exceeds', { limitCents: jobOwedCents(job) })
+    }
 
     const paymentId = await payJob(
       ctx,
@@ -111,7 +119,7 @@ export const addFromClient = businessMutation({
   returns: v.id('payments'),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
-    const client = await getOwned(ctx, 'clients', args.clientId)
+    const client = await getLiveClient(ctx, args.clientId)
     const amountCents = cents(args.amountCents, 'amountCents')
     if (amountCents === 0) fail('payment.zero')
 
@@ -177,7 +185,7 @@ export const refund = businessMutation({
   returns: v.id('payments'),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
-    const client = await getOwned(ctx, 'clients', args.clientId)
+    const client = await getLiveClient(ctx, args.clientId)
     const amountCents = cents(args.amountCents, 'amountCents')
     if (amountCents === 0) fail('payment.zero')
 
@@ -238,13 +246,19 @@ export const useCredit = businessMutation({
   },
 })
 
-/** Removes a payment entered by mistake, with its allocations. */
+/**
+ * Removes a payment entered by mistake, with its allocations. Not once money
+ * was refunded against it: that would take a job or the credit below zero
+ * (D26), so the refund goes first.
+ */
 export const remove = businessMutation({
   args: { paymentId: v.id('payments') },
   returns: v.null(),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const payment = await getOwned(ctx, 'payments', args.paymentId)
+    const { state } = await loadEditState(ctx, payment)
+    if (!paymentRemovable(state)) fail('payment.refunded')
     await removePayment(ctx, payment)
     await logActivity(ctx, {
       type: 'payment.removed',
@@ -314,6 +328,8 @@ export const get = businessQuery({
       }),
     ),
     prepaidCents: v.number(),
+    /** False once money was refunded against it: delete the refund first. */
+    removable: v.boolean(),
     range: v.object({
       minCents: v.number(),
       maxCents: v.union(v.number(), v.null()),
@@ -349,6 +365,7 @@ export const get = businessQuery({
         note: payment.note,
         allocations: own,
         prepaidCents: 0,
+        removable: false,
         range: { minCents: 0, maxCents: null, why: 'none' as const },
       }
     }
@@ -362,6 +379,7 @@ export const get = businessQuery({
       note: payment.note,
       allocations,
       prepaidCents: paymentPrepaidCents(state),
+      removable: paymentRemovable(state),
       range: paymentAmountRange(state),
     }
   },

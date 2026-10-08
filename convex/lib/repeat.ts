@@ -1,7 +1,11 @@
 import type { MutationCtx } from '../_generated/server'
 import type { Doc, Id } from '../_generated/dataModel'
 import { sofiaOffsetMinutes, sofiaTimeToUtc } from '../../shared/dates'
-import { nextRepeatDate, pickJobDate } from '../../shared/repeat'
+import {
+  nextRepeatDate,
+  pickJobDate,
+  repeatAnchorDay,
+} from '../../shared/repeat'
 import { defaultStage } from '../../shared/stages'
 import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
@@ -64,6 +68,26 @@ function sofiaClock(ms: number) {
 }
 
 /**
+ * Who a series' next job is created as: the job's creator, else the
+ * business's owner when the creator has gone. Null when nobody is left.
+ */
+async function seriesActor(ctx: MutationCtx, job: Doc<'jobs'>) {
+  const creator = await ctx.db.get('memberships', job.createdBy)
+  const creatorUser = creator ? await ctx.db.get('users', creator.userId) : null
+  if (creator && creatorUser) return { member: creator, user: creatorUser }
+  const members = await ctx.db
+    .query('memberships')
+    .withIndex('by_business_user', (q) => q.eq('businessId', job.businessId))
+    .collect()
+  for (const member of members) {
+    if (member.role !== 'owner' || member.deactivatedAt !== undefined) continue
+    const user = await ctx.db.get('users', member.userId)
+    if (user) return { member, user }
+  }
+  return null
+}
+
+/**
  * Creates the next job of a series one interval after this one: same client,
  * title, items, lines or price, address and extra fields, in the first New
  * stage. Idempotent: a job that already has its next job is left alone.
@@ -76,9 +100,14 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     return null
   }
   const business = await ctx.db.get('businesses', job.businessId)
-  const member = await ctx.db.get('memberships', job.createdBy)
-  const user = member ? await ctx.db.get('users', member.userId) : null
-  if (!business || !member || !user) return null
+  const actor = business ? await seriesActor(ctx, job) : null
+  if (!business || !actor) {
+    // Nobody can create it: stop the run from trying again every day.
+    if (job.nextRepeatOn !== undefined)
+      await ctx.db.patch('jobs', job._id, { nextRepeatOn: undefined })
+    return null
+  }
+  const { member, user } = actor
   const as: BusinessMutationCtx = { ...ctx, business, member, user }
 
   const when = await jobDate(ctx, job)
@@ -110,12 +139,16 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     itemIds: job.itemIds,
     assigneeIds: job.assigneeIds,
     source: job.source,
-    repeat: { every: job.repeat.every, unit: job.repeat.unit },
+    repeat: {
+      every: job.repeat.every,
+      unit: job.repeat.unit,
+      anchorDay: repeatAnchorDay(when.date, job.repeat),
+    },
     nextRepeatOn: date,
     seriesId: job.seriesId ?? job._id,
     extra: job.extra,
     searchText: job.searchText,
-    createdBy: job.createdBy,
+    createdBy: member._id,
   })
   for (const itemId of job.itemIds) {
     await ctx.db.insert('jobItems', {

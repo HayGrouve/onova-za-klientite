@@ -27,7 +27,7 @@ function fromDayNumber(day: number): string {
   return `${pad(d.getUTCFullYear(), 4)}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
 }
 
-function daysInMonth(year: number, month: number): number {
+export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate()
 }
 
