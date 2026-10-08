@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { addBusiness, nav, runSetup } from './support/app'
+import { addBusiness, nav, openMore, runSetup } from './support/app'
 import { BUSINESSES } from './support/businesses'
 import type { Business } from './support/businesses'
 import { expect, test } from './support/fixtures'
@@ -173,6 +173,8 @@ async function expectClientPage(page: Page, b: Business) {
     await expect(section('Обекти')).toHaveCount(0)
     return
   }
+  // The items sit under the "More" card.
+  await openMore(page)
   await expect(section(b.item.plural)).toBeVisible()
 
   await page

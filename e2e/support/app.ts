@@ -180,3 +180,12 @@ export async function addBusiness(page: Page) {
   await page.getByRole('button', { name: /Добави бизнес/ }).click()
   await expectSetup(page)
 }
+
+/** Opens a detail page's "More" card, unless an earlier visit left it open. */
+export async function openMore(page: Page) {
+  const trigger = page.locator('[data-slot="collapsible-trigger"]')
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
+    await trigger.click()
+  }
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+}
