@@ -1,5 +1,6 @@
 import { cn } from 'cn'
 import {
+  ChatCircleIcon,
   CopyIcon,
   DownloadSimpleIcon,
   ShareNetworkIcon,

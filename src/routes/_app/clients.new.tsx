@@ -33,12 +33,13 @@ function NewClientPage() {
             fields={fields}
             onDirtyChange={setDirty}
             onSaved={(clientId) => {
-              guard.release()
-              void navigate({
-                to: '/clients/$clientId',
-                params: { clientId },
-                replace: true,
-              })
+              void guard.releaseWhile(() =>
+                navigate({
+                  to: '/clients/$clientId',
+                  params: { clientId },
+                  replace: true,
+                }),
+              )
             }}
           />
         )}
