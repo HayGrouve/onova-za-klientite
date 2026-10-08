@@ -767,6 +767,7 @@
   "data_delete_word": "ИЗТРИЙ",
   "data_delete_confirm": "Изтрий завинаги",
   "data_deleting": "Изтриване…",
+  "error_client_anonymized": "Данните на този запис са анонимизирани. Не може да се добавя към него.",
   "error_client_merged": "Този запис вече е слят с друг.",
   "error_client_noClient": "Това не може за „Без клиент“.",
   "error_seed_notAllowed": "Примерните данни не са разрешени тук.",

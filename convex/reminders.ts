@@ -1,7 +1,12 @@
 import { v } from 'convex/values'
 import { isValidDate } from '../shared/dates'
 import { logActivity } from './lib/activity'
-import { businessMutation, getOwned, requireRole } from './lib/auth'
+import {
+  businessMutation,
+  getLiveClient,
+  getOwned,
+  requireRole,
+} from './lib/auth'
 import { fail } from './lib/errors'
 import { requiredText } from './lib/validate'
 
@@ -25,7 +30,13 @@ export const add = businessMutation({
     const job = args.jobId ? await getOwned(ctx, 'jobs', args.jobId) : null
     const item = args.itemId ? await getOwned(ctx, 'items', args.itemId) : null
     const clientId = args.clientId ?? job?.clientId ?? item?.clientId
-    const client = clientId ? await getOwned(ctx, 'clients', clientId) : null
+    // An id from the client must be live; one taken from the job or item is
+    // that record's own client, which stays even when anonymized.
+    const client = !clientId
+      ? null
+      : args.clientId
+        ? await getLiveClient(ctx, clientId)
+        : await getOwned(ctx, 'clients', clientId)
     // The rule suggests a follow-up with someone: not with the built-in No client.
     if (args.source === 'rule' && (!client || client.isNoClient)) {
       fail('client.noClient')

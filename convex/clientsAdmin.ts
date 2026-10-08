@@ -5,6 +5,7 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
+  getLiveClient,
   getOwned,
   requireRole,
 } from './lib/auth'
@@ -75,7 +76,7 @@ export const merge = businessMutation({
     requireRole(ctx.member, 'manager')
     if (fromId === intoId) fail('invalid', { field: 'intoId' })
     const from = await getOwned(ctx, 'clients', fromId)
-    const into = await getOwned(ctx, 'clients', intoId)
+    const into = await getLiveClient(ctx, intoId)
     if (from.isNoClient || into.isNoClient) fail('client.noClient')
     if (from.mergedIntoId || into.mergedIntoId) fail('client.merged')
 

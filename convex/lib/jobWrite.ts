@@ -5,7 +5,7 @@ import { lineTotalCents } from '../../shared/money'
 import { defaultStage } from '../../shared/stages'
 import { vExtra, vJobLine } from '../validators'
 import { logActivity } from './activity'
-import { getOwned } from './auth'
+import { getLiveClient, getOwned } from './auth'
 import type { BusinessMutationCtx } from './auth'
 import { fail } from './errors'
 import { mergeExtra } from './extra'
@@ -128,7 +128,7 @@ export async function checkLines(
 
 /** Creates a job with its items and caches, and logs it. Callers check roles. */
 export async function createJob(ctx: BusinessMutationCtx, args: CreateJobArgs) {
-  const client = await getOwned(ctx, 'clients', args.clientId)
+  const client = await getLiveClient(ctx, args.clientId)
   const stage = args.stageId
     ? await getOwned(ctx, 'stages', args.stageId)
     : defaultStage(await businessStages(ctx))

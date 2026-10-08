@@ -118,6 +118,22 @@ export async function getOwned<T extends BusinessScoped>(
 }
 
 /**
+ * `getOwned` for a client a write is aimed at. A tab that was left open can
+ * still hold the id of a client that was merged into another or anonymized
+ * since: writing to it would put new records on a dead client. Merge's `from`
+ * and anonymize itself use `getOwned`, as they work on such a client.
+ */
+export async function getLiveClient(
+  ctx: QueryCtx & { business: Doc<'businesses'> },
+  clientId: Id<'clients'>,
+): Promise<Doc<'clients'>> {
+  const client = await getOwned(ctx, 'clients', clientId)
+  if (client.mergedIntoId !== undefined) fail('client.merged')
+  if (client.anonymizedAt !== undefined) fail('client.anonymized')
+  return client
+}
+
+/**
  * `getOwned` for an id that came from the address bar, where any text can
  * arrive: text that is no id, or the id of another table, is `notFound` too
  * (D16), instead of an argument error the client could not tell apart.

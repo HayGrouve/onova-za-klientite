@@ -27,6 +27,7 @@ export const ERROR_CODES = [
   'credit.notEnough',
   'job.noDate',
   'client.merged',
+  'client.anonymized',
   'file.rejected',
 ] as const
 

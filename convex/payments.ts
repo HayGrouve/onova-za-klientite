@@ -18,6 +18,7 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
+  getLiveClient,
   getOwned,
   requireRole,
 } from './lib/auth'
@@ -112,7 +113,7 @@ export const addFromClient = businessMutation({
   returns: v.id('payments'),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
-    const client = await getOwned(ctx, 'clients', args.clientId)
+    const client = await getLiveClient(ctx, args.clientId)
     const amountCents = cents(args.amountCents, 'amountCents')
     if (amountCents === 0) fail('payment.zero')
 
@@ -178,7 +179,7 @@ export const refund = businessMutation({
   returns: v.id('payments'),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
-    const client = await getOwned(ctx, 'clients', args.clientId)
+    const client = await getLiveClient(ctx, args.clientId)
     const amountCents = cents(args.amountCents, 'amountCents')
     if (amountCents === 0) fail('payment.zero')
 

@@ -22,6 +22,7 @@ const MESSAGES: Record<ErrorCode, () => string> = {
   'stage.hasJobs': m.error_stage_hasJobs,
   'job.noDate': m.error_job_noDate,
   'client.merged': m.error_client_merged,
+  'client.anonymized': m.error_client_anonymized,
   'stage.lastInGroup': m.error_stage_lastInGroup,
   'file.rejected': m.files_rejected,
   'field.typeChange': m.error_field_typeChange,
