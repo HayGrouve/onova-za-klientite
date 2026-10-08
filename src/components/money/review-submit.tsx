@@ -3,6 +3,9 @@ import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { m } from '#/paraglide/messages.js'
 
+/** How long the confirm button ignores taps after the review appears. */
+const ARM_MS = 500
+
 /**
  * Whether a form is being reviewed before it commits. `snapshot` is a string
  * of everything the person can edit, so any edit ends the review without
@@ -43,9 +46,16 @@ export function ReviewSubmit({
 }) {
   const summaryId = useId()
   const back = useRef<HTMLButtonElement>(null)
-  // Focus lands on "Back", so a double tap or a second Enter can't record twice.
+  const [armed, setArmed] = useState(false)
+  // Focus lands on "Back", so a second Enter can't record twice. A bottom
+  // sheet keeps its last button where the submit button was, so a double tap
+  // would land on the confirm: it takes taps only after a short moment.
   useEffect(() => {
-    if (review.reviewing) back.current?.focus()
+    if (!review.reviewing) return
+    back.current?.focus()
+    setArmed(false)
+    const timer = window.setTimeout(() => setArmed(true), ARM_MS)
+    return () => window.clearTimeout(timer)
   }, [review.reviewing])
 
   if (!review.reviewing) {
@@ -80,7 +90,7 @@ export function ReviewSubmit({
           variant={tone}
           className="flex-1"
           disabled={busy}
-          onClick={onConfirm}
+          onClick={() => armed && onConfirm()}
         >
           {busy && <Spinner data-icon="inline-start" />}
           {label}
