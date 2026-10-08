@@ -334,9 +334,9 @@ export const board = businessQuery({
           owing.length,
         ).jobs
       }
-      const rows = async (list: typeof jobs) => {
+      const rows = async (from: typeof jobs) => {
         const out = []
-        for (const job of list) out.push(await jobRow(ctx, job, lookups, now))
+        for (const job of from) out.push(await jobRow(ctx, job, lookups, now))
         return out
       }
       columns.push({
