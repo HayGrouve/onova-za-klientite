@@ -18,7 +18,7 @@ const WHEN = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'Europe/Sofia',
 })
 
-function describe(item: TimelineItem, words: Words, today: string) {
+function describe(item: TimelineItem, words: Words, today: string): string {
   const { data } = item
   const when = formatActivityMoment(data.to ?? '', today)
   const amount = formatMoney(Math.abs(data.amountCents ?? 0))
@@ -96,7 +96,22 @@ function describe(item: TimelineItem, words: Words, today: string) {
       return m.event_file_added({ name: name || m.files_photo() })
     case 'file.removed':
       return m.event_file_removed({ name: name || m.files_photo() })
-    default:
+    case 'client.merged':
+      return m.event_client_merged({ name: data.from ?? '' })
+    case 'client.anonymized':
+      return m.event_client_anonymized()
+    // Settings changes belong to no job, client or item, so no timeline
+    // shows them; they are named here so a new type can't slip through.
+    case 'stage.added':
+    case 'stage.edited':
+    case 'stage.removed':
+    case 'stages.reordered':
+    case 'field.added':
+    case 'field.edited':
+    case 'field.archived':
+    case 'field.restored':
+    case 'setup.applied':
+    case 'settings.changed':
       return m.event_other()
   }
 }

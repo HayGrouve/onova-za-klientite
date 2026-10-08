@@ -1,5 +1,6 @@
 import { ConvexError } from 'convex/values'
 import { describe, expect, it } from 'vitest'
+import { ERROR_CODES } from '../../shared/errors'
 import { errorCode, errorMessage, isNotFound } from './errors'
 
 describe('errorMessage', () => {
@@ -7,6 +8,13 @@ describe('errorMessage', () => {
     const error = new ConvexError({ code: 'auth.notMember' })
     expect(errorCode(error)).toBe('auth.notMember')
     expect(errorMessage(error)).not.toBe(errorMessage(new Error('x')))
+  })
+
+  it('has its own message for every code the server throws', () => {
+    const fallback = errorMessage(new Error('boom'))
+    for (const code of ERROR_CODES) {
+      expect(errorMessage(new ConvexError({ code })), code).not.toBe(fallback)
+    }
   })
 
   it('falls back for plain errors and unknown codes', () => {
