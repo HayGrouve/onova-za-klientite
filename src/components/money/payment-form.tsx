@@ -5,6 +5,11 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { MethodPicker } from '#/components/money/method-picker'
 import type { PaymentMethod } from '#/components/money/method-picker'
 import { MoneyInput, moneyInputText } from '#/components/money/money-input'
+import {
+  ReviewAmount,
+  ReviewSubmit,
+  useReview,
+} from '#/components/money/review-submit'
 import { useSubmit } from '#/components/money/use-submit'
 import { Button } from '#/components/ui/button'
 import {
@@ -15,7 +20,8 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
-import { Spinner } from '#/components/ui/spinner'
+import { formatDay } from '#/i18n/dates'
+import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { splitPayment } from '../../../shared/allocation'
 import { formatMoney, parseMoney, sumCents } from '../../../shared/money'
@@ -118,6 +124,10 @@ export function PaymentForm({
     (rest < 0 || split.some((row) => rowOver(row.cents, row.job.balanceCents)))
 
   const amountMissing = tried && (!amountCents || amountCents <= 0)
+  // Any edit ends the review, so what is confirmed is what is recorded.
+  const review = useReview(
+    JSON.stringify([amount, date, method, label, splitEdits]),
+  )
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -134,6 +144,11 @@ export function PaymentForm({
         ?.focus()
       return
     }
+    review.start()
+  }
+
+  const record = () => {
+    if (!amountCents) return
     const common = {
       businessId,
       amountCents,
@@ -274,10 +289,40 @@ export function PaymentForm({
           </Button>
         )}
       </FieldGroup>
-      <Button type="submit" size="xl" disabled={busy}>
-        {busy && <Spinner data-icon="inline-start" />}
-        {m.pay_save()}
-      </Button>
+      <ReviewSubmit
+        review={review}
+        label={m.pay_save()}
+        busy={busy}
+        onConfirm={record}
+        summary={
+          <>
+            <p>
+              {m.review_pay()}{' '}
+              <ReviewAmount>{formatMoney(amountCents ?? 0)}</ReviewAmount>
+            </p>
+            <p className="text-muted-foreground">
+              {METHOD_LABEL[method]()} · {formatDay(date, today)}
+            </p>
+            {target.kind === 'client' &&
+              split
+                .filter((row) => row.cents > 0)
+                .map((row) => (
+                  <p key={row.job._id}>
+                    {m.pay_split_to_job({
+                      amount: formatMoney(row.cents),
+                      title: row.job.title,
+                    })}
+                  </p>
+                ))}
+            {target.kind === 'client' && rest > 0 && (
+              <p>{m.pay_split_prepaid({ amount: formatMoney(rest) })}</p>
+            )}
+            {target.kind === 'job' && rest > 0 && (
+              <p>{m.pay_rest_credit({ amount: formatMoney(rest) })}</p>
+            )}
+          </>
+        }
+      />
     </form>
   )
 }

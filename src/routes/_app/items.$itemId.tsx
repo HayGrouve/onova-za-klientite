@@ -14,6 +14,7 @@ import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { ItemForm } from '#/components/item-form'
 import { JobRow } from '#/components/job-row'
+import { ConfirmQuestion } from '#/components/confirm-action'
 import { useSubmit } from '#/components/money/use-submit'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { ReminderForm } from '#/components/reminders/reminder-form'
@@ -21,6 +22,7 @@ import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { Tip } from '#/components/tip'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { MoreSection } from '#/components/more-section'
 import { DetailError } from '#/components/not-found'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
@@ -31,7 +33,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
-import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useSheetGuard } from '#/hooks/use-discard-guard'
 import { usePageTitle } from '#/hooks/use-page-title'
@@ -78,6 +79,19 @@ function ItemPage() {
         : latest,
     undefined,
   )
+  // The folded parts, by name, with how many each holds.
+  const counted = (title: string, count: number) =>
+    count > 0 ? `${title}: ${count}` : title
+  const moreSummary = [
+    ...(business.modules.reminders
+      ? [counted(m.reminder_list(), reminders?.length ?? 0)]
+      : []),
+    m.job_files(),
+    ...(data.timeline.length > 0
+      ? [counted(m.item_history(), data.timeline.length)]
+      : []),
+    ...(client ? [m.item_move()] : []),
+  ]
 
   return (
     // A wide screen puts the owner and fields on the left, the work and files
@@ -122,7 +136,7 @@ function ItemPage() {
       <div className="contents lg:flex lg:flex-col lg:gap-4">
         <div className="px-4 empty:hidden">
           {client && (
-            <div className="flex animate-rise items-center gap-3 surface py-2 pr-2 pl-4">
+            <div className="flex animate-rise items-center gap-3 surface px-4 py-2">
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-sm text-muted-foreground">
                   {m.item_owner()}
@@ -135,14 +149,6 @@ function ItemPage() {
                   {client.name}
                 </Link>
               </span>
-              <Button
-                variant="outline"
-                className="h-11 shadow-xs"
-                onClick={() => setPanel('move')}
-              >
-                <ArrowsLeftRightIcon data-icon="inline-start" />
-                {m.item_move()}
-              </Button>
             </div>
           )}
         </div>
@@ -178,30 +184,43 @@ function ItemPage() {
           </PanelList>
         </Panel>
 
-        {business.modules.reminders && (
-          <RemindersPanel
-            reminders={reminders ?? []}
-            today={today}
-            onAdd={() => setPanel('reminder')}
-          />
-        )}
-
-        <Panel title={m.job_files()} icon={PaperclipIcon}>
-          <PanelBody className="px-0">
-            <FileGallery
-              businessId={business._id}
-              target={{ kind: 'item', itemId: item._id }}
+        <MoreSection page="item" summary={moreSummary}>
+          {business.modules.reminders && (
+            <RemindersPanel
+              reminders={reminders ?? []}
+              today={today}
+              onAdd={() => setPanel('reminder')}
             />
-          </PanelBody>
-        </Panel>
+          )}
 
-        {data.timeline.length > 0 && (
-          <Panel title={m.item_history()} icon={ClockCounterClockwiseIcon}>
+          <Panel title={m.job_files()} icon={PaperclipIcon}>
             <PanelBody className="px-0">
-              <Timeline items={data.timeline} />
+              <FileGallery
+                businessId={business._id}
+                target={{ kind: 'item', itemId: item._id }}
+              />
             </PanelBody>
           </Panel>
-        )}
+
+          {data.timeline.length > 0 && (
+            <Panel title={m.item_history()} icon={ClockCounterClockwiseIcon}>
+              <PanelBody className="px-0">
+                <Timeline items={data.timeline} />
+              </PanelBody>
+            </Panel>
+          )}
+          {client && (
+            <Button
+              variant="outline"
+              size="xl"
+              className="mx-4"
+              onClick={() => setPanel('move')}
+            >
+              <ArrowsLeftRightIcon data-icon="inline-start" />
+              {m.item_move()}
+            </Button>
+          )}
+        </MoreSection>
       </div>
 
       <Sheet
@@ -236,7 +255,11 @@ function ItemPage() {
               <MovePicker
                 businessId={business._id}
                 itemId={item._id}
-                currentClientId={item.clientId}
+                itemName={item.name}
+                from={client}
+                jobsWord={
+                  data.jobs.length > 0 ? business.words.job.plural : undefined
+                }
                 onDone={() => setPanel(null)}
               />
             )}
@@ -259,12 +282,18 @@ function ItemPage() {
 function MovePicker({
   businessId,
   itemId,
-  currentClientId,
+  itemName,
+  from,
+  jobsWord,
   onDone,
 }: {
   businessId: Id<'businesses'>
   itemId: Id<'items'>
-  currentClientId: Id<'clients'>
+  itemName: string
+  /** The client it is with now. */
+  from: { _id: Id<'clients'>; name: string } | null
+  /** The plural word for its jobs, when it has any: they are not touched. */
+  jobsWord?: string
   onDone: () => void
 }) {
   const clients = useQuery(api.clients.list, { businessId })
@@ -272,9 +301,11 @@ function MovePicker({
   const { busy, run } = useSubmit(onDone)
   const [query, setQuery] = useState('')
   const [toId, setToId] = useState<Id<'clients'> | null>(null)
+  // The client the question is about: picking another one drops it.
+  const [askingFor, setAskingFor] = useState<Id<'clients'> | null>(null)
   if (!clients) return <ListSkeleton />
   const candidates = clients
-    .filter((client) => !client.isNoClient && client._id !== currentClientId)
+    .filter((client) => !client.isNoClient && client._id !== from?._id)
     .map((client) => ({
       ...client,
       id: client._id,
@@ -320,20 +351,39 @@ function MovePicker({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <Button
-        size="xl"
-        disabled={busy || !chosen}
-        onClick={() =>
-          chosen &&
-          void run(
-            () => move({ businessId, itemId, toClientId: chosen._id }),
-            m.item_moved(),
-          )
-        }
-      >
-        {busy && <Spinner data-icon="inline-start" />}
-        {m.item_move_confirm()}
-      </Button>
+      {chosen && askingFor === chosen._id ? (
+        <ConfirmQuestion
+          tone="default"
+          question={
+            jobsWord
+              ? m.item_move_question_jobs({
+                  name: itemName,
+                  from: from?.name ?? '',
+                  to: chosen.name,
+                  jobs: jobsWord,
+                })
+              : m.item_move_question({
+                  name: itemName,
+                  from: from?.name ?? '',
+                  to: chosen.name,
+                })
+          }
+          confirmLabel={m.item_move_confirm()}
+          cancelLabel={m.back()}
+          busy={busy}
+          onConfirm={() =>
+            void run(
+              () => move({ businessId, itemId, toClientId: chosen._id }),
+              m.item_moved(),
+            )
+          }
+          onCancel={() => setAskingFor(null)}
+        />
+      ) : (
+        <Button size="xl" disabled={!chosen} onClick={() => setAskingFor(toId)}>
+          {m.item_move_confirm()}
+        </Button>
+      )}
     </div>
   )
 }
