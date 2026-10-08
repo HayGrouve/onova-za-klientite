@@ -19,7 +19,7 @@ import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { cn } from 'cn'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
@@ -134,19 +134,11 @@ function JobPage() {
   })
   usePageTitle(data?.job.title)
   const services = useQuery(api.services.list, { businessId: business._id })
-  const { move, announce } = useMoveJob()
+  const { moveAndAnnounce, ruleOffer, closeRuleOffer } = useMoveJob()
   const applyCredit = useMutation(api.payments.useCredit)
   const removeWriteOff = useMutation(api.jobs.removeWriteOff)
   // The edit, lines, appointment and cost forms ask before dropping what was typed.
   const sheet = useDetailSheet<OpenSheet>()
-  // The reminder rule's offer after reaching Done (Q5), and the stage toast
-  // that waits while it is open (see moveTo).
-  const [ruleOffer, setRuleOffer] = useState<{
-    _id: Id<'jobs'>
-    title: string
-    itemId?: Id<'items'>
-  } | null>(null)
-  const afterRuleOffer = useRef<(() => void) | null>(null)
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const [usingCredit, setUsingCredit] = useState(false)
   const [undoingWriteOff, setUndoingWriteOff] = useState(false)
@@ -196,28 +188,19 @@ function JobPage() {
     const target = data.stages.find((stage) => stage._id === stageId)
     const previous = data.stages.find((stage) => stage._id === job.stageId)
     if (!target) return
-    const moving = {
-      _id: job._id,
-      stageGroup: job.stageGroup,
-      isNoClient: client?.isNoClient ?? false,
-      balanceCents: job.balanceCents,
-    }
-    const { moved, offerRule } = await move(moving, target)
-    if (!moved) return
-    const say = () =>
-      announce(moving, target, previous, () => sheet.open({ kind: 'payment' }))
-    // Q5: reaching Done offers the reminder rule's reminder, pre-filled. Its
-    // sheet covers the page, so the toast comes once the sheet is closed.
-    if (offerRule) {
-      afterRuleOffer.current = say
-      setRuleOffer({
+    await moveAndAnnounce(
+      {
         _id: job._id,
         title: job.title,
+        stageGroup: job.stageGroup,
+        isNoClient: client?.isNoClient ?? false,
+        balanceCents: job.balanceCents,
         itemId: job.itemIds.at(0),
-      })
-    } else {
-      say()
-    }
+      },
+      target,
+      previous,
+      () => sheet.open({ kind: 'payment' }),
+    )
   }
   const spendCredit = async () => {
     setUsingCredit(true)
@@ -235,11 +218,6 @@ function JobPage() {
       removeWriteOff({ businessId: business._id, jobId: job._id }),
     )
     setUndoingWriteOff(false)
-  }
-  const closeRuleOffer = () => {
-    setRuleOffer(null)
-    afterRuleOffer.current?.()
-    afterRuleOffer.current = null
   }
   const editButton = (
     onClick: () => void,

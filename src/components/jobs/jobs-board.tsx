@@ -13,7 +13,7 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
-import { memo, useMemo, useRef, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
@@ -46,6 +46,7 @@ import { useStableCallback } from '#/hooks/use-stable-callback'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { GROUP_LABEL } from '#/i18n/groups'
+import { planMove } from '#/lib/move-plan'
 import { m } from '#/paraglide/messages.js'
 import { jobOwedCents } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
@@ -99,15 +100,15 @@ export function JobsBoard({
   const canMove = hasRole(business.role, 'manager')
   const now = useNow()
   const board = useQuery(api.jobs.board, { businessId: business._id, now })
-  const { move, announce } = useMoveJob()
-  const [ruleFor, setRuleFor] = useState<Card | null>(null)
-  // The move's toast waits while the reminder rule's offer covers the board.
-  const afterRuleOffer = useRef<(() => void) | null>(null)
-  // A move into Cancelled waits here for a yes. It stays set while the
-  // question closes, so the dialog keeps its words through the animation.
-  const [asking, setAsking] = useState<{ card: Card; target: Target } | null>(
-    null,
-  )
+  const { moveAndAnnounce, ruleOffer, closeRuleOffer } = useMoveJob()
+  // A move into Cancelled waits here for a yes. It keeps the job's id, not
+  // the card: the card is read again when the answer comes. It stays set while
+  // the question closes, so the dialog keeps its words through the animation.
+  const [asking, setAsking] = useState<{
+    jobId: Card['_id']
+    title: string
+    target: Target
+  } | null>(null)
   const [askOpen, setAskOpen] = useState(false)
 
   const stagesByGroup = useMemo(() => {
@@ -133,36 +134,46 @@ export function JobsBoard({
       ),
     [board?.columns, filter, today],
   )
-  const moveNow = (card: Card, target: Target) => {
-    const previous = board?.stages.find((stage) => stage._id === card.stageId)
-    void move(card, target).then(({ moved, offerRule }) => {
-      if (!moved) return
-      const say = () => announce(card, target, previous)
-      if (offerRule) {
-        afterRuleOffer.current = say
-        setRuleFor(card)
-      } else {
-        say()
-      }
-    })
+  // The card as the board has it now, or nothing once it is gone.
+  const currentCard = (jobId: Card['_id']) => {
+    for (const column of board?.columns ?? []) {
+      const found =
+        column.jobs.find((job) => job._id === jobId) ??
+        column.olderOwing.find((job) => job._id === jobId)
+      if (found) return found
+    }
+    return undefined
   }
-  const closeRuleOffer = () => {
-    setRuleFor(null)
-    afterRuleOffer.current?.()
-    afterRuleOffer.current = null
-  }
+  const moveNow = (card: Card, target: Target) =>
+    void moveAndAnnounce(
+      card,
+      target,
+      board?.stages.find((stage) => stage._id === card.stageId),
+    )
   // Steady for the memoized cards and columns; it reads the latest board.
-  const moveTo = useStableCallback((card: Card, target: Target) => {
-    if (target !== 'cancelled' && target._id === card.stageId) return
-    const toCancelled = target === 'cancelled' || target.group === 'cancelled'
+  const moveTo = useStableCallback((pressed: Card, target: Target) => {
+    // The card may have moved since it was pressed or its menu was drawn.
+    const card = currentCard(pressed._id)
+    const plan = planMove(card, target)
+    if (!card || plan === 'skip') return
     // Cancelled jobs stop counting as owed, so ask before a job goes there.
-    if (toCancelled && card.stageGroup !== 'cancelled') {
-      setAsking({ card, target })
+    if (plan === 'ask') {
+      setAsking({ jobId: card._id, title: card.title, target })
       setAskOpen(true)
       return
     }
     moveNow(card, target)
   })
+  // The answer: the job may have moved while the question was open, so it
+  // is looked up again and only moved if it still needs to go there.
+  const confirmAsked = () => {
+    setAskOpen(false)
+    if (!asking) return
+    const card = currentCard(asking.jobId)
+    if (card && planMove(card, asking.target) === 'ask') {
+      moveNow(card, asking.target)
+    }
+  }
   const { drag, floatRef, press, wasDragged } = useCardDrag<Card>(
     (card, key) => {
       const [kind, id] = key.split(':')
@@ -226,13 +237,13 @@ export function JobsBoard({
           </div>
         </div>
       )}
-      <RuleReminderSheet job={ruleFor} onClose={closeRuleOffer} />
+      <RuleReminderSheet job={ruleOffer} onClose={closeRuleOffer} />
       <AlertDialog open={askOpen} onOpenChange={setAskOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {m.stage_cancel_question({
-                title: asking?.card.title ?? '',
+                title: asking?.title ?? '',
                 stage:
                   asking?.target === 'cancelled'
                     ? GROUP_LABEL.cancelled()
@@ -243,13 +254,7 @@ export function JobsBoard({
           <AlertDialogFooter>
             {/* First in the page order, so focus lands on it, as in ConfirmAction. */}
             <AlertDialogCancel>{m.back()}</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                if (asking) moveNow(asking.card, asking.target)
-                setAskOpen(false)
-              }}
-            >
+            <AlertDialogAction variant="destructive" onClick={confirmAsked}>
               {m.stage_cancel_confirm()}
             </AlertDialogAction>
           </AlertDialogFooter>
