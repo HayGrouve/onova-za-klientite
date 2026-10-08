@@ -14,6 +14,7 @@ const MESSAGES: Record<ErrorCode, () => string> = {
   'payment.exceeds': m.error_payment_exceeds,
   'payment.signMismatch': m.error_payment_signMismatch,
   'payment.tooLow': m.error_payment_tooLow,
+  'payment.refunded': m.error_payment_refunded,
   'credit.notEnough': m.error_credit_notEnough,
   'job.otherClient': m.error_job_otherClient,
   'item.otherClient': m.error_job_otherClient,

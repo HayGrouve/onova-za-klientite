@@ -23,6 +23,7 @@ export const ERROR_CODES = [
   'payment.exceeds',
   'payment.zero',
   'payment.tooLow',
+  'payment.refunded',
   'credit.notEnough',
   'job.noDate',
   'client.merged',

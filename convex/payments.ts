@@ -10,6 +10,7 @@ import {
 import {
   paymentAmountRange,
   paymentPrepaidCents,
+  paymentRemovable,
   planPaymentEdit,
 } from '../shared/payment-edit'
 import type { PaymentEditState } from '../shared/payment-edit'
@@ -238,13 +239,19 @@ export const useCredit = businessMutation({
   },
 })
 
-/** Removes a payment entered by mistake, with its allocations. */
+/**
+ * Removes a payment entered by mistake, with its allocations. Not once money
+ * was refunded against it: that would take a job or the credit below zero
+ * (D26), so the refund goes first.
+ */
 export const remove = businessMutation({
   args: { paymentId: v.id('payments') },
   returns: v.null(),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const payment = await getOwned(ctx, 'payments', args.paymentId)
+    const { state } = await loadEditState(ctx, payment)
+    if (!paymentRemovable(state)) fail('payment.refunded')
     await removePayment(ctx, payment)
     await logActivity(ctx, {
       type: 'payment.removed',
@@ -314,6 +321,8 @@ export const get = businessQuery({
       }),
     ),
     prepaidCents: v.number(),
+    /** False once money was refunded against it: delete the refund first. */
+    removable: v.boolean(),
     range: v.object({
       minCents: v.number(),
       maxCents: v.union(v.number(), v.null()),
@@ -349,6 +358,7 @@ export const get = businessQuery({
         note: payment.note,
         allocations: own,
         prepaidCents: 0,
+        removable: false,
         range: { minCents: 0, maxCents: null, why: 'none' as const },
       }
     }
@@ -362,6 +372,7 @@ export const get = businessQuery({
       note: payment.note,
       allocations,
       prepaidCents: paymentPrepaidCents(state),
+      removable: paymentRemovable(state),
       range: paymentAmountRange(state),
     }
   },

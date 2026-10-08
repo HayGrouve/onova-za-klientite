@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   paymentAmountRange,
   paymentPrepaidCents,
+  paymentRemovable,
   planPaymentEdit,
   reallocate,
 } from './payment-edit'
@@ -426,5 +427,44 @@ describe('editing a payment, in general', () => {
         )
       }),
     )
+  })
+})
+
+describe('whether a payment can be removed', () => {
+  it('can when nothing was refunded against it', () => {
+    expect(paymentRemovable(payment(10000, [job('a', 10000)]))).toBe(true)
+    expect(paymentRemovable(payment(5000, []))).toBe(true)
+  })
+
+  it('cannot once its job was refunded, so the job would go below zero', () => {
+    // Paid 100, refunded 100: the job holds 0 now.
+    expect(paymentRemovable(payment(10000, [job('a', 10000, 0)]))).toBe(false)
+    // Paid 100, refunded 30.
+    expect(paymentRemovable(payment(10000, [job('a', 10000, 7000)]))).toBe(
+      false,
+    )
+    // Another payment covers the part that would be taken away.
+    expect(paymentRemovable(payment(10000, [job('a', 10000, 20000)]))).toBe(
+      true,
+    )
+  })
+
+  it('checks every job a payment sits on', () => {
+    expect(
+      paymentRemovable(
+        payment(14000, [job('a', 10000, 10000), job('b', 4000, 1000)]),
+      ),
+    ).toBe(false)
+  })
+
+  it('cannot when the credit it left was paid back', () => {
+    expect(paymentRemovable(payment(5000, [], 0))).toBe(false)
+    expect(paymentRemovable(payment(5000, [], 2000))).toBe(false)
+    expect(paymentRemovable(payment(5000, [], 5000))).toBe(true)
+  })
+
+  it('a refund can always be removed: it only gives the money back', () => {
+    expect(paymentRemovable(refund(4000, [job('a', 4000, 0)], 0))).toBe(true)
+    expect(paymentRemovable(refund(4000, [], 0))).toBe(true)
   })
 })

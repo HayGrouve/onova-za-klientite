@@ -196,6 +196,64 @@ describe('payments', () => {
     await expectCachesFresh(t)
   })
 
+  it('refuses to delete a payment that was refunded against, and offers its refund first', async () => {
+    const { t, owner, businessId, clientId, jobIds } = await withJobs([10000])
+    const paymentId = await owner.mutation(api.payments.addFromJob, {
+      businessId,
+      jobId: jobIds[0],
+      amountCents: 10000,
+      date: DATE,
+      method: 'cash',
+    })
+    const refundId = await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      jobId: jobIds[0],
+      amountCents: 10000,
+      date: DATE,
+      method: 'cash',
+    })
+    expect(
+      (await owner.query(api.payments.get, { businessId, paymentId }))
+        .removable,
+    ).toBe(false)
+    await expect(
+      owner.mutation(api.payments.remove, { businessId, paymentId }),
+    ).rejects.toThrow(/payment.refunded/)
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(0)
+    // Take the refund away first, and the payment can go.
+    await owner.mutation(api.payments.remove, {
+      businessId,
+      paymentId: refundId,
+    })
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(10000)
+    await owner.mutation(api.payments.remove, { businessId, paymentId })
+    expect((await getDoc(t, 'jobs', jobIds[0])).paidCents).toBe(0)
+    await expectCachesFresh(t)
+  })
+
+  it('refuses to delete a payment whose credit was paid back', async () => {
+    const { t, owner, businessId, clientId } = await withJobs([])
+    const paymentId = await owner.mutation(api.payments.addFromClient, {
+      businessId,
+      clientId,
+      amountCents: 5000,
+      date: DATE,
+      method: 'bank',
+    })
+    await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      amountCents: 2000,
+      date: DATE,
+      method: 'cash',
+    })
+    await expect(
+      owner.mutation(api.payments.remove, { businessId, paymentId }),
+    ).rejects.toThrow(/payment.refunded/)
+    expect((await getDoc(t, 'clients', clientId)).creditCents).toBe(3000)
+  })
+
   it('every cache equals a recomputation after any sequence of money changes', async () => {
     type Step =
       | { kind: 'fromJob'; job: number; amount: number }
@@ -941,9 +999,10 @@ describe('editing keeps the money invariants', () => {
     },
   )
   // Refused steps are part of the domain.
-  const REFUSED = /credit.notEnough|payment.zero|payment.exceeds|payment.tooLow/
+  const REFUSED =
+    /credit.notEnough|payment.zero|payment.exceeds|payment.tooLow|payment.refunded/
 
-  it('after any sequence the caches are fresh, and an edit never takes a job or the credit below zero', async () => {
+  it('after any sequence the caches are fresh, and an edit or a delete never takes a job or the credit below zero', async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(step, { maxLength: 10 }), async (steps) => {
         const { t, owner, businessId, clientId, jobIds } = await withJobs([
@@ -1028,6 +1087,7 @@ describe('editing keeps the money invariants', () => {
                 paymentId,
               })
               paymentIds.splice(paymentIds.indexOf(paymentId), 1)
+              return true
             }
             return false
           }
