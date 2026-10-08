@@ -89,7 +89,7 @@ export const summary = businessQuery({
       )
       .collect()
     const byClient = new Map<
-      string,
+      Id<'clients'>,
       {
         owedCents: number
         doneOwedCents: number
@@ -126,7 +126,7 @@ export const summary = businessQuery({
       .map(([clientId, entry]) => {
         const client = clientById.get(clientId)
         return {
-          clientId: client!._id,
+          clientId,
           name: client?.name ?? '',
           isNoClient: client?.isNoClient ?? false,
           phone: client?.phones.at(0)?.e164,

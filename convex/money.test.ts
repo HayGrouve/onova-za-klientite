@@ -50,6 +50,29 @@ describe('money.summary', () => {
     await expectCachesFresh(t)
   })
 
+  it('an owing job whose client record is missing still shows, without throwing', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Ани',
+    })
+    await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Шкаф',
+      typedPriceCents: 10000,
+    })
+    await t.run((ctx) => ctx.db.delete('clients', clientId))
+    const summary = await owner.query(api.money.summary, {
+      businessId,
+      month: '2026-10',
+    })
+    expect(summary.whoOwesMe).toEqual([
+      expect.objectContaining({ clientId, name: '', owedCents: 10000 }),
+    ])
+  })
+
   it('a refund lowers what was received in its month', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)
