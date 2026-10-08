@@ -1,13 +1,7 @@
 import { v } from 'convex/values'
 import { isValidDate } from '../shared/dates'
-import type { Doc } from './_generated/dataModel'
 import { logActivity } from './lib/activity'
-import {
-  businessMutation,
-  businessQuery,
-  getOwned,
-  requireRole,
-} from './lib/auth'
+import { businessMutation, getOwned, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
 import { requiredText } from './lib/validate'
 
@@ -88,32 +82,6 @@ export const close = businessMutation({
   },
 })
 
-const vOpenReminders = v.array(
-  v.object({
-    _id: v.id('reminders'),
-    date: v.string(),
-    note: v.string(),
-    source: v.union(v.literal('manual'), v.literal('rule')),
-    jobId: v.optional(v.id('jobs')),
-    itemId: v.optional(v.id('items')),
-  }),
-)
-
-/** The open ones, soonest first, as the lists show them. */
-function openReminders(reminders: Array<Doc<'reminders'>>) {
-  return reminders
-    .filter((reminder) => reminder.status === 'open')
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map(({ _id, date, note, source, jobId, itemId }) => ({
-      _id,
-      date,
-      note,
-      source,
-      jobId,
-      itemId,
-    }))
-}
-
 /**
  * "Snooze": moves an open reminder to another day and answers with the day it
  * was on, so an undo can snooze it back. Null when nothing moved: a closed
@@ -159,50 +127,5 @@ export const reopen = businessMutation({
       data: { note: reminder.note },
     })
     return null
-  },
-})
-
-/** A client's open reminders, soonest first. */
-export const forClient = businessQuery({
-  args: { clientId: v.id('clients') },
-  returns: vOpenReminders,
-  handler: async (ctx, { clientId }) => {
-    const client = await getOwned(ctx, 'clients', clientId)
-    return openReminders(
-      await ctx.db
-        .query('reminders')
-        .withIndex('by_client', (q) => q.eq('clientId', client._id))
-        .collect(),
-    )
-  },
-})
-
-/** The open reminders that point at a job, soonest first. */
-export const forJob = businessQuery({
-  args: { jobId: v.id('jobs') },
-  returns: vOpenReminders,
-  handler: async (ctx, { jobId }) => {
-    const job = await getOwned(ctx, 'jobs', jobId)
-    return openReminders(
-      await ctx.db
-        .query('reminders')
-        .withIndex('by_job', (q) => q.eq('jobId', job._id))
-        .collect(),
-    )
-  },
-})
-
-/** The open reminders that point at an item, soonest first. */
-export const forItem = businessQuery({
-  args: { itemId: v.id('items') },
-  returns: vOpenReminders,
-  handler: async (ctx, { itemId }) => {
-    const item = await getOwned(ctx, 'items', itemId)
-    return openReminders(
-      await ctx.db
-        .query('reminders')
-        .withIndex('by_item', (q) => q.eq('itemId', item._id))
-        .collect(),
-    )
   },
 })

@@ -56,6 +56,26 @@ export function creditForJob(
   return Math.max(Math.min(creditCents, jobOwedCents(job)), 0)
 }
 
+/**
+ * What a refund can pay back (D26): the client's credit, then what each job
+ * was paid, each up to its own amount.
+ */
+export function refundSources<TJobId>(
+  creditCents: number,
+  jobs: ReadonlyArray<{ _id: TJobId; title: string; paidCents: number }>,
+): Array<{ jobId?: TJobId; title?: string; limitCents: number }> {
+  return [
+    ...(creditCents > 0 ? [{ limitCents: creditCents }] : []),
+    ...jobs
+      .filter((job) => job.paidCents > 0)
+      .map((job) => ({
+        jobId: job._id,
+        title: job.title,
+        limitCents: job.paidCents,
+      })),
+  ]
+}
+
 /** Fills the open jobs in the given order (oldest first). The rest is credit. */
 export function splitPayment<TId extends string>(
   amountCents: number,

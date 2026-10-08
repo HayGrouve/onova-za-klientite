@@ -25,15 +25,9 @@ import { DetailError } from '#/components/not-found'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
 import { InputGroup, InputGroupInput } from '#/components/ui/input-group'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
-import { useSheetGuard } from '#/hooks/use-discard-guard'
+import { DetailSheet, useDetailSheet } from '#/components/detail-sheet'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
@@ -41,6 +35,7 @@ import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../../shared/dates'
 import { searchClients } from '../../../shared/search'
+import { lastDoneAt } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/items/$itemId')({
   staticData: { layout: 'wide' },
@@ -58,26 +53,11 @@ function ItemPage() {
     itemId,
   })
   usePageTitle(data?.item.name)
-  const guard = useSheetGuard()
-  const [panel, setPanel] = useState<'edit' | 'move' | 'reminder' | null>(null)
-  const reminders = useQuery(
-    api.reminders.forItem,
-    business.modules.reminders
-      ? { businessId: business._id, itemId: itemId as Id<'items'> }
-      : 'skip',
-  )
+  const sheet = useDetailSheet<{ kind: 'edit' | 'move' | 'reminder' }>()
   if (!data) return <ListSkeleton />
   const { item, client } = data
   // "When did I last do this one?": the latest job that reached Done.
-  const lastDoneAt = data.jobs.reduce<number | undefined>(
-    (latest, job) =>
-      job.stageGroup === 'done' &&
-      job.doneAt !== undefined &&
-      (latest === undefined || job.doneAt > latest)
-        ? job.doneAt
-        : latest,
-    undefined,
-  )
+  const lastDone = lastDoneAt(data.jobs)
 
   return (
     // A wide screen puts the owner and fields on the left, the work and files
@@ -93,16 +73,16 @@ function ItemPage() {
               variant="ghost"
               size="icon-xl"
               aria-label={m.edit()}
-              onClick={() => setPanel('edit')}
+              onClick={() => sheet.open({ kind: 'edit' })}
             >
               <PencilSimpleIcon />
             </Button>
           </Tip>
         </div>
-        {lastDoneAt !== undefined && (
+        {lastDone !== undefined && (
           <p className="text-sm text-muted-foreground">
             {m.item_last_done({
-              date: formatDay(dateInSofia(lastDoneAt), today),
+              date: formatDay(dateInSofia(lastDone), today),
             })}
           </p>
         )}
@@ -138,7 +118,7 @@ function ItemPage() {
               <Button
                 variant="outline"
                 className="h-11 shadow-xs"
-                onClick={() => setPanel('move')}
+                onClick={() => sheet.open({ kind: 'move' })}
               >
                 <ArrowsLeftRightIcon data-icon="inline-start" />
                 {m.item_move()}
@@ -180,9 +160,10 @@ function ItemPage() {
 
         {business.modules.reminders && (
           <RemindersPanel
-            reminders={reminders ?? []}
+            reminders={data.reminders}
+            on="item"
             today={today}
-            onAdd={() => setPanel('reminder')}
+            onAdd={() => sheet.open({ kind: 'reminder' })}
           />
         )}
 
@@ -204,54 +185,43 @@ function ItemPage() {
         )}
       </div>
 
-      <Sheet
-        open={panel !== null}
-        onOpenChange={(open) => !open && guard.close(() => setPanel(null))}
+      <DetailSheet
+        sheet={sheet}
+        title={
+          sheet.panel?.kind === 'move'
+            ? m.item_move_title()
+            : sheet.panel?.kind === 'reminder'
+              ? m.reminder_add_title()
+              : item.name
+        }
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>
-              {panel === 'move'
-                ? m.item_move_title()
-                : panel === 'reminder'
-                  ? m.reminder_add_title()
-                  : item.name}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {panel === 'edit' && (
-              <ItemForm
-                businessId={business._id}
-                clientId={item.clientId}
-                item={item}
-                fields={data.fields}
-                onSaved={() => setPanel(null)}
-                onDirtyChange={guard.setDirty}
-              />
-            )}
-            {panel === 'move' && (
-              <MovePicker
-                businessId={business._id}
-                itemId={item._id}
-                currentClientId={item.clientId}
-                onDone={() => setPanel(null)}
-              />
-            )}
-            {panel === 'reminder' && (
-              <ReminderForm
-                businessId={business._id}
-                target={{ itemId: item._id }}
-                initialDate={today}
-                onDone={() => setPanel(null)}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-      {guard.prompt}
+        {sheet.panel?.kind === 'edit' && (
+          <ItemForm
+            businessId={business._id}
+            clientId={item.clientId}
+            item={item}
+            fields={data.fields}
+            onSaved={sheet.close}
+            onDirtyChange={sheet.setDirty}
+          />
+        )}
+        {sheet.panel?.kind === 'move' && (
+          <MovePicker
+            businessId={business._id}
+            itemId={item._id}
+            currentClientId={item.clientId}
+            onDone={sheet.close}
+          />
+        )}
+        {sheet.panel?.kind === 'reminder' && (
+          <ReminderForm
+            businessId={business._id}
+            target={{ itemId: item._id }}
+            initialDate={today}
+            onDone={sheet.close}
+          />
+        )}
+      </DetailSheet>
     </div>
   )
 }

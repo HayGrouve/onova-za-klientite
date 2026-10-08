@@ -1,5 +1,4 @@
 import {
-  BellIcon,
   CaretRightIcon,
   ChatCircleIcon,
   ClipboardTextIcon,
@@ -33,7 +32,7 @@ import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
 import { PaymentSheet } from '#/components/money/payment-sheet'
 import { ReminderForm } from '#/components/reminders/reminder-form'
-import { ReminderRow } from '#/components/reminders/reminder-row'
+import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { RefundForm } from '#/components/money/refund-form'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
@@ -42,19 +41,14 @@ import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
-import { useSheetGuard } from '#/hooks/use-discard-guard'
+import { DetailSheet, useDetailSheet } from '#/components/detail-sheet'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
+import { refundSources } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
@@ -77,38 +71,15 @@ function ClientPage() {
   usePageTitle(
     data && (data.client.isNoClient ? m.no_client() : data.client.name),
   )
-  const [panel, setPanel] = useState<
-    | { kind: 'edit' }
-    | { kind: 'payment' }
-    | { kind: 'refund' }
-    | { kind: 'reminder' }
-    | null
-  >(null)
+  const sheet = useDetailSheet<{
+    kind: 'edit' | 'payment' | 'refund' | 'reminder'
+  }>()
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
-  const close = () => setPanel(null)
-  const guard = useSheetGuard()
-  const reminders = useQuery(
-    api.reminders.forClient,
-    business.modules.reminders
-      ? { businessId: business._id, clientId: clientId as Id<'clients'> }
-      : 'skip',
-  )
   const { words } = business
 
   if (!data) return <ListSkeleton />
   const { client } = data
   const phone = client.phones.at(0)?.e164
-  // A refund pays back client credit, or takes back part of what a job was paid (D26).
-  const refundSources = [
-    ...(client.creditCents > 0 ? [{ limitCents: client.creditCents }] : []),
-    ...data.jobs
-      .filter((job) => job.paidCents > 0)
-      .map((job) => ({
-        jobId: job._id,
-        title: job.title,
-        limitCents: job.paidCents,
-      })),
-  ]
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -127,7 +98,7 @@ function ClientPage() {
                     variant="ghost"
                     size="icon-xl"
                     aria-label={m.client_edit()}
-                    onClick={() => setPanel({ kind: 'edit' })}
+                    onClick={() => sheet.open({ kind: 'edit' })}
                   >
                     <PencilSimpleIcon />
                   </Button>
@@ -324,16 +295,17 @@ function ClientPage() {
                   <>
                     <Button
                       size="xl"
-                      onClick={() => setPanel({ kind: 'payment' })}
+                      onClick={() => sheet.open({ kind: 'payment' })}
                     >
                       <PlusIcon data-icon="inline-start" />
                       {m.pay_add()}
                     </Button>
-                    {refundSources.length > 0 && (
+                    {refundSources(client.creditCents, data.jobs).length >
+                      0 && (
                       <Button
                         variant="outline"
                         size="xl"
-                        onClick={() => setPanel({ kind: 'refund' })}
+                        onClick={() => sheet.open({ kind: 'refund' })}
                       >
                         {m.refund_add()}
                       </Button>
@@ -429,34 +401,12 @@ function ClientPage() {
             key: 'reminders',
             side: true,
             node: business.modules.reminders && !client.isNoClient && (
-              <Panel
-                title={m.reminder_list()}
-                icon={BellIcon}
-                action={
-                  <Button
-                    variant="ghost"
-                    className="h-9 text-primary"
-                    onClick={() => setPanel({ kind: 'reminder' })}
-                  >
-                    <PlusIcon data-icon="inline-start" />
-                    {m.reminder_add()}
-                  </Button>
-                }
-              >
-                <PanelList>
-                  {(reminders ?? []).map((reminder) => (
-                    <ReminderRow
-                      key={reminder._id}
-                      reminderId={reminder._id}
-                      note={reminder.note}
-                      detail={formatDay(reminder.date, today)}
-                      date={reminder.date}
-                      jobId={reminder.jobId}
-                      itemId={reminder.itemId}
-                    />
-                  ))}
-                </PanelList>
-              </Panel>
+              <RemindersPanel
+                reminders={data.reminders}
+                on="client"
+                today={today}
+                onAdd={() => sheet.open({ kind: 'reminder' })}
+              />
             ),
           },
           {
@@ -488,70 +438,59 @@ function ClientPage() {
         ]}
       />
 
-      <Sheet
-        open={panel !== null}
-        onOpenChange={(open) => !open && guard.close(close)}
+      <DetailSheet
+        sheet={sheet}
+        title={
+          sheet.panel?.kind === 'payment'
+            ? m.pay_title()
+            : sheet.panel?.kind === 'refund'
+              ? m.refund_title()
+              : sheet.panel?.kind === 'reminder'
+                ? m.reminder_add_title()
+                : client.name
+        }
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>
-              {panel?.kind === 'payment'
-                ? m.pay_title()
-                : panel?.kind === 'refund'
-                  ? m.refund_title()
-                  : panel?.kind === 'reminder'
-                    ? m.reminder_add_title()
-                    : client.name}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {panel?.kind === 'edit' && (
-              <ClientForm
-                businessId={business._id}
-                client={client}
-                fields={data.fields}
-                onSaved={close}
-                onDirtyChange={guard.setDirty}
-              />
-            )}
-            {panel?.kind === 'payment' && (
-              <PaymentForm
-                businessId={business._id}
-                target={{
-                  kind: 'client',
-                  clientId: client._id,
-                  openJobs: data.jobs.filter((job) => job.owes),
-                }}
-                today={today}
-                depositsOn={business.depositsOnNewJob}
-                defaultMethod={defaultPaymentMethod(data.payments)}
-                onDone={close}
-              />
-            )}
-            {panel?.kind === 'refund' && (
-              <RefundForm
-                businessId={business._id}
-                clientId={client._id}
-                sources={refundSources}
-                today={today}
-                onDone={close}
-              />
-            )}
-            {panel?.kind === 'reminder' && (
-              <ReminderForm
-                businessId={business._id}
-                target={{ clientId: client._id }}
-                initialDate={today}
-                onDone={close}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-      {guard.prompt}
+        {sheet.panel?.kind === 'edit' && (
+          <ClientForm
+            businessId={business._id}
+            client={client}
+            fields={data.fields}
+            onSaved={sheet.close}
+            onDirtyChange={sheet.setDirty}
+          />
+        )}
+        {sheet.panel?.kind === 'payment' && (
+          <PaymentForm
+            businessId={business._id}
+            target={{
+              kind: 'client',
+              clientId: client._id,
+              openJobs: data.jobs.filter((job) => job.owes),
+            }}
+            today={today}
+            depositsOn={business.depositsOnNewJob}
+            defaultMethod={defaultPaymentMethod(data.payments)}
+            onDone={sheet.close}
+          />
+        )}
+        {sheet.panel?.kind === 'refund' && (
+          <RefundForm
+            businessId={business._id}
+            clientId={client._id}
+            sources={refundSources(client.creditCents, data.jobs)}
+            today={today}
+            onDone={sheet.close}
+          />
+        )}
+        {sheet.panel?.kind === 'reminder' && (
+          <ReminderForm
+            businessId={business._id}
+            target={{ clientId: client._id }}
+            initialDate={today}
+            onDone={sheet.close}
+          />
+        )}
+      </DetailSheet>
       <PaymentSheet
         businessId={business._id}
         paymentId={openPayment}

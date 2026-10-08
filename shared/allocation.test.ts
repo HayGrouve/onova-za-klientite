@@ -9,6 +9,7 @@ import {
   jobPriceCents,
   jobProfitCents,
   jobProfitIsFinal,
+  refundSources,
   splitPayment,
 } from './allocation'
 
@@ -235,5 +236,20 @@ describe('checkAllocations', () => {
 
   it('treats a zero payment with allocations as a sign mismatch', () => {
     expect(checkAllocations(0, [{ amountCents: 5 }])).toBe('signMismatch')
+  })
+})
+
+describe('refundSources', () => {
+  it('offers the credit, then each job that was paid, up to its own amount', () => {
+    expect(
+      refundSources(2500, [
+        { _id: 'a', title: 'Гардероб', paidCents: 30000 },
+        { _id: 'b', title: 'Шкаф', paidCents: 0 },
+      ]),
+    ).toEqual([
+      { limitCents: 2500 },
+      { jobId: 'a', title: 'Гардероб', limitCents: 30000 },
+    ])
+    expect(refundSources(0, [])).toEqual([])
   })
 })

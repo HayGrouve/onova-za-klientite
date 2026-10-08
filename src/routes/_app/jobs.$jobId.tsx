@@ -33,7 +33,7 @@ import { AppointmentForm } from '#/components/job/appointment-form'
 import { RepeatSection } from '#/components/job/repeat-section'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { RemindersPanel } from '#/components/reminders/reminders-panel'
-import { monthsLabel } from '#/components/setup/steps'
+import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
 import { CostForm } from '#/components/money/cost-form'
 import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
@@ -53,14 +53,8 @@ import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
-import { useSheetGuard } from '#/hooks/use-discard-guard'
+import { DetailSheet, useDetailSheet } from '#/components/detail-sheet'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useMoveJob } from '#/hooks/use-move-job'
@@ -70,11 +64,12 @@ import { METHOD_LABEL } from '#/i18n/money'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import {
+  creditForJob,
   jobOwedCents,
   jobProfitCents,
   jobProfitIsFinal,
+  refundSources,
 } from '../../../shared/allocation'
-import { addMonths } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
 import { formatQuantity } from '../../../shared/quantity'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
@@ -98,7 +93,7 @@ type OpenSheet =
   | { kind: 'refund' }
   | { kind: 'writeOff' }
   | { kind: 'cost'; cost?: Doc<'costs'> }
-  | { kind: 'reminder'; rule: boolean }
+  | { kind: 'reminder' }
 
 type StageRef = { _id: Id<'stages'>; name: string; group: StageGroup }
 
@@ -144,33 +139,28 @@ function JobPage() {
     jobId,
   })
   usePageTitle(data?.job.title)
-  const fields = useQuery(api.fields.list, {
-    businessId: business._id,
-    target: 'job',
-  })
   const services = useQuery(api.services.list, { businessId: business._id })
-  const reminders = useQuery(
-    api.reminders.forJob,
-    business.modules.reminders
-      ? { businessId: business._id, jobId: jobId as Id<'jobs'> }
-      : 'skip',
-  )
   const move = useMoveJob()
   const applyCredit = useMutation(api.payments.useCredit)
   const removeWriteOff = useMutation(api.jobs.removeWriteOff)
-  const [panel, setPanel] = useState<OpenSheet | null>(null)
-  // The stage toast waits here while the reminder offer is open (see moveTo).
-  const afterSheet = useRef<(() => void) | null>(null)
+  // The edit, lines, appointment and cost forms ask before dropping what was typed.
+  const sheet = useDetailSheet<OpenSheet>()
+  // The reminder rule's offer after reaching Done (Q5), and the stage toast
+  // that waits while it is open (see moveTo).
+  const [ruleOffer, setRuleOffer] = useState<{
+    _id: Id<'jobs'>
+    title: string
+    itemId?: Id<'items'>
+  } | null>(null)
+  const afterRuleOffer = useRef<(() => void) | null>(null)
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const [usingCredit, setUsingCredit] = useState(false)
-  // The edit, lines, appointment and cost forms ask before dropping what was typed.
-  const guard = useSheetGuard()
   const { words, modules } = business
 
   // A toast's undo and payment buttons belong to this job's page.
   useEffect(() => () => void toast.dismiss(STAGE_TOAST), [jobId])
 
-  if (!data || !fields) return <ListSkeleton />
+  if (!data) return <ListSkeleton />
   const { job, client } = data
   const phone = client?.phones.at(0)?.e164
   // New and in-progress work can still be paid or cost more: profit so far.
@@ -207,7 +197,7 @@ function JobPage() {
         ? {
             action: {
               label: m.pay_add(),
-              onClick: () => setPanel({ kind: 'payment' }),
+              onClick: () => sheet.open({ kind: 'payment' }),
             },
             cancel: undo,
           }
@@ -227,18 +217,21 @@ function JobPage() {
       // Q5: reaching Done offers the reminder rule's reminder, pre-filled. Its
       // sheet covers the page, so the toast comes once the sheet is closed.
       if (offerRule) {
-        afterSheet.current = () => announceMove(target, previous)
-        setPanel({ kind: 'reminder', rule: true })
+        afterRuleOffer.current = () => announceMove(target, previous)
+        setRuleOffer({
+          _id: job._id,
+          title: job.title,
+          itemId: job.itemIds.at(0),
+        })
       } else {
         announceMove(target, previous)
       }
     })
   }
-  const close = () => {
-    guard.setDirty(false)
-    setPanel(null)
-    afterSheet.current?.()
-    afterSheet.current = null
+  const closeRuleOffer = () => {
+    setRuleOffer(null)
+    afterRuleOffer.current?.()
+    afterRuleOffer.current = null
   }
   const editButton = (
     onClick: () => void,
@@ -267,7 +260,7 @@ function JobPage() {
               variant="ghost"
               size="icon-xl"
               aria-label={m.job_edit()}
-              onClick={() => setPanel({ kind: 'edit' })}
+              onClick={() => sheet.open({ kind: 'edit' })}
             >
               <PencilSimpleIcon />
             </Button>
@@ -402,7 +395,7 @@ function JobPage() {
                 title={words.appointment.plural}
                 icon={CalendarBlankIcon}
                 action={editButton(
-                  () => setPanel({ kind: 'appointment' }),
+                  () => sheet.open({ kind: 'appointment' }),
                   m.job_add_appointment(),
                   PlusIcon,
                 )}
@@ -413,7 +406,7 @@ function JobPage() {
                       <button
                         type="button"
                         onClick={() =>
-                          setPanel({ kind: 'appointment', appointment })
+                          sheet.open({ kind: 'appointment', appointment })
                         }
                         className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-3 text-left"
                       >
@@ -446,7 +439,7 @@ function JobPage() {
                   <>
                     <Button
                       size="xl"
-                      onClick={() => setPanel({ kind: 'payment' })}
+                      onClick={() => sheet.open({ kind: 'payment' })}
                     >
                       <PlusIcon data-icon="inline-start" />
                       {m.pay_add()}
@@ -455,7 +448,7 @@ function JobPage() {
                       <Button
                         variant="outline"
                         size="xl"
-                        onClick={() => setPanel({ kind: 'refund' })}
+                        onClick={() => sheet.open({ kind: 'refund' })}
                       >
                         {m.refund_add()}
                       </Button>
@@ -464,7 +457,7 @@ function JobPage() {
                       <Button
                         variant="ghost"
                         size="xl"
-                        onClick={() => setPanel({ kind: 'writeOff' })}
+                        onClick={() => sheet.open({ kind: 'writeOff' })}
                       >
                         {m.writeoff_add()}
                       </Button>
@@ -532,7 +525,7 @@ function JobPage() {
                         label={m.credit_use()}
                         question={m.credit_use_question({
                           amount: formatMoney(
-                            Math.min(client.creditCents, job.balanceCents),
+                            creditForJob(client.creditCents, job),
                           ),
                         })}
                         confirmLabel={m.credit_use()}
@@ -628,7 +621,7 @@ function JobPage() {
                 title={m.job_lines()}
                 icon={ListBulletsIcon}
                 action={editButton(
-                  () => setPanel({ kind: 'lines' }),
+                  () => sheet.open({ kind: 'lines' }),
                   job.lines.length ? m.edit() : m.job_add_line(),
                   job.lines.length ? PencilSimpleIcon : PlusIcon,
                 )}
@@ -673,7 +666,7 @@ function JobPage() {
                 title={m.job_costs()}
                 icon={ReceiptIcon}
                 action={editButton(
-                  () => setPanel({ kind: 'cost' }),
+                  () => sheet.open({ kind: 'cost' }),
                   m.cost_add(),
                   PlusIcon,
                 )}
@@ -683,7 +676,7 @@ function JobPage() {
                     <li key={cost._id}>
                       <button
                         type="button"
-                        onClick={() => setPanel({ kind: 'cost', cost })}
+                        onClick={() => sheet.open({ kind: 'cost', cost })}
                         className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
                       >
                         <span className="min-w-0 break-words">
@@ -709,7 +702,7 @@ function JobPage() {
               <Panel
                 title={words.item.plural}
                 icon={StackIcon}
-                action={editButton(() => setPanel({ kind: 'items' }))}
+                action={editButton(() => sheet.open({ kind: 'items' }))}
               >
                 {data.items.length > 0 && (
                   <PanelBody className="flex flex-wrap gap-2">
@@ -743,7 +736,7 @@ function JobPage() {
             key: 'extra',
             node: (
               <ExtraFieldsView
-                fields={fields}
+                fields={data.fields}
                 values={job.extra}
                 today={today}
               />
@@ -769,9 +762,10 @@ function JobPage() {
             side: true,
             node: modules.reminders && client && !client.isNoClient && (
               <RemindersPanel
-                reminders={reminders ?? []}
+                reminders={data.reminders}
+                on="job"
                 today={today}
-                onAdd={() => setPanel({ kind: 'reminder', rule: false })}
+                onAdd={() => sheet.open({ kind: 'reminder' })}
               />
             ),
           },
@@ -803,156 +797,116 @@ function JobPage() {
         ]}
       />
 
-      <Sheet
-        open={panel !== null}
-        onOpenChange={(open) => !open && guard.close(close)}
+      <DetailSheet
+        sheet={sheet}
+        title={
+          sheet.panel
+            ? {
+                edit: job.title,
+                lines: m.job_lines(),
+                appointment: words.appointment.singular,
+                items: words.item.plural,
+                payment: m.pay_title(),
+                refund: m.refund_title(),
+                writeOff: m.writeoff_title(),
+                cost: m.cost_title(),
+                reminder: m.reminder_add_title(),
+              }[sheet.panel.kind]
+            : null
+        }
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>
-              {panel?.kind === 'payment'
-                ? m.pay_title()
-                : panel?.kind === 'refund'
-                  ? m.refund_title()
-                  : panel?.kind === 'writeOff'
-                    ? m.writeoff_title()
-                    : panel?.kind === 'cost'
-                      ? m.cost_title()
-                      : panel?.kind === 'reminder'
-                        ? panel.rule
-                          ? m.reminder_rule_title()
-                          : m.reminder_add_title()
-                        : panel?.kind === 'lines'
-                          ? m.job_lines()
-                          : panel?.kind === 'appointment'
-                            ? words.appointment.singular
-                            : panel?.kind === 'items'
-                              ? words.item.plural
-                              : job.title}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {panel?.kind === 'edit' && (
-              <JobEditForm
-                businessId={business._id}
-                job={job}
-                fields={fields}
-                onDone={close}
-                onDirtyChange={guard.setDirty}
-              />
+        {sheet.panel?.kind === 'edit' && (
+          <JobEditForm
+            businessId={business._id}
+            job={job}
+            fields={data.fields}
+            onDone={sheet.close}
+            onDirtyChange={sheet.setDirty}
+          />
+        )}
+        {sheet.panel?.kind === 'lines' && (
+          <LinesEditor
+            businessId={business._id}
+            job={job}
+            services={services ?? []}
+            onDone={sheet.close}
+            onDirtyChange={sheet.setDirty}
+          />
+        )}
+        {sheet.panel?.kind === 'appointment' && (
+          <AppointmentForm
+            businessId={business._id}
+            jobId={job._id}
+            appointment={sheet.panel.appointment}
+            today={today}
+            onDone={sheet.close}
+            onDirtyChange={sheet.setDirty}
+          />
+        )}
+        {sheet.panel?.kind === 'payment' && (
+          <PaymentForm
+            businessId={business._id}
+            target={{
+              kind: 'job',
+              jobId: job._id,
+              balanceCents: jobOwedCents(job),
+            }}
+            today={today}
+            depositsOn={business.depositsOnNewJob}
+            defaultMethod={defaultPaymentMethod(
+              data.payments.map((payment) => ({
+                amountCents: payment.paymentAmountCents,
+                method: payment.method,
+              })),
             )}
-            {panel?.kind === 'lines' && (
-              <LinesEditor
-                businessId={business._id}
-                job={job}
-                services={services ?? []}
-                onDone={close}
-                onDirtyChange={guard.setDirty}
-              />
-            )}
-            {panel?.kind === 'appointment' && (
-              <AppointmentForm
-                businessId={business._id}
-                jobId={job._id}
-                appointment={panel.appointment}
-                today={today}
-                onDone={close}
-                onDirtyChange={guard.setDirty}
-              />
-            )}
-            {panel?.kind === 'payment' && (
-              <PaymentForm
-                businessId={business._id}
-                target={{
-                  kind: 'job',
-                  jobId: job._id,
-                  balanceCents: jobOwedCents(job),
-                }}
-                today={today}
-                depositsOn={business.depositsOnNewJob}
-                defaultMethod={defaultPaymentMethod(
-                  data.payments.map((payment) => ({
-                    amountCents: payment.paymentAmountCents,
-                    method: payment.method,
-                  })),
-                )}
-                onDone={close}
-              />
-            )}
-            {panel?.kind === 'refund' && client && (
-              <RefundForm
-                businessId={business._id}
-                clientId={client._id}
-                sources={[
-                  {
-                    jobId: job._id,
-                    title: job.title,
-                    limitCents: job.paidCents,
-                  },
-                ]}
-                today={today}
-                onDone={close}
-              />
-            )}
-            {panel?.kind === 'writeOff' && (
-              <WriteOffForm
-                businessId={business._id}
-                jobId={job._id}
-                balanceCents={job.balanceCents}
-                onDone={close}
-              />
-            )}
-            {panel?.kind === 'cost' && (
-              <CostForm
-                businessId={business._id}
-                jobId={job._id}
-                cost={panel.cost}
-                today={today}
-                onDone={close}
-                onDirtyChange={guard.setDirty}
-              />
-            )}
-            {panel?.kind === 'reminder' && (
-              <>
-                {panel.rule && business.reminderRule && (
-                  <p className="pb-4 text-sm">
-                    {m.reminder_rule_body({
-                      when: monthsLabel(
-                        business.reminderRule.months,
-                      ).toLocaleLowerCase('bg'),
-                    })}
-                  </p>
-                )}
-                <ReminderForm
-                  businessId={business._id}
-                  target={{ jobId: job._id, itemId: job.itemIds.at(0) }}
-                  initialDate={
-                    panel.rule && business.reminderRule
-                      ? addMonths(today, business.reminderRule.months)
-                      : today
-                  }
-                  initialNote={panel.rule ? job.title : ''}
-                  source={panel.rule ? 'rule' : 'manual'}
-                  onDone={close}
-                  onSkip={panel.rule ? close : undefined}
-                />
-              </>
-            )}
-            {panel?.kind === 'items' && client && (
-              <ItemsPicker
-                businessId={business._id}
-                job={job}
-                clientId={client._id}
-                onDone={close}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-      {guard.prompt}
+            onDone={sheet.close}
+          />
+        )}
+        {sheet.panel?.kind === 'refund' && client && (
+          <RefundForm
+            businessId={business._id}
+            clientId={client._id}
+            sources={refundSources(0, [job])}
+            today={today}
+            onDone={sheet.close}
+          />
+        )}
+        {sheet.panel?.kind === 'writeOff' && (
+          <WriteOffForm
+            businessId={business._id}
+            jobId={job._id}
+            balanceCents={job.balanceCents}
+            onDone={sheet.close}
+          />
+        )}
+        {sheet.panel?.kind === 'cost' && (
+          <CostForm
+            businessId={business._id}
+            jobId={job._id}
+            cost={sheet.panel.cost}
+            today={today}
+            onDone={sheet.close}
+            onDirtyChange={sheet.setDirty}
+          />
+        )}
+        {sheet.panel?.kind === 'reminder' && (
+          <ReminderForm
+            businessId={business._id}
+            target={{ jobId: job._id, itemId: job.itemIds.at(0) }}
+            initialDate={today}
+            onDone={sheet.close}
+          />
+        )}
+        {sheet.panel?.kind === 'items' && client && (
+          <ItemsPicker
+            businessId={business._id}
+            job={job}
+            clientId={client._id}
+            onDone={sheet.close}
+          />
+        )}
+      </DetailSheet>
+      <RuleReminderSheet job={ruleOffer} onClose={closeRuleOffer} />
       <PaymentSheet
         businessId={business._id}
         paymentId={openPayment}

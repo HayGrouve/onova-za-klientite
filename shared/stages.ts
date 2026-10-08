@@ -18,6 +18,23 @@ export function isJobLate(
   return isOpenGroup(job.stageGroup) && isOverdue(job.dueDate, today)
 }
 
+/** "When did I last do this one?": when the latest of the jobs reached Done. */
+export function lastDoneAt(
+  jobs: ReadonlyArray<{ stageGroup: StageGroup; doneAt?: number }>,
+): number | undefined {
+  let latest: number | undefined
+  for (const job of jobs) {
+    if (
+      job.stageGroup === 'done' &&
+      job.doneAt !== undefined &&
+      (latest === undefined || job.doneAt > latest)
+    ) {
+      latest = job.doneAt
+    }
+  }
+  return latest
+}
+
 /**
  * What changes on a job when it enters a stage of `group`: when it reached
  * Done (kept on a move within Done) and its cancel reason (kept only in

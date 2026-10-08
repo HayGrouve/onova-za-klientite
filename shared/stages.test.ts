@@ -10,6 +10,7 @@ import {
   groupedOrder,
   isJobLate,
   isOpenGroup,
+  lastDoneAt,
   stagesFor,
 } from './stages'
 import type { StageGroup } from './stages'
@@ -234,5 +235,20 @@ describe('enterGroup', () => {
         },
       ),
     )
+  })
+})
+
+describe('lastDoneAt', () => {
+  it('is when the latest job still in Done got there', () => {
+    expect(
+      lastDoneAt([
+        { stageGroup: 'done', doneAt: 5 },
+        { stageGroup: 'done', doneAt: 9 },
+        // Moved back out of Done: it no longer counts.
+        { stageGroup: 'in_progress', doneAt: 12 },
+        { stageGroup: 'new' },
+      ]),
+    ).toBe(9)
+    expect(lastDoneAt([{ stageGroup: 'new' }])).toBeUndefined()
   })
 })

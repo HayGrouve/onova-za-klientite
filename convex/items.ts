@@ -13,7 +13,13 @@ import { mergeExtra } from './lib/extra'
 import { setJobItems } from './lib/jobWrite'
 import { itemSearchText } from './lib/search'
 import { requiredText } from './lib/validate'
-import { jobRow, newLookups, timeline } from './lib/views'
+import {
+  activeFields,
+  jobRow,
+  newLookups,
+  openRemindersOn,
+  timeline,
+} from './lib/views'
 import { vExtra } from './validators'
 
 /**
@@ -116,12 +122,6 @@ export const get = businessQuery({
   handler: async (ctx, { itemId }) => {
     const item = await getOwnedFromUrl(ctx, 'items', itemId)
     const client = await ctx.db.get('clients', item.clientId)
-    const fields = await ctx.db
-      .query('fields')
-      .withIndex('by_business_target_order', (q) =>
-        q.eq('businessId', ctx.business._id).eq('target', 'item'),
-      )
-      .collect()
     const links = await ctx.db
       .query('jobItems')
       .withIndex('by_item', (q) => q.eq('itemId', item._id))
@@ -140,8 +140,9 @@ export const get = businessQuery({
     return {
       item,
       client: client && { _id: client._id, name: client.name },
-      fields: fields.filter((field) => field.archivedAt === undefined),
+      fields: await activeFields(ctx, ctx.business._id, 'item'),
       jobs,
+      reminders: await openRemindersOn(ctx, ctx.business, { itemId: item._id }),
       timeline: await timeline(ctx, events),
     }
   },

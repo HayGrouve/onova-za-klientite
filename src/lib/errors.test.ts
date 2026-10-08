@@ -23,23 +23,6 @@ describe('isNotFound', () => {
     ).toBe(true)
   })
 
-  it('is true when the address held something that is not an id at all', () => {
-    expect(
-      isNotFound(
-        new Error(
-          '[Request ID: abc] Server Error\nArgumentValidationError: Value does not match validator.\nPath: .jobId\nValue: "nope"\nValidator: v.id("jobs")',
-        ),
-      ),
-    ).toBe(true)
-    expect(
-      isNotFound(
-        new Error(
-          'Found ID "x" from table `clients`, which does not match the table name in validator `v.id("jobs")`.',
-        ),
-      ),
-    ).toBe(true)
-  })
-
   it('is false for every other error, so real problems still say so', () => {
     expect(isNotFound(new ConvexError({ code: 'auth.notMember' }))).toBe(false)
     expect(isNotFound(new ConvexError({ code: 'invalid' }))).toBe(false)

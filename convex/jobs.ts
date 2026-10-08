@@ -26,7 +26,14 @@ import type { JobPatch } from './lib/ledger'
 import { jobDate, refreshRepeat, setJobRepeat } from './lib/repeat'
 import { jobSearchText } from './lib/search'
 import { cents, optionalDate, optionalText, requiredText } from './lib/validate'
-import { jobRow, newLookups, timeline, vJobRow } from './lib/views'
+import {
+  activeFields,
+  jobRow,
+  newLookups,
+  openRemindersOn,
+  timeline,
+  vJobRow,
+} from './lib/views'
 import { vExtra, vJobLine, vRepeatUnit, vStageGroup } from './validators'
 
 const vClearableString = v.optional(v.union(v.string(), v.null()))
@@ -412,6 +419,8 @@ export const get = businessQuery({
       items,
       payments,
       costs: costs.sort((a, b) => b.date.localeCompare(a.date)),
+      fields: await activeFields(ctx, ctx.business._id, 'job'),
+      reminders: await openRemindersOn(ctx, ctx.business, { jobId: job._id }),
       timeline: await timeline(ctx, events),
     }
   },

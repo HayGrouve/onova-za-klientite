@@ -151,3 +151,56 @@ export async function timeline(
   }
   return result
 }
+
+/** A target's fields that aren't archived, in their order: what a form shows. */
+export async function activeFields(
+  ctx: QueryCtx,
+  businessId: Id<'businesses'>,
+  target: Doc<'fields'>['target'],
+) {
+  const fields = await ctx.db
+    .query('fields')
+    .withIndex('by_business_target_order', (q) =>
+      q.eq('businessId', businessId).eq('target', target),
+    )
+    .collect()
+  return fields.filter((field) => field.archivedAt === undefined)
+}
+
+/**
+ * The open reminders on a client, a job or an item, soonest first, as its
+ * page lists them. None while the Reminders module is off.
+ */
+export async function openRemindersOn(
+  ctx: QueryCtx,
+  business: Doc<'businesses'>,
+  on:
+    | { clientId: Id<'clients'> }
+    | { jobId: Id<'jobs'> }
+    | { itemId: Id<'items'> },
+) {
+  if (!business.modules.reminders) return []
+  const reminders =
+    'clientId' in on
+      ? ctx.db
+          .query('reminders')
+          .withIndex('by_client', (q) => q.eq('clientId', on.clientId))
+      : 'jobId' in on
+        ? ctx.db
+            .query('reminders')
+            .withIndex('by_job', (q) => q.eq('jobId', on.jobId))
+        : ctx.db
+            .query('reminders')
+            .withIndex('by_item', (q) => q.eq('itemId', on.itemId))
+  return (await reminders.collect())
+    .filter((reminder) => reminder.status === 'open')
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ _id, date, note, source, jobId, itemId }) => ({
+      _id,
+      date,
+      note,
+      source,
+      jobId,
+      itemId,
+    }))
+}

@@ -22,7 +22,13 @@ import { listExtra, listFieldIds } from './lib/listFields'
 import { clientSearchText, jobSearchText } from './lib/search'
 import { optionalText, requiredText } from './lib/validate'
 import { vExtra } from './validators'
-import { jobRow, newLookups, timeline } from './lib/views'
+import {
+  activeFields,
+  jobRow,
+  newLookups,
+  openRemindersOn,
+  timeline,
+} from './lib/views'
 
 export const create = businessMutation({
   args: vCreateClientArgs.fields,
@@ -186,12 +192,6 @@ export const get = businessQuery({
       .query('payments')
       .withIndex('by_client', (q) => q.eq('clientId', client._id))
       .collect()
-    const fields = await ctx.db
-      .query('fields')
-      .withIndex('by_business_target_order', (q) =>
-        q.eq('businessId', ctx.business._id).eq('target', 'client'),
-      )
-      .collect()
     const events = await ctx.db
       .query('activity')
       .withIndex('by_client', (q) => q.eq('clientId', client._id))
@@ -229,7 +229,10 @@ export const get = businessQuery({
             note,
           }),
         ),
-      fields: fields.filter((field) => field.archivedAt === undefined),
+      fields: await activeFields(ctx, ctx.business._id, 'client'),
+      reminders: await openRemindersOn(ctx, ctx.business, {
+        clientId: client._id,
+      }),
       timeline: await timeline(ctx, events),
     }
   },
