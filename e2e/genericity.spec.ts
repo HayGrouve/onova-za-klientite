@@ -186,8 +186,11 @@ async function expectClientPage(page: Page, b: Business) {
   for (const field of b.item.fields) {
     await expect(page.getByLabel(field, { exact: true })).toBeVisible()
   }
-  await page.getByLabel('Име', { exact: true }).fill('Първият')
-  await page.getByRole('button', { name: 'Запази', exact: true }).click()
+  // Enter saves from the field: the toasts from adding the fields sit just
+  // above the nav, where Save stops when it scrolls into view.
+  const name = page.getByLabel('Име', { exact: true })
+  await name.fill('Първият')
+  await name.press('Enter')
   await expect(page.getByText('Първият').first()).toBeVisible()
 }
 
