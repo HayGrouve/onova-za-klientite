@@ -6,7 +6,6 @@ import {
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { FilterChips } from '#/components/jobs/filter-chips'
@@ -24,6 +23,7 @@ import {
 } from '#/components/ui/input-group'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { useNow } from '#/hooks/use-now'
+import { useQueryKeepPrevious } from '#/hooks/use-query-keep-previous'
 import { useToday } from '#/hooks/use-today'
 import { useUrlText } from '#/hooks/use-url-text'
 import { useViewer } from '#/hooks/use-viewer'
@@ -203,7 +203,7 @@ function JobsList({
   const now = useNow()
   // A filter counts what it finds in every tab, so it reads all of them.
   const filtering = table && isFiltering(filter)
-  const data = useQuery(
+  const data = useQueryKeepPrevious(
     api.jobs.list,
     group === 'all' || filtering
       ? { businessId: business._id, now }

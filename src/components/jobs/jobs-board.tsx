@@ -10,7 +10,6 @@ import {
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import { memo, useMemo, useState } from 'react'
@@ -42,6 +41,7 @@ import { Skeleton } from '#/components/ui/skeleton'
 import { useCardDrag } from '#/hooks/use-card-drag'
 import { useMoveJob } from '#/hooks/use-move-job'
 import { useNow } from '#/hooks/use-now'
+import { useQueryKeepPrevious } from '#/hooks/use-query-keep-previous'
 import { useStableCallback } from '#/hooks/use-stable-callback'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
@@ -99,7 +99,10 @@ export function JobsBoard({
   // Level 2: a Worker cannot change stages, so their cards don't move.
   const canMove = hasRole(business.role, 'manager')
   const now = useNow()
-  const board = useQuery(api.jobs.board, { businessId: business._id, now })
+  const board = useQueryKeepPrevious(api.jobs.board, {
+    businessId: business._id,
+    now,
+  })
   const { moveAndAnnounce, ruleOffer, closeRuleOffer } = useMoveJob()
   // A move into Cancelled waits here for a yes. It keeps the job's id, not
   // the card: the card is read again when the answer comes. It stays set while

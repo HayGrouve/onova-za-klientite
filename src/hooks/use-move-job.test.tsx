@@ -27,7 +27,6 @@ vi.mock('convex/react', () => ({
 vi.mock('sonner', () => ({
   toast: { success: mocks.toastSuccess, error: vi.fn(), dismiss: vi.fn() },
 }))
-vi.mock('#/hooks/use-now', () => ({ useNow: () => 0 }))
 vi.mock('#/hooks/use-viewer', () => ({
   useViewer: () => ({
     business: {

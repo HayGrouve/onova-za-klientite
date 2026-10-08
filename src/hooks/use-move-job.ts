@@ -3,17 +3,14 @@ import { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
-import { useNow } from '#/hooks/use-now'
 import { useStableCallback } from '#/hooks/use-stable-callback'
 import { useViewer } from '#/hooks/use-viewer'
 import { GROUP_LABEL } from '#/i18n/groups'
+import { moveOnBoard } from '#/lib/board-move'
 import { runChange } from '#/lib/change'
 import { targetGroup } from '#/lib/move-plan'
 import { m } from '#/paraglide/messages.js'
-import { jobOwedCents, jobOwes } from '../../shared/allocation'
-import { boardColumn } from '../../shared/board'
 import { offersRuleReminder } from '../../shared/reminder-rule'
-import { enterGroup } from '../../shared/stages'
 import type { StageGroup } from '../../shared/stages'
 
 type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
@@ -41,49 +38,16 @@ export type RuleOffer = { _id: Id<'jobs'>; title: string; itemId?: Id<'items'> }
  */
 export function useMoveJob() {
   const { business } = useViewer()
-  // The board's query arguments, so the optimistic update finds its result.
-  const now = useNow()
   const changeStage = useMutation(api.jobs.changeStage).withOptimisticUpdate(
     (store, { businessId, jobId, stageId }) => {
-      const board = store.getQuery(api.jobs.board, { businessId, now })
-      const stage = board?.stages.find((item) => item._id === stageId)
-      const moving = board?.columns
-        .flatMap((column) => column.jobs)
-        .find((job) => job._id === jobId)
-      if (!board || !stage || !moving) return
-      // The same rule the server applies: Cancelled never owes, Done
-      // records when it was reached.
-      const moved = {
-        ...moving,
-        stageId: stage._id,
-        stageName: stage.name,
-        stageGroup: stage.group,
-        owes: jobOwes(moving.balanceCents, stage.group),
-        doneAt: enterGroup(moving, stage.group, Date.now()).doneAt,
+      // Every cached board of this business, whatever `now` it was asked
+      // with: the screen's clock may be a step ahead of the one a cached
+      // result was read for.
+      for (const { args, value } of store.getAllQueries(api.jobs.board)) {
+        if (!value || args.businessId !== businessId) continue
+        const moved = moveOnBoard(value, jobId, stageId, Date.now())
+        if (moved) store.setQuery(api.jobs.board, args, moved)
       }
-      store.setQuery(
-        api.jobs.board,
-        { businessId, now },
-        {
-          ...board,
-          columns: board.columns.map((column) => {
-            const rest = column.jobs.filter((job) => job._id !== jobId)
-            const left = rest.length < column.jobs.length
-            const arrives = column.group === stage.group
-            const jobs = arrives ? [...rest, moved] : rest
-            return {
-              ...column,
-              jobs: boardColumn(column.group, jobs, jobs.length).jobs,
-              olderOwing: column.olderOwing.filter((job) => job._id !== jobId),
-              total: column.total - (left ? 1 : 0) + (arrives ? 1 : 0),
-              owedCents:
-                column.owedCents -
-                (left ? jobOwedCents(moving) : 0) +
-                (arrives ? jobOwedCents(moved) : 0),
-            }
-          }),
-        },
-      )
     },
   )
   const cancel = useMutation(api.jobs.cancel)
