@@ -17,6 +17,10 @@ import type { IconProps } from '@phosphor-icons/react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { m } from '#/paraglide/messages.js'
 import appCss from '../styles.css?url'
+// The two Sofia Sans subsets every screen uses. Vite hashes the file by its
+// content, so this URL is the one the stylesheet's @font-face points at.
+import cyrillicFont from '@fontsource-variable/sofia-sans/files/sofia-sans-cyrillic-wght-normal.woff2?url'
+import latinFont from '@fontsource-variable/sofia-sans/files/sofia-sans-latin-wght-normal.woff2?url'
 
 // The theme follows the system's light or dark setting. It runs in <head>,
 // before the first paint, so a dark screen never flashes white, and it
@@ -51,6 +55,15 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
+      // Fonts need crossorigin even from the same origin, or the preload is
+      // not reused by the @font-face request.
+      ...[cyrillicFont, latinFont].map((href) => ({
+        rel: 'preload',
+        as: 'font',
+        type: 'font/woff2',
+        crossOrigin: 'anonymous' as const,
+        href,
+      })),
       { rel: 'manifest', href: '/manifest.webmanifest' },
       { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
       { rel: 'icon', href: '/icon.svg', type: 'image/svg+xml' },
