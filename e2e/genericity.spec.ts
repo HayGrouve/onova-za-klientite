@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { addBusiness, nav, runSetup } from './support/app'
+import { addBusiness, nav, openMore, runSetup } from './support/app'
 import { BUSINESSES } from './support/businesses'
 import type { Business } from './support/businesses'
 import { expect, test } from './support/fixtures'
@@ -142,8 +142,7 @@ async function expectJobPage(page: Page, b: Business) {
   await expect(chips).toHaveText(b.stages)
 
   // Repeat is folded under "Още", which stays open once opened.
-  const more = page.getByRole('button', { name: /^(Още|Скрий)/ })
-  if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click()
+  await openMore(page)
   if (b.repeat) {
     await expect(page.getByText(`Повтаря се: ${lower(b.repeat)}`)).toBeVisible()
   } else {

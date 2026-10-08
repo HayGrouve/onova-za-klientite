@@ -180,3 +180,10 @@ export async function addBusiness(page: Page) {
   await page.getByRole('button', { name: /Добави бизнес/ }).click()
   await expectSetup(page)
 }
+
+/** Opens a detail page's "Още" fold, unless it is open already (it is remembered). */
+export async function openMore(page: Page) {
+  const more = page.locator('[data-slot="collapsible-trigger"]')
+  if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click()
+  await expect(more).toHaveAttribute('aria-expanded', 'true')
+}
