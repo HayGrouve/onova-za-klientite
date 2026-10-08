@@ -791,7 +791,7 @@ function JobPage() {
         title={
           sheet.panel
             ? {
-                edit: job.title,
+                edit: m.job_edit_title(),
                 lines: m.job_lines(),
                 appointment: words.appointment.singular,
                 items: words.item.plural,

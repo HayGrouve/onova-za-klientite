@@ -30,6 +30,15 @@ function parseTime(text: string) {
   return { hour, minute }
 }
 
+/** What a field that can stay empty says after its name. */
+function Optional() {
+  return (
+    <span className="font-normal text-muted-foreground">
+      {m.optional_hint()}
+    </span>
+  )
+}
+
 /** Add or change an appointment: a day, an optional time, an optional end day. */
 export function AppointmentForm({
   businessId,
@@ -139,7 +148,7 @@ export function AppointmentForm({
           </Field>
           <Field>
             <FieldLabel htmlFor="appointment-time">
-              {m.appointment_time()}
+              {m.appointment_time()} <Optional />
             </FieldLabel>
             <Input
               id="appointment-time"
@@ -152,7 +161,7 @@ export function AppointmentForm({
         </div>
         <Field>
           <FieldLabel htmlFor="appointment-end">
-            {m.appointment_end_date()}
+            {m.appointment_end_date()} <Optional />
           </FieldLabel>
           <Input
             id="appointment-end"
@@ -165,7 +174,7 @@ export function AppointmentForm({
         </Field>
         <Field>
           <FieldLabel htmlFor="appointment-label">
-            {m.appointment_label()}
+            {m.appointment_label()} <Optional />
           </FieldLabel>
           <Input
             id="appointment-label"

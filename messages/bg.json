@@ -368,6 +368,8 @@
   "job_payments": "Плащания",
   "job_costs": "Разходи",
   "job_edit": "Промени",
+  "job_edit_title": "Промяна на данните",
+  "optional_hint": "(по желание)",
   "job_save": "Запази",
   "job_cancel_reason": "Причина",
   "job_title": "Какво",

@@ -212,8 +212,14 @@ function SummaryBody({
         </div>
         <a
           href={viberTextHref(summaryText(input))}
-          className={buttonVariants({ variant: 'ghost', className: 'h-11' })}
+          className={buttonVariants({ variant: 'outline', className: 'h-11' })}
         >
+          {/* Viber's own purple, as on the client page. */}
+          <ChatCircleIcon
+            data-icon="inline-start"
+            weight="fill"
+            className="text-[#7360f2]"
+          />
           {m.summary_viber()}
         </a>
       </div>
