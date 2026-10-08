@@ -84,6 +84,7 @@ import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
 import { hasRole } from '../../../shared/roles'
 import { isJobLate } from '../../../shared/stages'
+import type { MorePart } from '../../../shared/more-summary'
 
 export const Route = createFileRoute('/_app/jobs/$jobId')({
   staticData: { layout: 'wide' },
@@ -172,23 +173,23 @@ function JobPage() {
   const canRefund = job.paidCents > 0
   const canWriteOff = jobOwedCents(job) > 0 && job.paidCents < job.priceCents
   // The folded parts, by name, with how many each holds.
-  const counted = (title: string, count: number) =>
-    count > 0 ? `${title}: ${count}` : title
-  const moreSummary = [
+  const moreSummary: MorePart[] = [
     ...(modules.appointments
-      ? [counted(words.appointment.plural, data.appointments.length)]
+      ? [{ name: words.appointment.plural, count: data.appointments.length }]
       : []),
-    counted(m.job_lines(), job.lines.length),
-    ...(modules.costs ? [counted(m.job_costs(), data.costs.length)] : []),
+    { name: m.job_lines(), count: job.lines.length },
+    ...(modules.costs
+      ? [{ name: m.job_costs(), count: data.costs.length }]
+      : []),
     ...(modules.items && client && !client.isNoClient
-      ? [counted(words.item.plural, data.items.length)]
+      ? [{ name: words.item.plural, count: data.items.length }]
       : []),
-    m.repeat_title(),
+    { name: m.repeat_title() },
     ...(modules.reminders && client && !client.isNoClient
-      ? [counted(m.reminder_list(), data.reminders.length)]
+      ? [{ name: m.reminder_list(), count: data.reminders.length }]
       : []),
-    m.job_files(),
-    counted(m.job_history(), data.timeline.length),
+    { name: m.job_files() },
+    { name: m.job_history(), count: data.timeline.length },
   ]
 
   const moveTo = async (stageId: Id<'stages'>) => {
@@ -392,9 +393,12 @@ function JobPage() {
                 icon={WalletIcon}
                 footer={
                   <>
+                    {/* Solid only while something is owed; "Next" stays the one
+                        main action otherwise. A wide screen doesn't stretch it. */}
                     <Button
                       size="xl"
-                      className="flex-1"
+                      variant={jobOwedCents(job) > 0 ? 'default' : 'secondary'}
+                      className="flex-1 lg:max-w-60"
                       onClick={() => sheet.open({ kind: 'payment' })}
                     >
                       <PlusIcon data-icon="inline-start" />

@@ -336,6 +336,7 @@
   "stage_cancel_confirm": "Премести",
   "more_show": "Още",
   "more_hide": "Скрий",
+  "more_rest": "и още {count}",
   "money_more": "Още за парите",
   "payments_show_all": "Всички плащания: {count}",
   "payments_show_fewer": "Само последните",

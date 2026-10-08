@@ -129,6 +129,7 @@ export function FileGallery({
         />
         <Button
           size="xl"
+          variant="outline"
           className="min-h-12"
           onClick={() => cameraRef.current?.click()}
         >
