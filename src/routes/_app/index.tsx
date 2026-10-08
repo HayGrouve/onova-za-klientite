@@ -1,5 +1,4 @@
 import {
-  PlusIcon,
   BellIcon,
   CalendarCheckIcon,
   CalendarDotsIcon,
@@ -8,11 +7,11 @@ import {
   SunIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
+import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import { JobRow } from '#/components/job-row'
-import { buttonVariants } from '#/components/ui/button'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { ReminderRow } from '#/components/reminders/reminder-row'
 import { ListSection } from '#/components/list-section'
@@ -24,6 +23,7 @@ import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
+import { isOverdue } from '../../../shared/dates'
 
 export const Route = createFileRoute('/_app/')({
   staticData: { layout: 'wide' },
@@ -37,12 +37,44 @@ const LONG_DATE = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'Europe/Sofia',
 })
 
+type ReminderData = FunctionReturnType<
+  typeof api.today.list
+>['reminders'][number]
+
+function TodayReminder({
+  reminder,
+  today,
+}: {
+  reminder: ReminderData
+  today: string
+}) {
+  return (
+    <ReminderRow
+      reminderId={reminder._id}
+      note={reminder.note}
+      detail={[reminder.clientName, formatDay(reminder.date, today)]
+        .filter(Boolean)
+        .join(' · ')}
+      date={reminder.date}
+      clientId={reminder.clientId}
+      jobId={reminder.jobId}
+      itemId={reminder.itemId}
+    />
+  )
+}
+
 function TodayPage() {
   const { business } = useViewer()
   const today = useToday()
   const data = useQuery(api.today.list, { businessId: business._id, today })
   const wide = useWide()
   const { words } = business
+
+  // A reminder past its date is late like a job: it sits with them, first.
+  const lateReminders =
+    data?.reminders.filter((reminder) => isOverdue(reminder.date, today)) ?? []
+  const dueReminders =
+    data?.reminders.filter((reminder) => !isOverdue(reminder.date, today)) ?? []
 
   const empty =
     data &&
@@ -71,12 +103,6 @@ function TodayPage() {
           icon={SunIcon}
           title={m.today_empty_title()}
           body={m.today_empty_body()}
-          action={
-            <Link to="/new" className={buttonVariants({ size: 'xl' })}>
-              <PlusIcon data-icon="inline-start" weight="bold" />
-              {words.job.singular}
-            </Link>
-          }
         />
       ) : (
         <div className="flex flex-col gap-5">
@@ -93,13 +119,20 @@ function TodayPage() {
               ))}
             </ListSection>
           )}
-          {data.overdue.length > 0 && (
+          {data.overdue.length + lateReminders.length > 0 && (
             <ListSection
               title={m.today_overdue()}
               icon={WarningCircleIcon}
               tone="danger"
-              count={data.overdue.length}
+              count={data.overdue.length + lateReminders.length}
             >
+              {lateReminders.map((reminder) => (
+                <TodayReminder
+                  key={reminder._id}
+                  reminder={reminder}
+                  today={today}
+                />
+              ))}
               {data.overdue.map((job) => (
                 <JobRow
                   key={job._id}
@@ -126,24 +159,17 @@ function TodayPage() {
               ))}
             </ListSection>
           )}
-          {data.reminders.length > 0 && (
+          {dueReminders.length > 0 && (
             <ListSection
               title={m.today_reminders()}
               icon={BellIcon}
-              count={data.reminders.length}
+              count={dueReminders.length}
             >
-              {data.reminders.map((reminder) => (
-                <ReminderRow
+              {dueReminders.map((reminder) => (
+                <TodayReminder
                   key={reminder._id}
-                  reminderId={reminder._id}
-                  note={reminder.note}
-                  detail={[reminder.clientName, formatDay(reminder.date, today)]
-                    .filter(Boolean)
-                    .join(' · ')}
-                  date={reminder.date}
-                  clientId={reminder.clientId}
-                  jobId={reminder.jobId}
-                  itemId={reminder.itemId}
+                  reminder={reminder}
+                  today={today}
                 />
               ))}
             </ListSection>
