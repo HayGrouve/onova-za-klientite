@@ -4,6 +4,7 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
+import { trimClerkBundle } from './build/clerk-localization.ts'
 import { serviceWorker } from './build/service-worker.ts'
 
 const isVitest = Boolean(process.env.VITEST)
@@ -23,6 +24,7 @@ export default defineConfig({
       emitTsDeclarations: true,
     }),
     tailwindcss(),
+    trimClerkBundle(),
     tanstackStart({ spa: { enabled: true } }),
     // Nitro's server runtime is for dev and build only. Under Vitest it loads
     // CJS React in an ESM runner and keeps the process alive.
