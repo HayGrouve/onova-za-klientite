@@ -11,7 +11,8 @@ The design doc says: view offline, edit online. Today's jobs, client contacts an
 - **Shell:**
   - TanStack Start in SPA mode (`spa: { enabled: true }`), which prerenders a static `/_shell.html`.
   - A small hand-written service worker, emitted by a tiny Vite plugin from the client bundle's file list:
-    - it precaches the hashed assets, icons, fonts and the shell;
+    - it keeps two caches: a small versioned one for the shell, icons and manifest, and a stable `assets` cache for hashed `/assets/*` files, so a deploy downloads only the files whose names changed and activation drops the ones the build no longer lists;
+    - it precaches only what the offline view needs (the entry graph, the signed-in layout, the start screen, the snapshot view, the Cyrillic and Latin fonts); lazy chunks and other font subsets are cached the first time the browser asks for them;
     - it answers every navigation with the cached shell;
     - it passes Clerk, Convex and `/_serverFn/*` straight through.
   - `vite-plugin-pwa` is not used, because it doesn't support the Vite Environment API that Start builds on ([vite-plugin-pwa#786](https://github.com/vite-pwa/vite-plugin-pwa/pull/786)).
