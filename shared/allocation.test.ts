@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
   checkAllocations,
   jobBalanceCents,
+  creditForJob,
+  jobOwedCents,
   jobOwes,
   jobPriceCents,
   jobProfitCents,
   jobProfitIsFinal,
+  refundSources,
   splitPayment,
 } from './allocation'
 
@@ -55,6 +58,20 @@ describe('jobBalanceCents and jobOwes', () => {
     expect(jobOwes(1, 'cancelled')).toBe(false)
     expect(jobOwes(0, 'done')).toBe(false)
     expect(jobOwes(-5, 'done')).toBe(false)
+  })
+
+  it('owes its balance only when it owes', () => {
+    expect(jobOwedCents({ owes: true, balanceCents: 4200 })).toBe(4200)
+    expect(jobOwedCents({ owes: false, balanceCents: 4200 })).toBe(0)
+    expect(jobOwedCents({ owes: false, balanceCents: -300 })).toBe(0)
+  })
+
+  it('puts on a job no more credit than there is, or than it owes', () => {
+    const job = { owes: true, balanceCents: 5000 }
+    expect(creditForJob(2000, job)).toBe(2000)
+    expect(creditForJob(9000, job)).toBe(5000)
+    expect(creditForJob(9000, { ...job, owes: false })).toBe(0)
+    expect(creditForJob(-100, job)).toBe(0)
   })
 
   it('keeps price = paid + balance + write-off', () => {
@@ -219,5 +236,20 @@ describe('checkAllocations', () => {
 
   it('treats a zero payment with allocations as a sign mismatch', () => {
     expect(checkAllocations(0, [{ amountCents: 5 }])).toBe('signMismatch')
+  })
+})
+
+describe('refundSources', () => {
+  it('offers the credit, then each job that was paid, up to its own amount', () => {
+    expect(
+      refundSources(2500, [
+        { _id: 'a', title: 'Гардероб', paidCents: 30000 },
+        { _id: 'b', title: 'Шкаф', paidCents: 0 },
+      ]),
+    ).toEqual([
+      { limitCents: 2500 },
+      { jobId: 'a', title: 'Гардероб', limitCents: 30000 },
+    ])
+    expect(refundSources(0, [])).toEqual([])
   })
 })

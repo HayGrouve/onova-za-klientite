@@ -29,8 +29,13 @@ import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
 import { GROUP_LABEL } from '#/i18n/groups'
 import { m } from '#/paraglide/messages.js'
-import { filterJobs, isFiltering } from '../../../shared/board'
-import type { JobFilter } from '../../../shared/board'
+import {
+  filterFromSearch,
+  filterJobs,
+  isFiltering,
+  parseFilterSearch,
+} from '../../../shared/board'
+import type { JobFilter, JobFilterSearch } from '../../../shared/board'
 import {
   nextSort,
   parseSortSearch,
@@ -48,17 +53,8 @@ import type { StageGroup } from '../../../shared/stages'
 type JobsSearch = {
   group?: StageGroup | 'all'
   view?: 'table'
-  /** Words for the filter. */
-  q?: string
-  owing?: true
-  due?: 'month'
-} & SortSearch<JobSortKey>
-
-// The address parser reads "12" as a number and "true" as a boolean.
-const text = (value: unknown) =>
-  typeof value === 'string' || typeof value === 'number'
-    ? String(value)
-    : undefined
+} & JobFilterSearch &
+  SortSearch<JobSortKey>
 
 export const Route = createFileRoute('/_app/jobs/')({
   validateSearch: (search: Record<string, unknown>): JobsSearch => ({
@@ -67,9 +63,7 @@ export const Route = createFileRoute('/_app/jobs/')({
       ? { group: search.group as StageGroup | 'all' }
       : {}),
     ...(search.view === 'table' && { view: 'table' as const }),
-    ...(text(search.q)?.trim() && { q: text(search.q) }),
-    ...(search.owing === true && { owing: true as const }),
-    ...(search.due === 'month' && { due: 'month' as const }),
+    ...parseFilterSearch(search),
     ...parseSortSearch(search, JOB_SORT_KEYS),
   }),
   staticData: { layout: 'full' },
@@ -101,11 +95,7 @@ function WideJobsPage() {
   const view = search.view ?? 'board'
   const today = useToday()
   const setSearch = useListSearch()
-  const filter: JobFilter = {
-    text: search.q,
-    owing: search.owing,
-    dueThisMonth: search.due === 'month',
-  }
+  const filter = filterFromSearch(search)
   const filterText = useUrlText(search.q ?? '', (value) =>
     setSearch({ q: value.trim() ? value : undefined }),
   )

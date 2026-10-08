@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 import type { Id } from './_generated/dataModel'
-import { monthRange } from '../shared/dates'
+import { isValidMonth, monthRange } from '../shared/dates'
 import { sumCents } from '../shared/money'
 import { businessQuery, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
@@ -65,7 +65,7 @@ export const summary = businessQuery({
   handler: async (ctx, { month }) => {
     // Level 2: a Worker records payments but sees no totals.
     requireRole(ctx.member, 'manager')
-    if (!/^\d{4}-\d{2}$/.test(month)) fail('invalid', { field: 'month' })
+    if (!isValidMonth(month)) fail('invalid', { field: 'month' })
     const businessId = ctx.business._id
     const { from, to } = monthRange(month)
 

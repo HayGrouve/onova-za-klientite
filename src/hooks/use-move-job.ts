@@ -3,20 +3,21 @@ import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { useViewer } from '#/hooks/use-viewer'
-import { errorMessage } from '#/lib/errors'
+import { GROUP_LABEL } from '#/i18n/groups'
+import { runChange } from '#/lib/change'
+import { m } from '#/paraglide/messages.js'
+import { jobOwedCents, jobOwes } from '../../shared/allocation'
 import { boardColumn } from '../../shared/board'
 import { offersRuleReminder } from '../../shared/reminder-rule'
+import { enterGroup } from '../../shared/stages'
 import type { StageGroup } from '../../shared/stages'
 
 type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
 
 /**
  * Moves a job to another stage, from the job page or the board. The board
- * shows the move at once and settles when the server answers. Resolves to
- * true when the move reached Done and the reminder rule should be offered
- * (Q5, never for a No client job); a failure shows a toast and resolves to
- * false. `onMoved` runs once the server has taken the move, with that same
- * answer, for a caller that confirms the move (the job page's undo toast).
+ * shows the move at once and settles when the server answers. `announce`
+ * says where the job went, with Undo, the same way on both.
  */
 export function useMoveJob() {
   const { business } = useViewer()
@@ -28,19 +29,16 @@ export function useMoveJob() {
         .flatMap((column) => column.jobs)
         .find((job) => job._id === jobId)
       if (!board || !stage || !moving) return
+      // The same rule the server applies: Cancelled never owes, Done
+      // records when it was reached.
       const moved = {
         ...moving,
         stageId: stage._id,
         stageName: stage.name,
         stageGroup: stage.group,
-        // Cancelled never owes; Done records when it was reached.
-        owes: stage.group === 'cancelled' ? false : moving.owes,
-        doneAt:
-          stage.group === 'done' && moving.stageGroup !== 'done'
-            ? Date.now()
-            : moving.doneAt,
+        owes: jobOwes(moving.balanceCents, stage.group),
+        doneAt: enterGroup(moving, stage.group, Date.now()).doneAt,
       }
-      const owed = (job: typeof moving) => (job.owes ? job.balanceCents : 0)
       store.setQuery(
         api.jobs.board,
         { businessId },
@@ -54,11 +52,12 @@ export function useMoveJob() {
             return {
               ...column,
               jobs: boardColumn(column.group, jobs, jobs.length).jobs,
+              olderOwing: column.olderOwing.filter((job) => job._id !== jobId),
               total: column.total - (left ? 1 : 0) + (arrives ? 1 : 0),
               owedCents:
                 column.owedCents -
-                (left ? owed(moving) : 0) +
-                (arrives ? owed(moved) : 0),
+                (left ? jobOwedCents(moving) : 0) +
+                (arrives ? jobOwedCents(moved) : 0),
             }
           }),
         },
@@ -67,35 +66,85 @@ export function useMoveJob() {
   )
   const cancel = useMutation(api.jobs.cancel)
 
-  return async (
-    job: { _id: Id<'jobs'>; stageGroup: StageGroup; isNoClient: boolean },
+  type Moving = {
+    _id: Id<'jobs'>
+    stageGroup: StageGroup
+    isNoClient: boolean
+  }
+
+  /**
+   * Moves the job. Resolves to whether it moved and whether the reminder
+   * rule should be offered (Q5, never for a No client job). Offline or on a
+   * failure it doesn't move and says why.
+   */
+  const move = async (
+    job: Moving,
     /** The stage, or Cancelled when the business has no Cancelled stage left. */
     target: Stage | 'cancelled',
-    onMoved?: (offerRule: boolean) => void,
   ) => {
-    try {
-      if (target === 'cancelled') {
-        await cancel({ businessId: business._id, jobId: job._id })
-        onMoved?.(false)
-        return false
-      }
-      await changeStage({
-        businessId: business._id,
-        jobId: job._id,
-        stageId: target._id,
-      })
-      const offerRule = offersRuleReminder({
-        from: job.stageGroup,
-        to: target.group,
-        remindersOn: business.modules.reminders,
-        ruleOn: Boolean(business.reminderRule),
-        isNoClient: job.isNoClient,
-      })
-      onMoved?.(offerRule)
-      return offerRule
-    } catch (error) {
-      toast.error(errorMessage(error))
-      return false
+    const result = await runChange(() =>
+      target === 'cancelled'
+        ? cancel({ businessId: business._id, jobId: job._id })
+        : changeStage({
+            businessId: business._id,
+            jobId: job._id,
+            stageId: target._id,
+          }),
+    )
+    return {
+      moved: result.done,
+      offerRule:
+        result.done &&
+        target !== 'cancelled' &&
+        offersRuleReminder({
+          from: job.stageGroup,
+          to: target.group,
+          remindersOn: business.modules.reminders,
+          ruleOn: Boolean(business.reminderRule),
+          isNoClient: job.isNoClient,
+        }),
     }
   }
+
+  /**
+   * Tells which stage the job is in now, with a way back to `previous`. One
+   * toast at a time: a new move replaces the last. With `onPay`, reaching Done
+   * with a balance also offers the payment.
+   */
+  const announce = (
+    job: Moving & { balanceCents: number },
+    target: Stage | 'cancelled',
+    previous: Stage | undefined,
+    onPay?: () => void,
+  ) => {
+    const group = target === 'cancelled' ? 'cancelled' : target.group
+    const undo = previous
+      ? {
+          label: m.undo(),
+          onClick: () => void move({ ...job, stageGroup: group }, previous),
+        }
+      : undefined
+    const offerPayment =
+      onPay !== undefined &&
+      group === 'done' &&
+      job.stageGroup !== 'done' &&
+      job.balanceCents > 0
+    toast.success(
+      m.job_stage_moved({
+        stage: target === 'cancelled' ? GROUP_LABEL.cancelled() : target.name,
+      }),
+      {
+        id: STAGE_TOAST,
+        duration: offerPayment ? 10_000 : 6000,
+        ...(offerPayment
+          ? { action: { label: m.pay_add(), onClick: onPay }, cancel: undo }
+          : { action: undo }),
+      },
+    )
+  }
+
+  return { move, announce }
 }
+
+/** One toast at a time for stage changes: a new one replaces the last. */
+export const STAGE_TOAST = 'stage-moved'

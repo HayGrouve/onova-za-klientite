@@ -1,7 +1,9 @@
 import { ConvexError } from 'convex/values'
 import { m } from '#/paraglide/messages.js'
+import { ERROR_CODES } from '../../shared/errors'
+import type { ErrorCode } from '../../shared/errors'
 
-const MESSAGES: Partial<Record<string, () => string>> = {
+const MESSAGES: Record<ErrorCode, () => string> = {
   'auth.signedOut': m.error_auth_signedOut,
   'auth.noUser': m.error_auth_noUser,
   'auth.notMember': m.error_auth_notMember,
@@ -23,36 +25,37 @@ const MESSAGES: Partial<Record<string, () => string>> = {
   'file.rejected': m.files_rejected,
   'field.typeChange': m.error_field_typeChange,
   'field.value': m.error_field_value,
+  'client.noClient': m.error_client_noClient,
+  'seed.notAllowed': m.error_seed_notAllowed,
 }
 
-/** The error code Convex threw on purpose (D16), if any. */
-export function errorCode(error: unknown): string | undefined {
+const isErrorCode = (code: unknown): code is ErrorCode =>
+  (ERROR_CODES as ReadonlyArray<unknown>).includes(code)
+
+/** The error code Convex threw on purpose (D16), if it is one it knows. */
+export function errorCode(error: unknown): ErrorCode | undefined {
   if (!(error instanceof ConvexError)) return undefined
   const data: unknown = error.data
-  if (data && typeof data === 'object' && 'code' in data) {
-    return typeof data.code === 'string' ? data.code : undefined
-  }
-  return undefined
+  return data &&
+    typeof data === 'object' &&
+    'code' in data &&
+    isErrorCode(data.code)
+    ? data.code
+    : undefined
 }
 
 /** A Bulgarian message for any error, from its code when it has one. */
 export function errorMessage(error: unknown): string {
   const code = errorCode(error)
-  return (code && MESSAGES[code]?.()) || m.error_unknown()
+  return code ? MESSAGES[code]() : m.error_unknown()
 }
 
 /**
- * A record that isn't there for this person: an id from another business
- * (the server says `notFound`, D16), or an address that holds no id at all,
- * which the server's argument check turns away before the function runs.
+ * A record that isn't there for this person: an id from another business,
+ * or an address that holds no id of that kind. The job, client and item
+ * pages read their id from the address only through their `get` query,
+ * which answers `notFound` for both (D16).
  */
 export function isNotFound(error: unknown): boolean {
-  if (errorCode(error) === 'notFound') return true
-  return (
-    error instanceof Error &&
-    !(error instanceof ConvexError) &&
-    /ArgumentValidationError|does not match (the table name in )?validator/i.test(
-      error.message,
-    )
-  )
+  return errorCode(error) === 'notFound'
 }

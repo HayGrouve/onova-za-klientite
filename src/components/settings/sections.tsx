@@ -15,9 +15,8 @@ import { useNavigate } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 
 export type SettingsSection = {
@@ -100,12 +99,9 @@ export function useAddBusiness() {
   const [busy, setBusy] = useState(false)
   const add = () => {
     setBusy(true)
-    void createAnother({})
-      .then(() => navigate({ to: '/setup' }))
-      .catch((error: unknown) => {
-        toast.error(errorMessage(error))
-        setBusy(false)
-      })
+    void runChange(() => createAnother({})).then((created) =>
+      created.done ? navigate({ to: '/setup' }) : setBusy(false),
+    )
   }
   return { add, busy }
 }

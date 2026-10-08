@@ -3,11 +3,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
-import { MoneyInput, moneyInputText } from '#/components/money/money-input'
+import { MoneyInput } from '#/components/money/money-input'
 import { useSubmit } from '#/components/money/use-submit'
 import { ModuleOff } from '#/components/settings/module-off'
 import { SettingsPage } from '#/components/settings/settings-page'
@@ -15,18 +14,13 @@ import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
 import { Button } from '#/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
-import { formatMoney, parseMoney } from '../../../shared/money'
+import { formatMoney, moneyInputText, parseMoney } from '../../../shared/money'
 
 export const Route = createFileRoute('/_app/settings/services')({
   component: ServicesSettings,
@@ -58,10 +52,12 @@ function ServicesSettings() {
     const ids = active.map((service) => service._id)
     const [moved] = ids.splice(index, 1)
     ids.splice(index + by, 0, moved)
-    void reorder({
-      businessId: business._id,
-      serviceIds: [...ids, ...archived.map((s) => s._id)],
-    }).catch((error: unknown) => toast.error(errorMessage(error)))
+    void runChange(() =>
+      reorder({
+        businessId: business._id,
+        serviceIds: [...ids, ...archived.map((s) => s._id)],
+      }),
+    )
   }
   const row = (service: Service, index?: number) => (
     <li key={service._id} className="flex items-center gap-1 pr-2">
@@ -159,27 +155,20 @@ function ServicesSettings() {
           </ListCard>
         </section>
       )}
-      <Sheet
+      <BottomSheet
         open={panel !== null}
-        onOpenChange={(open) => !open && setPanel(null)}
+        onClose={() => setPanel(null)}
+        title={panel?.service?.name ?? m.services_add()}
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>{panel?.service?.name ?? m.services_add()}</SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {panel && (
-              <ServiceForm
-                service={panel.service}
-                onDone={() => setPanel(null)}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+        <div className="px-4 pb-6">
+          {panel && (
+            <ServiceForm
+              service={panel.service}
+              onDone={() => setPanel(null)}
+            />
+          )}
+        </div>
+      </BottomSheet>
     </SettingsPage>
   )
 }

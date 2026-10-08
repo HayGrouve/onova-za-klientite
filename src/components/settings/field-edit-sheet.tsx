@@ -14,15 +14,10 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { Switch } from '#/components/ui/switch'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { canChangeFieldType } from '../../../shared/fields'
 import type { FieldType } from '../../../shared/fields'
@@ -40,37 +35,30 @@ export function FieldEditSheet({
   onClose: () => void
 }) {
   return (
-    <Sheet
+    <BottomSheet
       open={field !== undefined}
-      onOpenChange={(open) => !open && onClose()}
+      onClose={onClose}
+      title={field?.name}
     >
-      <SheetContent
-        side="bottom"
-        className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-      >
-        <SheetHeader>
-          <SheetTitle>{field?.name}</SheetTitle>
-        </SheetHeader>
-        {field && (
-          <div className="flex flex-col gap-6 px-4 pb-6">
-            <FieldDetails
-              key={field._id}
-              businessId={businessId}
-              field={field}
-              onDone={onClose}
-            />
-            {field.type === 'choice' && (
-              <OptionsList businessId={businessId} field={field} />
-            )}
-            <ArchiveBlock
-              businessId={businessId}
-              field={field}
-              onDone={onClose}
-            />
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
+      {field && (
+        <div className="flex flex-col gap-6 px-4 pb-6">
+          <FieldDetails
+            key={field._id}
+            businessId={businessId}
+            field={field}
+            onDone={onClose}
+          />
+          {field.type === 'choice' && (
+            <OptionsList businessId={businessId} field={field} />
+          )}
+          <ArchiveBlock
+            businessId={businessId}
+            field={field}
+            onDone={onClose}
+          />
+        </div>
+      )}
+    </BottomSheet>
   )
 }
 
@@ -162,14 +150,11 @@ function OptionsList({
 
   const save = async (action: () => Promise<unknown>) => {
     setBusy(true)
-    try {
+    await runChange(async () => {
       await action()
       toast.success(m.saved())
-    } catch (error) {
-      toast.error(errorMessage(error))
-    } finally {
-      setBusy(false)
-    }
+    })
+    setBusy(false)
   }
 
   return (

@@ -49,19 +49,22 @@ export function nextStage(stages: StageRef[], currentId: Id<'stages'>) {
 /**
  * Where the job is, and the one usual step forward. Every other stage waits
  * behind "Other stage", and a Cancelled-group stage asks before it moves,
- * since the rest of the money stops counting as owed.
+ * since the rest of the money stops counting as owed. Read-only, it shows
+ * only where the job is: moving a job is for managers.
  */
 export function StagePicker({
   stages,
   currentId,
   jobTitle,
   onMove,
+  readOnly = false,
   children,
 }: {
   stages: StageRef[]
   currentId: Id<'stages'>
   jobTitle: string
   onMove: (stageId: Id<'stages'>) => void
+  readOnly?: boolean
   /** More about the stage, under it (why the job was cancelled). */
   children?: React.ReactNode
 }) {
@@ -110,8 +113,8 @@ export function StagePicker({
     <Panel
       title={m.job_stage()}
       icon={FlowArrowIcon}
-      hint={<Hint term={m.job_stage()}>{m.hint_stage()}</Hint>}
-      action={toggle}
+      hint={!readOnly && <Hint term={m.job_stage()}>{m.hint_stage()}</Hint>}
+      action={!readOnly && toggle}
     >
       <PanelBody className="flex flex-col gap-3">
         {/* The full list marks the current stage itself. */}
@@ -132,7 +135,7 @@ export function StagePicker({
                 {current.name}
               </span>
             )}
-            {next && (
+            {next && !readOnly && (
               <Button
                 size="xl"
                 className="ml-auto max-w-full whitespace-normal"

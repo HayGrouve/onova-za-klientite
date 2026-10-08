@@ -11,7 +11,7 @@ import {
 } from './test.setup'
 import type { TestConvex } from './test.setup'
 
-/** Today lists reminders only while the Reminders module is on. */
+/** Today and the pages list reminders only while the Reminders module is on. */
 async function turnOnReminders(t: TestConvex, businessId: Id<'businesses'>) {
   await t.run(async (ctx) => {
     const business = (await ctx.db.get('businesses', businessId))!
@@ -21,10 +21,15 @@ async function turnOnReminders(t: TestConvex, businessId: Id<'businesses'>) {
   })
 }
 
+/** The open reminders a record's page lists. */
+const remindersOn = async <T>(page: Promise<{ reminders: T }>) =>
+  (await page).reminders
+
 describe('reminders', () => {
   it('add, done and dismiss; open ones list soonest first', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)
+    await turnOnReminders(t, businessId)
     const clientId = await owner.mutation(api.clients.create, {
       businessId,
       name: 'Елена',
@@ -45,7 +50,9 @@ describe('reminders', () => {
     expect((await lastActivity(t)).type).toBe('reminder.added')
     expect(
       (
-        await owner.query(api.reminders.forClient, { businessId, clientId })
+        await remindersOn(
+          owner.query(api.clients.get, { businessId, clientId }),
+        )
       ).map((r) => r._id),
     ).toEqual([sooner, later])
     await owner.mutation(api.reminders.close, {
@@ -60,7 +67,7 @@ describe('reminders', () => {
     })
     expect((await getDoc(t, 'reminders', later)).status).toBe('dismissed')
     expect(
-      await owner.query(api.reminders.forClient, { businessId, clientId }),
+      await remindersOn(owner.query(api.clients.get, { businessId, clientId })),
     ).toEqual([])
   })
 
@@ -193,9 +200,33 @@ describe('reminders', () => {
     ).rejects.toThrow(/item.otherJob/)
   })
 
+  it('a page lists no reminders while the Reminders module is off', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Елена',
+    })
+    await owner.mutation(api.reminders.add, {
+      businessId,
+      clientId,
+      date: '2027-10-01',
+      note: 'Годишна профилактика',
+      source: 'manual',
+    })
+    expect(
+      await remindersOn(owner.query(api.clients.get, { businessId, clientId })),
+    ).toEqual([])
+    await turnOnReminders(t, businessId)
+    expect(
+      await remindersOn(owner.query(api.clients.get, { businessId, clientId })),
+    ).toHaveLength(1)
+  })
+
   it('a job lists its own open reminders, soonest first', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)
+    await turnOnReminders(t, businessId)
     const clientId = await owner.mutation(api.clients.create, {
       businessId,
       name: 'Елена',
@@ -247,10 +278,9 @@ describe('reminders', () => {
       reminderId: closed,
       status: 'done',
     })
-    const listed = await owner.query(api.reminders.forJob, {
-      businessId,
-      jobId,
-    })
+    const listed = await remindersOn(
+      owner.query(api.jobs.get, { businessId, jobId }),
+    )
     expect(listed.map((r) => r._id)).toEqual([sooner, later])
     expect(listed[1]).toMatchObject({
       note: 'Годишна профилактика',
@@ -262,6 +292,7 @@ describe('reminders', () => {
   it('an item lists the open reminders that point at it', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)
+    await turnOnReminders(t, businessId)
     const clientId = await owner.mutation(api.clients.create, {
       businessId,
       name: 'Елена',
@@ -315,14 +346,16 @@ describe('reminders', () => {
       status: 'dismissed',
     })
     expect(
-      (await owner.query(api.reminders.forItem, { businessId, itemId })).map(
-        (r) => r._id,
-      ),
+      (
+        await remindersOn(owner.query(api.items.get, { businessId, itemId }))
+      ).map((r) => r._id),
     ).toEqual([direct, fromRule])
     // A reminder added on an item belongs to the item's client too.
     expect(
       (
-        await owner.query(api.reminders.forClient, { businessId, clientId })
+        await remindersOn(
+          owner.query(api.clients.get, { businessId, clientId }),
+        )
       ).map((r) => r._id),
     ).toContain(direct)
   })
@@ -361,8 +394,11 @@ describe('reminders', () => {
     expect(await onToday('2026-10-08')).toEqual([])
     expect(await onToday('2026-10-15')).toEqual([reminderId])
     expect(
-      (await owner.query(api.reminders.forClient, { businessId, clientId }))[0]
-        .date,
+      (
+        await remindersOn(
+          owner.query(api.clients.get, { businessId, clientId }),
+        )
+      )[0].date,
     ).toBe('2026-10-15')
     const event = await lastActivity(t)
     expect(event.type).toBe('reminder.moved')
@@ -473,7 +509,9 @@ describe('reminders', () => {
         status,
       })
       expect(
-        await owner.query(api.reminders.forClient, { businessId, clientId }),
+        await remindersOn(
+          owner.query(api.clients.get, { businessId, clientId }),
+        ),
       ).toEqual([])
 
       await owner.mutation(api.reminders.reopen, { businessId, reminderId })
@@ -483,7 +521,9 @@ describe('reminders', () => {
       expect(back.date).toBe('2026-10-07')
       expect(
         (
-          await owner.query(api.reminders.forClient, { businessId, clientId })
+          await remindersOn(
+            owner.query(api.clients.get, { businessId, clientId }),
+          )
         ).map((reminder) => reminder._id),
       ).toEqual([reminderId])
       expect((await lastActivity(t)).type).toBe('reminder.reopened')

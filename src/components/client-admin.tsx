@@ -15,18 +15,13 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { InputGroup, InputGroupInput } from '#/components/ui/input-group'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
 import { m } from '#/paraglide/messages.js'
-import { searchClients } from '../../shared/search'
+import { asCandidate, searchClients } from '../../shared/search'
 
 /** Merge a duplicate into another client, or anonymize on request (GDPR). */
 export function ClientAdmin({
@@ -66,39 +61,32 @@ export function ClientAdmin({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Sheet
+      <BottomSheet
         open={panel !== null}
-        onOpenChange={(open) => !open && setPanel(null)}
+        onClose={() => setPanel(null)}
+        title={
+          panel === 'merge'
+            ? m.client_merge_title()
+            : m.client_anonymize_title()
+        }
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>
-              {panel === 'merge'
-                ? m.client_merge_title()
-                : m.client_anonymize_title()}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {panel === 'merge' && (
-              <MergePicker
-                businessId={businessId}
-                client={client}
-                onDone={() => setPanel(null)}
-              />
-            )}
-            {panel === 'anonymize' && (
-              <Anonymize
-                businessId={businessId}
-                clientId={client._id}
-                onDone={() => setPanel(null)}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+        <div className="px-4 pb-6">
+          {panel === 'merge' && (
+            <MergePicker
+              businessId={businessId}
+              client={client}
+              onDone={() => setPanel(null)}
+            />
+          )}
+          {panel === 'anonymize' && (
+            <Anonymize
+              businessId={businessId}
+              clientId={client._id}
+              onDone={() => setPanel(null)}
+            />
+          )}
+        </div>
+      </BottomSheet>
     </>
   )
 }
@@ -122,11 +110,7 @@ function MergePicker({
   if (!clients) return <ListSkeleton />
   const candidates = clients
     .filter((item) => !item.isNoClient && item._id !== client._id)
-    .map((item) => ({
-      ...item,
-      id: item._id,
-      phones: item.phone ? [item.phone] : [],
-    }))
+    .map(asCandidate)
   const shown = query.trim()
     ? searchClients(candidates, query, 20)
     : candidates.slice(0, 20)

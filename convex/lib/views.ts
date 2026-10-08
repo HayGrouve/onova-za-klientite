@@ -1,8 +1,15 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { QueryCtx } from '../_generated/server'
-import { vExtra, vStageColor, vStageGroup } from '../validators'
+import {
+  vActivityData,
+  vActivityType,
+  vExtra,
+  vStageColor,
+  vStageGroup,
+} from '../validators'
 import { listExtra, listFieldIds } from './listFields'
+import { isOpenGroup } from '../../shared/stages'
 
 /** A job as lists show it: enough for a row, nothing more. */
 export const vJobRow = v.object({
@@ -63,8 +70,7 @@ export async function jobRow(
   const client = await cached(ctx, lookups.clients, 'clients', job.clientId)
   const stage = await cached(ctx, lookups.stages, 'stages', job.stageId)
   // A finished or cancelled job has nothing coming up, whatever is left on it.
-  const closed = job.stageGroup === 'done' || job.stageGroup === 'cancelled'
-  const appointments = closed
+  const appointments = !isOpenGroup(job.stageGroup)
     ? []
     : await ctx.db
         .query('appointments')
@@ -107,18 +113,10 @@ export async function jobRow(
 export const vActivityItem = v.object({
   _id: v.id('activity'),
   _creationTime: v.number(),
-  type: v.string(),
+  type: vActivityType,
   actorName: v.string(),
   jobId: v.optional(v.id('jobs')),
-  data: v.object({
-    from: v.optional(v.string()),
-    to: v.optional(v.string()),
-    amountCents: v.optional(v.number()),
-    note: v.optional(v.string()),
-    name: v.optional(v.string()),
-    fromId: v.optional(v.string()),
-    toId: v.optional(v.string()),
-  }),
+  data: vActivityData,
 })
 
 /** A record's timeline, newest first, with who did each change. */
@@ -150,4 +148,57 @@ export async function timeline(
     })
   }
   return result
+}
+
+/** A target's fields that aren't archived, in their order: what a form shows. */
+export async function activeFields(
+  ctx: QueryCtx,
+  businessId: Id<'businesses'>,
+  target: Doc<'fields'>['target'],
+) {
+  const fields = await ctx.db
+    .query('fields')
+    .withIndex('by_business_target_order', (q) =>
+      q.eq('businessId', businessId).eq('target', target),
+    )
+    .collect()
+  return fields.filter((field) => field.archivedAt === undefined)
+}
+
+/**
+ * The open reminders on a client, a job or an item, soonest first, as its
+ * page lists them. None while the Reminders module is off.
+ */
+export async function openRemindersOn(
+  ctx: QueryCtx,
+  business: Doc<'businesses'>,
+  on:
+    | { clientId: Id<'clients'> }
+    | { jobId: Id<'jobs'> }
+    | { itemId: Id<'items'> },
+) {
+  if (!business.modules.reminders) return []
+  const reminders =
+    'clientId' in on
+      ? ctx.db
+          .query('reminders')
+          .withIndex('by_client', (q) => q.eq('clientId', on.clientId))
+      : 'jobId' in on
+        ? ctx.db
+            .query('reminders')
+            .withIndex('by_job', (q) => q.eq('jobId', on.jobId))
+        : ctx.db
+            .query('reminders')
+            .withIndex('by_item', (q) => q.eq('itemId', on.itemId))
+  return (await reminders.collect())
+    .filter((reminder) => reminder.status === 'open')
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ _id, date, note, source, jobId, itemId }) => ({
+      _id,
+      date,
+      note,
+      source,
+      jobId,
+      itemId,
+    }))
 }

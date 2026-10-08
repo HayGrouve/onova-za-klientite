@@ -30,12 +30,13 @@ import { useWide } from '#/hooks/use-wide'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
 import { formatPhone } from '../../../shared/phone-format'
-import { searchClients } from '../../../shared/search'
+import { asCandidate, searchClients } from '../../../shared/search'
 import {
   nextSort,
   parseSortSearch,
   sortFromSearch,
   sortToSearch,
+  textParam,
 } from '../../../shared/sort'
 import type { SortSearch } from '../../../shared/sort'
 
@@ -44,13 +45,9 @@ type ClientsSearch = { q?: string } & SortSearch<ClientSortKey>
 
 export const Route = createFileRoute('/_app/clients/')({
   validateSearch: (search: Record<string, unknown>): ClientsSearch => {
-    // The address parser reads "12" as a number.
-    const q =
-      typeof search.q === 'string' || typeof search.q === 'number'
-        ? String(search.q)
-        : ''
+    const q = textParam(search.q)
     return {
-      ...(q.trim() && { q }),
+      ...(q !== undefined && { q }),
       ...parseSortSearch(search, CLIENT_SORT_KEYS),
     }
   },
@@ -80,15 +77,7 @@ function ClientsPage() {
   const shown = !clients
     ? []
     : query.trim()
-      ? searchClients(
-          clients.map((client) => ({
-            ...client,
-            id: client._id,
-            phones: client.phone ? [client.phone] : [],
-          })),
-          query,
-          200,
-        )
+      ? searchClients(clients.map(asCandidate), query, 200)
       : clients
   const real = clients?.filter((client) => !client.isNoClient) ?? []
 

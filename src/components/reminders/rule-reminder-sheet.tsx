@@ -2,12 +2,7 @@ import { useState } from 'react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { monthsLabel } from '#/components/setup/steps'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
@@ -31,33 +26,29 @@ export function RuleReminderSheet({
   const [shown, setShown] = useState(job)
   if (job && job !== shown) setShown(job)
   return (
-    <Sheet open={job !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-      >
-        <SheetHeader>
-          <SheetTitle>{m.reminder_rule_title()}</SheetTitle>
-        </SheetHeader>
-        {shown && rule && (
-          <div className="px-4 pb-6">
-            <p className="pb-4 text-sm">
-              {m.reminder_rule_body({
-                when: monthsLabel(rule.months).toLocaleLowerCase('bg'),
-              })}
-            </p>
-            <ReminderForm
-              businessId={business._id}
-              target={{ jobId: shown._id, itemId: shown.itemId }}
-              initialDate={addMonths(today, rule.months)}
-              initialNote={shown.title}
-              source="rule"
-              onDone={onClose}
-              onSkip={onClose}
-            />
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
+    <BottomSheet
+      open={job !== null}
+      onClose={onClose}
+      title={m.reminder_rule_title()}
+    >
+      {shown && rule && (
+        <div className="px-4 pb-6">
+          <p className="pb-4 text-sm">
+            {m.reminder_rule_body({
+              when: monthsLabel(rule.months).toLocaleLowerCase('bg'),
+            })}
+          </p>
+          <ReminderForm
+            businessId={business._id}
+            target={{ jobId: shown._id, itemId: shown.itemId }}
+            initialDate={addMonths(today, rule.months)}
+            initialNote={shown.title}
+            source="rule"
+            onDone={onClose}
+            onSkip={onClose}
+          />
+        </div>
+      )}
+    </BottomSheet>
   )
 }

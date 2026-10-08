@@ -13,7 +13,7 @@ import { SettingsPreview } from '#/components/settings/settings-preview'
 import { Switch } from '#/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { useViewer } from '#/hooks/use-viewer'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { MODULE_KEYS } from '../../../shared/setup'
 import type {
@@ -94,8 +94,10 @@ function ModulesSettings() {
   })
   const { words } = business
   const owner = settings?.role === 'owner'
-  const fail = (error: unknown) => toast.error(errorMessage(error))
-  const saved = () => toast.success(m.saved())
+  const save = (change: () => Promise<unknown>) =>
+    void runChange(change).then(
+      (saved) => saved.done && toast.success(m.saved()),
+    )
   // The switch just moved: show the view it changes, and mark the part.
   const show = (key: Switchable) => {
     setView(SHOWN_IN[key].view)
@@ -167,12 +169,12 @@ function ModulesSettings() {
               disabled={!owner}
               onChange={(checked) => {
                 show(key)
-                void setModules({
-                  businessId: business._id,
-                  modules: { ...settings.modules, [key]: checked },
-                })
-                  .then(saved)
-                  .catch(fail)
+                save(() =>
+                  setModules({
+                    businessId: business._id,
+                    modules: { ...settings.modules, [key]: checked },
+                  }),
+                )
               }}
             />
           ))}
@@ -184,12 +186,12 @@ function ModulesSettings() {
             disabled={!owner}
             onChange={(checked) => {
               show('deposits')
-              void setNewJob({
-                businessId: business._id,
-                depositsOnNewJob: checked,
-              })
-                .then(saved)
-                .catch(fail)
+              save(() =>
+                setNewJob({
+                  businessId: business._id,
+                  depositsOnNewJob: checked,
+                }),
+              )
             }}
           />
         </ListCard>

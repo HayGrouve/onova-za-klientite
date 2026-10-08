@@ -3,12 +3,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { PaymentForm } from '#/components/money/payment-form'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
@@ -27,27 +22,23 @@ export function ClientPaymentSheet({
   onClose: () => void
 }) {
   return (
-    <Sheet open={client !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-      >
-        <SheetHeader>
-          <SheetTitle>{m.money_pay({ name: client?.name ?? '' })}</SheetTitle>
-        </SheetHeader>
-        <div className="px-4 pb-6">
-          {client && (
-            <ClientPaymentBody
-              // Another client starts with a fresh form.
-              key={client._id}
-              clientId={client._id}
-              today={today}
-              onClose={onClose}
-            />
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
+    <BottomSheet
+      open={client !== null}
+      onClose={onClose}
+      title={m.money_pay({ name: client?.name ?? '' })}
+    >
+      <div className="px-4 pb-6">
+        {client && (
+          <ClientPaymentBody
+            // Another client starts with a fresh form.
+            key={client._id}
+            clientId={client._id}
+            today={today}
+            onClose={onClose}
+          />
+        )}
+      </div>
+    </BottomSheet>
   )
 }
 

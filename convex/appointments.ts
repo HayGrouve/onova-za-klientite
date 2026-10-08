@@ -5,7 +5,7 @@ import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
 import { refreshRepeat } from './lib/repeat'
-import { optionalText } from './lib/validate'
+import { clockTime, optionalText } from './lib/validate'
 
 const vSlot = {
   date: v.string(),
@@ -23,25 +23,13 @@ type Slot = {
   endTime?: { hour: number; minute: number }
 }
 
-function checkTime(time: { hour: number; minute: number } | undefined) {
-  if (!time) return
-  const ok =
-    Number.isInteger(time.hour) &&
-    time.hour >= 0 &&
-    time.hour <= 23 &&
-    Number.isInteger(time.minute) &&
-    time.minute >= 0 &&
-    time.minute <= 59
-  if (!ok) fail('invalid', { field: 'time' })
-}
-
 /** Calendar date and optional time in Sofia → start, end and all-day. */
 function toMoments(slot: Slot) {
   if (!isValidDate(slot.date)) fail('invalid', { field: 'date' })
   if (slot.endDate !== undefined && !isValidDate(slot.endDate))
     fail('invalid', { field: 'endDate' })
-  checkTime(slot.time)
-  checkTime(slot.endTime)
+  clockTime(slot.time, 'time')
+  clockTime(slot.endTime, 'time')
   const start = sofiaTimeToUtc(
     slot.date,
     slot.time?.hour ?? 0,

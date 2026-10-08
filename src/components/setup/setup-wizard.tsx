@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { cn } from 'cn'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { BusinessSwitcher } from '#/components/app-shell'
@@ -14,7 +13,7 @@ import { Stopwatch } from '#/components/stopwatch'
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { recordTiming } from '#/lib/timing'
 import { m } from '#/paraglide/messages.js'
 import {
@@ -128,16 +127,14 @@ export function SetupWizard({
   }
   const confirm = async () => {
     setSaving(true)
-    try {
+    const ran = await runChange(async () => {
       await apply({ businessId, answers })
       sessionStorage.removeItem(draftKey)
       const importing =
         answers.importFrom === 'phone' || answers.importFrom === 'excel'
       await navigate({ to: importing ? '/import' : '/', replace: true })
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!ran.done) setSaving(false)
   }
 
   const Body = key ? STEP_BODY[key] : null

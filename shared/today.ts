@@ -1,4 +1,4 @@
-import { isOverdue } from './dates'
+import { isOpenGroup } from './stages'
 import type { StageGroup } from './stages'
 
 /** An appointment as Today lists it: the job it belongs to, if any. */
@@ -22,16 +22,6 @@ export type TodayLists<
   doneUnpaid: TJob[]
 }
 
-const CLOSED: ReadonlySet<StageGroup> = new Set(['done', 'cancelled'])
-
-/** Overdue means late and still open: a Done or Cancelled job is never late. */
-export function isJobLate(
-  job: { stageGroup: StageGroup; dueDate?: string },
-  today: string,
-): boolean {
-  return !CLOSED.has(job.stageGroup) && isOverdue(job.dueDate, today)
-}
-
 /**
  * Today shows each job once, under the most urgent reason to look at it:
  * a visit today, then overdue, then due soon, then done but unpaid, then a
@@ -46,7 +36,7 @@ export function arrangeToday<
 >(lists: TodayLists<TAppointment, TJob>): TodayLists<TAppointment, TJob> {
   const shown = new Set<string>()
   const open = (item: TAppointment) =>
-    !item.job || !CLOSED.has(item.job.stageGroup)
+    !item.job || isOpenGroup(item.job.stageGroup)
 
   const appointments = lists.appointments.filter(open)
   for (const item of appointments) if (item.job) shown.add(item.job._id)

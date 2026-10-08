@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
 import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
-import { recomputeJob } from './lib/recompute'
+import { insertCost, patchCost, removeCost } from './lib/ledger'
 import { calendarDate, cents, optionalText, requiredText } from './lib/validate'
 
 /** A cost on a job, or a general one (rent, fuel, tools) when there is no job. */
@@ -20,7 +20,7 @@ export const add = businessMutation({
     const job = args.jobId ? await getOwned(ctx, 'jobs', args.jobId) : null
     const amountCents = cents(args.amountCents, 'amountCents')
     const label = requiredText(args.label, 'label', 100)
-    const costId = await ctx.db.insert('costs', {
+    const costId = await insertCost(ctx, {
       businessId: ctx.business._id,
       jobId: job?._id,
       amountCents,
@@ -28,7 +28,6 @@ export const add = businessMutation({
       label,
       note: optionalText(args.note, 'note', 1000),
     })
-    if (job) await recomputeJob(ctx, job._id)
     await logActivity(ctx, {
       type: 'cost.added',
       costId,
@@ -60,8 +59,7 @@ export const update = businessMutation({
       patch.label = requiredText(args.label, 'label', 100)
     if (args.note !== undefined)
       patch.note = optionalText(args.note, 'note', 1000)
-    await ctx.db.patch('costs', cost._id, patch)
-    if (cost.jobId) await recomputeJob(ctx, cost.jobId)
+    await patchCost(ctx, cost, patch)
     const job = cost.jobId ? await ctx.db.get('jobs', cost.jobId) : null
     await logActivity(ctx, {
       type: 'cost.edited',
@@ -80,8 +78,7 @@ export const remove = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const cost = await getOwned(ctx, 'costs', args.costId)
-    await ctx.db.delete('costs', cost._id)
-    if (cost.jobId) await recomputeJob(ctx, cost.jobId)
+    await removeCost(ctx, cost)
     const job = cost.jobId ? await ctx.db.get('jobs', cost.jobId) : null
     await logActivity(ctx, {
       type: 'cost.removed',

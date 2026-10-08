@@ -1,34 +1,8 @@
 import { ConvexError } from 'convex/values'
 
-/**
- * Error codes the client turns into Bulgarian messages (D16). Convex never
- * returns UI text.
- */
-export type ErrorCode =
-  | 'auth.signedOut'
-  | 'auth.noUser'
-  | 'auth.notMember'
-  | 'auth.forbidden'
-  | 'notFound'
-  | 'invalid'
-  | 'seed.notAllowed'
-  | 'stage.hasJobs'
-  | 'stage.lastInGroup'
-  | 'field.typeChange'
-  | 'field.value'
-  | 'client.noClient'
-  | 'job.otherClient'
-  | 'item.otherClient'
-  | 'item.otherJob'
-  | 'job.cancelled'
-  | 'payment.signMismatch'
-  | 'payment.exceeds'
-  | 'payment.zero'
-  | 'payment.tooLow'
-  | 'credit.notEnough'
-  | 'job.noDate'
-  | 'client.merged'
-  | 'file.rejected'
+import type { ErrorCode } from '../../shared/errors'
+
+export type { ErrorCode }
 
 export function fail(
   code: ErrorCode,

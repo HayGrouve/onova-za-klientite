@@ -11,10 +11,10 @@ import {
 import { createClient } from './lib/clientWrite'
 import { fail } from './lib/errors'
 import { businessStages, createJob } from './lib/jobWrite'
-import { recomputeMoney } from './lib/recompute'
-import { refreshRepeat } from './lib/repeat'
-import { calendarDate, cents, optionalText } from './lib/validate'
-import { vPaymentMethod } from './validators'
+import { payJob } from './lib/ledger'
+import { setJobRepeat } from './lib/repeat'
+import { calendarDate, cents, clockTime, optionalText } from './lib/validate'
+import { vPaymentMethod, vRepeatUnit } from './validators'
 
 /** Most clients a Level 1 business has; the picker searches them in the browser. */
 const MAX_PICKER_CLIENTS = 2000
@@ -149,7 +149,7 @@ export const save = businessMutation({
     repeat: v.optional(
       v.object({
         every: v.number(),
-        unit: v.union(v.literal('week'), v.literal('month')),
+        unit: vRepeatUnit,
       }),
     ),
   },
@@ -190,31 +190,11 @@ export const save = businessMutation({
     if (args.deposit) {
       const amountCents = cents(args.deposit.amountCents, 'deposit')
       if (amountCents === 0) fail('payment.zero')
-      const job = (await ctx.db.get('jobs', jobId))!
-      const paymentId = await ctx.db.insert('payments', {
-        businessId: ctx.business._id,
-        clientId,
+      const paymentId = await payJob(ctx, jobId, {
         amountCents,
         date: calendarDate(args.deposit.date, 'depositDate'),
         method: args.deposit.method,
         label: optionalText(args.deposit.label, 'label', 100),
-        allocatedCents: 0,
-        createdBy: ctx.member._id,
-      })
-      const toJob = Math.min(amountCents, Math.max(job.balanceCents, 0))
-      if (toJob > 0) {
-        await ctx.db.insert('allocations', {
-          businessId: ctx.business._id,
-          paymentId,
-          jobId,
-          clientId,
-          amountCents: toJob,
-        })
-      }
-      await recomputeMoney(ctx, {
-        paymentIds: [paymentId],
-        jobIds: [jobId],
-        clientIds: [clientId],
       })
       await logActivity(ctx, {
         type: 'payment.added',
@@ -227,18 +207,7 @@ export const save = businessMutation({
 
     if (args.when) {
       const date = calendarDate(args.when.date, 'when')
-      const time = args.when.time
-      if (
-        time &&
-        (!Number.isInteger(time.hour) ||
-          time.hour < 0 ||
-          time.hour > 23 ||
-          !Number.isInteger(time.minute) ||
-          time.minute < 0 ||
-          time.minute > 59)
-      ) {
-        fail('invalid', { field: 'time' })
-      }
+      const time = clockTime(args.when.time, 'time')
       await ctx.db.insert('appointments', {
         businessId: ctx.business._id,
         jobId,
@@ -256,11 +225,7 @@ export const save = businessMutation({
     }
     // Repeating needs the job's date; without one the switch is ignored.
     if (args.repeat && (args.when || args.dueDate)) {
-      const { every, unit } = args.repeat
-      if (!Number.isInteger(every) || every < 1 || every > 52)
-        fail('invalid', { field: 'every' })
-      await ctx.db.patch('jobs', jobId, { repeat: { every, unit } })
-      await refreshRepeat(ctx, jobId)
+      await setJobRepeat(ctx, (await ctx.db.get('jobs', jobId))!, args.repeat)
     }
     return { jobId, clientId }
   },

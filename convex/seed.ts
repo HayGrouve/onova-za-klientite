@@ -3,12 +3,11 @@ import { internalMutation } from './_generated/server'
 import type { MutationCtx } from './_generated/server'
 import type { Doc, Id, TableNames } from './_generated/dataModel'
 import { addDays, sofiaTimeToUtc, todayInSofia } from '../shared/dates'
-import { lineTotalCents } from '../shared/money'
 import { logActivity } from './lib/activity'
 import type { BusinessMutationCtx } from './lib/auth'
 import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
-import { recomputeMoney } from './lib/recompute'
+import { insertCost, insertJob, payJob, recordPayment } from './lib/ledger'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { joinSeedBusinesses, seedAllowed } from './lib/seedAccess'
 import { SEED_BUSINESSES } from './seedData'
@@ -291,7 +290,6 @@ async function seedBusiness(
     return id
   }
 
-  const touchedClients = new Set<Id<'clients'>>()
   for (const spec of seed.jobs) {
     const stage = stageIds.get(spec.stage)
     if (!stage) throw new Error(`Seed stage "${spec.stage}" is not defined`)
@@ -333,15 +331,10 @@ async function seedBusiness(
       source: 'manual' as const,
       cancelReason: spec.cancelReason,
       extra: {},
-      priceCents: 0,
-      paidCents: 0,
-      costCents: 0,
-      balanceCents: 0,
-      owes: false,
       searchText: '',
       createdBy: member._id,
     }
-    const jobId = await ctx.db.insert('jobs', {
+    const jobId = await insertJob(ctx, {
       ...job,
       searchText: await jobSearchText(ctx, job),
     })
@@ -364,38 +357,13 @@ async function seedBusiness(
       })
     }
 
-    const price =
-      lines.length > 0
-        ? lines.reduce(
-            (sum, line) =>
-              sum + lineTotalCents(line.quantity, line.unitPriceCents),
-            0,
-          )
-        : (spec.typedPriceCents ?? 0)
-    let unpaid = price
     for (const payment of spec.payments ?? []) {
-      const paymentId = await ctx.db.insert('payments', {
-        businessId,
-        clientId: owner,
+      const paymentId = await payJob(as, jobId, {
         amountCents: payment.amountCents,
         date: daysAgo(payment.daysAgo),
         method: payment.method,
         label: payment.label,
-        allocatedCents: 0,
-        createdBy: member._id,
       })
-      const toJob = Math.min(payment.amountCents, unpaid)
-      if (toJob > 0) {
-        await ctx.db.insert('allocations', {
-          businessId,
-          paymentId,
-          jobId,
-          clientId: owner,
-          amountCents: toJob,
-        })
-        unpaid -= toJob
-      }
-      await recomputeMoney(ctx, { paymentIds: [paymentId] })
       await logActivity(as, {
         type: 'payment.added',
         jobId,
@@ -405,7 +373,7 @@ async function seedBusiness(
       })
     }
     for (const cost of spec.costs ?? []) {
-      const costId = await ctx.db.insert('costs', {
+      const costId = await insertCost(ctx, {
         businessId,
         jobId,
         amountCents: cost.amountCents,
@@ -434,21 +402,15 @@ async function seedBusiness(
         assigneeIds: [],
       })
     }
-    await recomputeMoney(ctx, { jobIds: [jobId] })
-    touchedClients.add(owner)
   }
 
   for (const payment of seed.credit ?? []) {
     const owner = clientId(payment.client)
-    const paymentId = await ctx.db.insert('payments', {
-      businessId,
-      clientId: owner,
+    const paymentId = await recordPayment(as, owner, {
       amountCents: payment.amountCents,
       date: daysAgo(payment.daysAgo),
       method: payment.method,
       label: payment.label,
-      allocatedCents: 0,
-      createdBy: member._id,
     })
     await logActivity(as, {
       type: 'payment.added',
@@ -456,12 +418,10 @@ async function seedBusiness(
       paymentId,
       data: { amountCents: payment.amountCents, note: payment.label },
     })
-    touchedClients.add(owner)
   }
-  await recomputeMoney(ctx, { clientIds: [...touchedClients] })
 
   for (const cost of seed.generalCosts ?? []) {
-    const costId = await ctx.db.insert('costs', {
+    const costId = await insertCost(ctx, {
       businessId,
       amountCents: cost.amountCents,
       date: daysAgo(cost.daysAgo),

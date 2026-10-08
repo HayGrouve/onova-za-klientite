@@ -4,7 +4,6 @@ import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ConfirmAction } from '#/components/confirm-action'
@@ -22,18 +21,13 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
 import { GROUP_LABEL, GROUP_MEANING } from '#/i18n/groups'
 import { lower } from '#/i18n/words'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import {
   STAGE_GROUPS,
@@ -99,9 +93,7 @@ function StagesSettings() {
     const ids = groupedOrder(stages)
     const index = ids.indexOf(stageId)
     ;[ids[index], ids[index + by]] = [ids[index + by], ids[index]]
-    void reorder({ businessId: business._id, stageIds: ids }).catch(
-      (error: unknown) => toast.error(errorMessage(error)),
-    )
+    void runChange(() => reorder({ businessId: business._id, stageIds: ids }))
   }
 
   return (
@@ -203,29 +195,22 @@ function StagesSettings() {
               </section>
             )
           })}
-          <Sheet
+          <BottomSheet
             open={panel !== null}
-            onOpenChange={(open) => !open && setPanel(null)}
+            onClose={() => setPanel(null)}
+            title={panel?.stage?.name ?? m.stages_add()}
           >
-            <SheetContent
-              side="bottom"
-              className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-            >
-              <SheetHeader>
-                <SheetTitle>{panel?.stage?.name ?? m.stages_add()}</SheetTitle>
-              </SheetHeader>
-              <div className="px-4 pb-6">
-                {panel && (
-                  <StageForm
-                    stage={panel.stage}
-                    group={panel.group}
-                    stages={settings.stages}
-                    onDone={() => setPanel(null)}
-                  />
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+            <div className="px-4 pb-6">
+              {panel && (
+                <StageForm
+                  stage={panel.stage}
+                  group={panel.group}
+                  stages={settings.stages}
+                  onDone={() => setPanel(null)}
+                />
+              )}
+            </div>
+          </BottomSheet>
         </>
       )}
     </SettingsPage>

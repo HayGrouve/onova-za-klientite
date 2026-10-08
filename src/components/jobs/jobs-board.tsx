@@ -14,7 +14,6 @@ import { useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
@@ -45,20 +44,24 @@ import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { GROUP_LABEL } from '#/i18n/groups'
 import { m } from '#/paraglide/messages.js'
-import { isOverdue } from '../../../shared/dates'
+import { jobOwedCents } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
-import { filterJobs, isFiltering, owedCents } from '../../../shared/board'
+import {
+  filterJobs,
+  filterToSearch,
+  isFiltering,
+  owedCents,
+} from '../../../shared/board'
 import type { JobFilter } from '../../../shared/board'
-import { STAGE_GROUPS } from '../../../shared/stages'
+import { STAGE_GROUPS, isJobLate } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
+import { hasRole } from '../../../shared/roles'
 
 type Board = FunctionReturnType<typeof api.jobs.board>
 type Card = Board['columns'][number]['jobs'][number]
 type Stage = Board['stages'][number]
 /** Where a dragged job lands: a stage, or Cancelled when it has no stage left. */
 type Target = Stage | 'cancelled'
-
-const MOVE_TOAST = 'board-move'
 
 // The dot by a column's name carries its group's meaning: open work blue,
 // done green, cancelled red, as on the stage badges (D53).
@@ -81,13 +84,14 @@ export function JobsBoard({
   filter: JobFilter
   today: string
 }) {
-  const { business, businesses } = useViewer()
-  const role = businesses.find((item) => item._id === business._id)?.role
+  const { business } = useViewer()
   // Level 2: a Worker cannot change stages, so their cards don't move.
-  const canMove = role === 'owner' || role === 'manager'
+  const canMove = hasRole(business.role, 'manager')
   const board = useQuery(api.jobs.board, { businessId: business._id })
-  const move = useMoveJob()
+  const { move, announce } = useMoveJob()
   const [ruleFor, setRuleFor] = useState<Card | null>(null)
+  // The move's toast waits while the reminder rule's offer covers the board.
+  const afterRuleOffer = useRef<(() => void) | null>(null)
   // A move into Cancelled waits here for a yes. It stays set while the
   // question closes, so the dialog keeps its words through the animation.
   const [asking, setAsking] = useState<{ card: Card; target: Target } | null>(
@@ -97,27 +101,23 @@ export function JobsBoard({
 
   const stagesOf = (group: StageGroup) =>
     board?.stages.filter((stage) => stage.group === group) ?? []
-  // Tells the person where the job went, with a way back to where it was.
-  const announce = (card: Card, target: Target) => {
-    const previous = board?.stages.find((stage) => stage._id === card.stageId)
-    const group = target === 'cancelled' ? 'cancelled' : target.group
-    const undo = previous
-      ? {
-          label: m.undo(),
-          onClick: () => void move({ ...card, stageGroup: group }, previous),
-        }
-      : undefined
-    toast.success(
-      m.job_stage_moved({
-        stage: target === 'cancelled' ? GROUP_LABEL.cancelled() : target.name,
-      }),
-      { id: MOVE_TOAST, duration: 6000, action: undo },
-    )
-  }
   const moveNow = (card: Card, target: Target) => {
-    void move(card, target, () => announce(card, target)).then(
-      (offer) => offer && setRuleFor(card),
-    )
+    const previous = board?.stages.find((stage) => stage._id === card.stageId)
+    void move(card, target).then(({ moved, offerRule }) => {
+      if (!moved) return
+      const say = () => announce(card, target, previous)
+      if (offerRule) {
+        afterRuleOffer.current = say
+        setRuleFor(card)
+      } else {
+        say()
+      }
+    })
+  }
+  const closeRuleOffer = () => {
+    setRuleFor(null)
+    afterRuleOffer.current?.()
+    afterRuleOffer.current = null
   }
   const moveTo = (card: Card, target: Target) => {
     if (target !== 'cancelled' && target._id === card.stageId) return
@@ -152,7 +152,14 @@ export function JobsBoard({
           <Column
             key={column.group}
             column={column}
-            cards={filterJobs(column.jobs, filter, today)}
+            cards={filterJobs(
+              // The owing filter finds every Done job that owes, not only the latest.
+              filter.owing
+                ? [...column.jobs, ...column.olderOwing]
+                : column.jobs,
+              filter,
+              today,
+            )}
             filter={filter}
             filtering={filtering}
             stages={stagesOf(column.group)}
@@ -180,7 +187,7 @@ export function JobsBoard({
           <CardFace card={drag.card} today={today} />
         </div>
       )}
-      <RuleReminderSheet job={ruleFor} onClose={() => setRuleFor(null)} />
+      <RuleReminderSheet job={ruleFor} onClose={closeRuleOffer} />
       <AlertDialog open={askOpen} onOpenChange={setAskOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -513,9 +520,7 @@ function Column({
             search={{
               view: 'table',
               group,
-              ...(filter.text?.trim() && { q: filter.text }),
-              ...(filter.owing && { owing: true as const }),
-              ...(filter.dueThisMonth && { due: 'month' as const }),
+              ...filterToSearch(filter),
             }}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
@@ -570,9 +575,7 @@ function BoardCard({
   wasDragged: () => boolean
   onMove: (target: Target) => void
 }) {
-  const late =
-    (card.stageGroup === 'new' || card.stageGroup === 'in_progress') &&
-    isOverdue(card.dueDate, today)
+  const late = isJobLate(card, today)
   return (
     <li
       onPointerDown={canMove ? onPress : undefined}
@@ -606,9 +609,7 @@ function BoardCard({
  * (as on the phone's rows), the client, when, and what is still owed.
  */
 function CardFace({ card, today }: { card: Card; today: string }) {
-  const late =
-    (card.stageGroup === 'new' || card.stageGroup === 'in_progress') &&
-    isOverdue(card.dueDate, today)
+  const late = isJobLate(card, today)
   const timing: { icon: Icon; text: string } | null =
     late && card.dueDate
       ? {
@@ -630,7 +631,7 @@ function CardFace({ card, today }: { card: Card; today: string }) {
               text: m.due_short({ date: formatDay(card.dueDate, today) }),
             }
           : null
-  const owes = card.owes && card.balanceCents > 0
+  const owes = jobOwedCents(card) > 0
 
   return (
     <span className="flex flex-col gap-1.5 p-3">

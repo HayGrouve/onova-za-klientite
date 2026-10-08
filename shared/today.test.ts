@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { arrangeToday, isJobLate } from './today'
+import { arrangeToday } from './today'
 import type { TodayAppointment, TodayJob } from './today'
 import type { StageGroup } from './stages'
 
@@ -196,38 +196,5 @@ describe('arrangeToday', () => {
     const copy = structuredClone(lists)
     arrangeToday(lists)
     expect(lists).toEqual(copy)
-  })
-})
-
-describe('isJobLate', () => {
-  it('is a New or In progress job past its due date', () => {
-    expect(
-      isJobLate({ stageGroup: 'new', dueDate: '2026-10-05' }, '2026-10-08'),
-    ).toBe(true)
-    expect(
-      isJobLate(
-        { stageGroup: 'in_progress', dueDate: '2026-10-07' },
-        '2026-10-08',
-      ),
-    ).toBe(true)
-  })
-
-  it('is not late on the due date, or with no due date', () => {
-    expect(
-      isJobLate({ stageGroup: 'new', dueDate: '2026-10-08' }, '2026-10-08'),
-    ).toBe(false)
-    expect(isJobLate({ stageGroup: 'new' }, '2026-10-08')).toBe(false)
-  })
-
-  it('is never late once Done or Cancelled', () => {
-    expect(
-      isJobLate({ stageGroup: 'done', dueDate: '2026-10-01' }, '2026-10-08'),
-    ).toBe(false)
-    expect(
-      isJobLate(
-        { stageGroup: 'cancelled', dueDate: '2026-10-01' },
-        '2026-10-08',
-      ),
-    ).toBe(false)
   })
 })

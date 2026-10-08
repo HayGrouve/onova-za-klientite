@@ -17,6 +17,7 @@ import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { canPickContact } from '#/lib/contacts'
+import { runChange } from '#/lib/change'
 import { errorMessage } from '#/lib/errors'
 import { buildExportZip } from '#/lib/export-zip'
 import { wipeSnapshots } from '#/lib/offline-store'
@@ -28,9 +29,8 @@ export const Route = createFileRoute('/_app/settings/data')({
 })
 
 function DataSettings() {
-  const { business, businesses } = useViewer()
-  const owner =
-    businesses.find((item) => item._id === business._id)?.role === 'owner'
+  const { business } = useViewer()
+  const owner = business.role === 'owner'
   return (
     <SettingsPage title={m.settings_data()}>
       <ListCard>
@@ -152,13 +152,13 @@ function DeleteAccount() {
         disabled={!confirmed || busy}
         onClick={() => {
           setBusy(true)
-          void deleteAccount({})
-            .then(() => wipeSnapshots())
-            .then(() => signOut())
-            .catch((error: unknown) => {
-              toast.error(errorMessage(error))
-              setBusy(false)
-            })
+          void runChange(async () => {
+            await deleteAccount({})
+            await wipeSnapshots()
+            await signOut()
+          }).then((deleted) => {
+            if (!deleted.done) setBusy(false)
+          })
         }}
       >
         {busy && <Spinner data-icon="inline-start" />}

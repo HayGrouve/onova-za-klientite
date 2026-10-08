@@ -21,7 +21,7 @@ import { Spinner } from '#/components/ui/spinner'
 import { Textarea } from '#/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useWide } from '#/hooks/use-wide'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { formatPhone, normalizePhone } from '../../shared/phone'
 
@@ -119,7 +119,7 @@ export function ClientForm({
       note,
       extra: activeValues(fields, extra),
     }
-    try {
+    const saved = await runChange(async () => {
       if (client) {
         await update({ businessId, clientId: client._id, ...values })
         onSaved(client._id)
@@ -127,10 +127,8 @@ export function ClientForm({
         onSaved(await create({ businessId, ...values }))
       }
       toast.success(m.saved())
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!saved.done) setSaving(false)
   }
 
   return (

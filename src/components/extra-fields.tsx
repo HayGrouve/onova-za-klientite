@@ -13,7 +13,7 @@ import { Textarea } from '#/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
-import { formatMoney, parseMoney } from '../../shared/money'
+import { formatMoney, moneyInputText, parseMoney } from '../../shared/money'
 
 type FieldDoc = Doc<'fields'>
 export type ExtraValues = Record<string, string | number | boolean>
@@ -111,7 +111,7 @@ function NumberInput({
     typeof value !== 'number'
       ? ''
       : kind === 'money'
-        ? formatMoney(value).replace(/\s?€/, '')
+        ? moneyInputText(value)
         : String(value),
   )
   const parse = (input: string) =>

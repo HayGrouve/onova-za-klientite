@@ -17,7 +17,7 @@ import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../shared/dates'
 import { formatMoney } from '../../shared/money'
-import { isJobLate } from '../../shared/today'
+import { isJobLate } from '../../shared/stages'
 
 export type JobRowData = FunctionReturnType<
   typeof api.jobs.list

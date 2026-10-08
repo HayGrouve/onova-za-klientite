@@ -8,9 +8,14 @@ import { Button } from '#/components/ui/button'
 import { FieldError } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
-import { formatMoney, lineTotalCents, parseMoney } from '../../../shared/money'
+import {
+  formatMoney,
+  lineTotalCents,
+  moneyInputText,
+  parseMoney,
+} from '../../../shared/money'
 import { formatQuantity } from '../../../shared/quantity'
 
 type Line = Doc<'jobs'>['lines'][number]
@@ -27,7 +32,7 @@ function toRow(line: Line): Row {
     id: line.id,
     description: line.description,
     quantity: formatQuantity(line.quantity),
-    price: formatMoney(line.unitPriceCents).replace(/\s?€/, ''),
+    price: moneyInputText(line.unitPriceCents),
     serviceId: line.serviceId,
   }
 }
@@ -133,7 +138,7 @@ export function LinesEditor({
       return
     }
     setSaving(true)
-    try {
+    const saved = await runChange(async () => {
       await setLines({
         businessId,
         jobId: job._id,
@@ -147,10 +152,8 @@ export function LinesEditor({
       })
       toast.success(m.saved())
       onDone()
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!saved.done) setSaving(false)
   }
 
   return (
@@ -165,7 +168,7 @@ export function LinesEditor({
               onClick={() =>
                 add({
                   description: service.name,
-                  price: formatMoney(service.priceCents).replace(/\s?€/, ''),
+                  price: moneyInputText(service.priceCents),
                   serviceId: service.id,
                 })
               }

@@ -206,6 +206,26 @@ describe('newJob.save with repeat', () => {
     const job = await getDoc(t, 'jobs', jobId)
     expect(job.repeat).toEqual({ every: 1, unit: 'week' })
     expect(job.nextRepeatOn).toBe('2026-10-09')
+    // The timeline says so, as when repeating is set on the job page.
+    const logged = await t.run(async (ctx) =>
+      (await ctx.db.query('activity').collect()).filter(
+        (event) => event.jobId === jobId && event.type === 'job.repeatSet',
+      ),
+    )
+    expect(logged).toHaveLength(1)
+  })
+
+  it('refuses a time that is not on the clock', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    await expect(
+      owner.mutation(api.newJob.save, {
+        businessId,
+        client: { kind: 'none' },
+        title: 'Почистване',
+        when: { date: '2026-10-09', time: { hour: 24, minute: 0 } },
+      }),
+    ).rejects.toThrow()
   })
 })
 

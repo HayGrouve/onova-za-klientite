@@ -14,7 +14,8 @@ import { Button, buttonVariants } from '#/components/ui/button'
 import { formatDay } from '#/i18n/dates'
 import type { SavedSnapshot, Snapshot } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
-import { dateInSofia, isOverdue, todayInSofia } from '../../../shared/dates'
+import { dateInSofia, todayInSofia } from '../../../shared/dates'
+import { isJobLate } from '../../../shared/stages'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
 import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
 import { formatQuantity } from '../../../shared/quantity'
@@ -46,7 +47,7 @@ function JobLine({
   today: string
   onOpen: () => void
 }) {
-  const late = isOverdue(job.dueDate, today)
+  const late = isJobLate(job, today)
   return (
     <li>
       <button
@@ -268,10 +269,7 @@ export function OfflineApp({ saved }: { saved: SavedSnapshot | null }) {
               )
             })}
             {data.jobs
-              .filter(
-                (job) =>
-                  job.stageGroup !== 'done' && isOverdue(job.dueDate, today),
-              )
+              .filter((job) => isJobLate(job, today))
               .map((job) => (
                 <JobLine
                   key={job._id}

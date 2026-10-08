@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  asCandidate,
   buildSearchText,
   foldName,
   foldQuery,
@@ -406,5 +407,17 @@ describe('similarClients', () => {
     const found = similarClients(many, 'Георги Иванво').map((c) => c.id)
     expect(found).toHaveLength(3)
     expect(found[0]).toBe('c')
+  })
+})
+
+describe('asCandidate', () => {
+  it('searches a list row by its first phone, or by name alone', () => {
+    expect(
+      asCandidate({ _id: 'a', name: 'Иван', phone: '+359888' }),
+    ).toMatchObject({
+      id: 'a',
+      phones: ['+359888'],
+    })
+    expect(asCandidate({ _id: 'b', name: 'Ана' }).phones).toEqual([])
   })
 })

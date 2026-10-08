@@ -18,6 +18,7 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
+import { hasRole } from '../../../shared/roles'
 
 /**
  * A payment row opens this: what was paid and how it was split, with Edit and
@@ -72,8 +73,7 @@ function PaymentSheetBody({
   today: string
   onClose: () => void
 }) {
-  const { business, businesses } = useViewer()
-  const role = businesses.find((item) => item._id === business._id)?.role
+  const { business } = useViewer()
   const [mode, setMode] = useState<Mode>('view')
   // Once it is deleted the payment is gone, and asking for it again would fail.
   const [kept, setKept] = useState<PaymentData>()
@@ -150,7 +150,7 @@ function PaymentSheetBody({
               </h3>
               <Split payment={payment} />
             </section>
-            {(role === 'owner' || role === 'manager') && (
+            {hasRole(business.role, 'manager') && (
               <div className="flex gap-2">
                 <Button
                   size="xl"

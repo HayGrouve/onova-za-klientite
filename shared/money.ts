@@ -61,6 +61,13 @@ export function formatMoney(cents: number): string {
   )
 }
 
+/** The digits of an amount for an input: 1200,5 → "1200,50", without the € sign. */
+export function moneyInputText(cents: number | null | undefined): string {
+  return cents === null || cents === undefined
+    ? ''
+    : formatMoney(cents).replace(/\s?€/, '')
+}
+
 /** round(quantity x unit price), half away from zero. */
 export function lineTotalCents(
   quantity: number,

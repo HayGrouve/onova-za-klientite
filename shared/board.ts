@@ -1,5 +1,8 @@
+import { jobOwedCents } from './allocation'
 import { monthOf } from './dates'
 import { foldName, nameMatches } from './search'
+import { textParam } from './sort'
+import { isOpenGroup } from './stages'
 import type { StageGroup } from './stages'
 
 /** What the board needs to order and sum a job. */
@@ -15,8 +18,6 @@ export type BoardJob = {
 /** Done and Cancelled keep growing, so the board shows only the latest of them. */
 export const BOARD_CLOSED_LIMIT = 20
 
-const OPEN: ReadonlySet<StageGroup> = new Set(['new', 'in_progress'])
-
 /**
  * One column of the board: the jobs of one stage group in board order, how
  * many there are, and what they still owe. Open work comes soonest due first,
@@ -29,7 +30,7 @@ export function boardColumn<T extends BoardJob>(
   closedLimit = BOARD_CLOSED_LIMIT,
 ) {
   const sorted = [...jobs].sort(
-    OPEN.has(group)
+    isOpenGroup(group)
       ? (a, b) =>
           a.dueDate && b.dueDate
             ? a.dueDate.localeCompare(b.dueDate) ||
@@ -42,7 +43,7 @@ export function boardColumn<T extends BoardJob>(
       : (a, b) => (b.doneAt ?? b._creationTime) - (a.doneAt ?? a._creationTime),
   )
   return {
-    jobs: OPEN.has(group) ? sorted : sorted.slice(0, closedLimit),
+    jobs: isOpenGroup(group) ? sorted : sorted.slice(0, closedLimit),
     total: jobs.length,
     owedCents: owedCents(jobs),
   }
@@ -52,10 +53,7 @@ export function boardColumn<T extends BoardJob>(
 export function owedCents(
   jobs: ReadonlyArray<Pick<BoardJob, 'owes' | 'balanceCents'>>,
 ) {
-  return jobs.reduce(
-    (sum, item) => (item.owes ? sum + item.balanceCents : sum),
-    0,
-  )
+  return jobs.reduce((sum, item) => sum + jobOwedCents(item), 0)
 }
 
 /** What the jobs filter reads from a job (a board card or a table row). */
@@ -82,6 +80,37 @@ export type JobFilter = {
   dueThisMonth?: boolean
 }
 
+/** The filter as the jobs list's address holds it, so Back returns to it. */
+export type JobFilterSearch = { q?: string; owing?: true; due?: 'month' }
+
+/** The filter's part of an address, with anything it doesn't know left out. */
+export function parseFilterSearch(
+  search: Record<string, unknown>,
+): JobFilterSearch {
+  const q = textParam(search.q)
+  return {
+    ...(q !== undefined && { q }),
+    ...(search.owing === true && { owing: true as const }),
+    ...(search.due === 'month' && { due: 'month' as const }),
+  }
+}
+
+export function filterFromSearch(search: JobFilterSearch): JobFilter {
+  return {
+    text: search.q,
+    owing: search.owing,
+    dueThisMonth: search.due === 'month',
+  }
+}
+
+export function filterToSearch(filter: JobFilter): JobFilterSearch {
+  return {
+    ...(hasText(filter.text) && { q: filter.text }),
+    ...(filter.owing && { owing: true as const }),
+    ...(filter.dueThisMonth && { due: 'month' as const }),
+  }
+}
+
 const hasText = (text: string | undefined): text is string =>
   text !== undefined && foldName(text) !== ''
 
@@ -104,7 +133,7 @@ export function filterJobs<T extends FilterableJob>(
           filter.text,
           `${job.title} ${job.isNoClient ? '' : job.clientName} ${job.stageName}`,
         )) &&
-      (!filter.owing || (job.owes && job.balanceCents > 0)) &&
+      (!filter.owing || jobOwedCents(job) > 0) &&
       (!filter.dueThisMonth ||
         (job.dueDate !== undefined && monthOf(job.dueDate) === month)),
   )

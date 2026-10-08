@@ -13,7 +13,7 @@ import {
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../../shared/dates'
 
@@ -81,14 +81,12 @@ export function AppointmentForm({
 
   const run = async (action: () => Promise<unknown>) => {
     setSaving(true)
-    try {
+    const saved = await runChange(async () => {
       await action()
       toast.success(m.saved())
       onDone()
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!saved.done) setSaving(false)
   }
   const slot = {
     date,

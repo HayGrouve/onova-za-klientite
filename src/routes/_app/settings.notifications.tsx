@@ -9,7 +9,7 @@ import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
 import { Field, FieldLabel } from '#/components/ui/field'
 import { Switch } from '#/components/ui/switch'
 import { useViewer } from '#/hooks/use-viewer'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { vapidPublicKey } from '#/lib/env'
 import {
   currentSubscription,
@@ -160,7 +160,7 @@ function NotificationSwitches({ publicKey }: { publicKey: string }) {
 
   const toggleDevice = async (on: boolean) => {
     setBusy(true)
-    try {
+    await runChange(async () => {
       if (on) {
         // The permission question comes from this tap, never from loading.
         const result = await subscribePush(publicKey)
@@ -178,11 +178,8 @@ function NotificationSwitches({ publicKey }: { publicKey: string }) {
         if (endpoint) await unsubscribe({ endpoint })
         setDeviceOn(false)
       }
-    } catch (error) {
-      toast.error(errorMessage(error))
-    } finally {
-      setBusy(false)
-    }
+    })
+    setBusy(false)
   }
 
   const save = (change: {
@@ -190,9 +187,9 @@ function NotificationSwitches({ publicKey }: { publicKey: string }) {
     remindersDue?: boolean
     overdue?: boolean
   }) =>
-    void setNotify({ ...args, ...change })
-      .then(() => toast.success(m.saved()))
-      .catch((error: unknown) => toast.error(errorMessage(error)))
+    void runChange(() => setNotify({ ...args, ...change })).then(
+      (saved) => saved.done && toast.success(m.saved()),
+    )
 
   if (!settings || deviceOn === undefined) return <ListSkeleton />
 

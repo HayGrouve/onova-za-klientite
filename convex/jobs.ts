@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
 import { BOARD_CLOSED_LIMIT, boardColumn } from '../shared/board'
-import { STAGE_GROUPS, stagesFor } from '../shared/stages'
+import { STAGE_GROUPS, isOpenGroup, stagesFor } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import {
   businessMutation,
@@ -21,12 +21,20 @@ import {
   setJobItems,
   vCreateJobArgs,
 } from './lib/jobWrite'
-import { recomputeJob } from './lib/recompute'
-import { jobDate, refreshRepeat } from './lib/repeat'
+import { patchJob } from './lib/ledger'
+import type { JobPatch } from './lib/ledger'
+import { jobDate, refreshRepeat, setJobRepeat } from './lib/repeat'
 import { jobSearchText } from './lib/search'
 import { cents, optionalDate, optionalText, requiredText } from './lib/validate'
-import { jobRow, newLookups, timeline, vJobRow } from './lib/views'
-import { vExtra, vJobLine, vStageGroup } from './validators'
+import {
+  activeFields,
+  jobRow,
+  newLookups,
+  openRemindersOn,
+  timeline,
+  vJobRow,
+} from './lib/views'
+import { vExtra, vJobLine, vRepeatUnit, vStageGroup } from './validators'
 
 const vClearableString = v.optional(v.union(v.string(), v.null()))
 
@@ -53,7 +61,7 @@ export const update = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    const patch: Partial<Doc<'jobs'>> = {}
+    const patch: JobPatch = {}
     if (args.title !== undefined)
       patch.title = requiredText(args.title, 'title')
     if (args.typedPriceCents !== undefined) {
@@ -85,8 +93,7 @@ export const update = businessMutation({
     }
     const next = { ...job, ...patch }
     patch.searchText = await jobSearchText(ctx, next)
-    await ctx.db.patch('jobs', job._id, patch)
-    await recomputeJob(ctx, job._id)
+    await patchJob(ctx, job._id, patch)
     // A repeating job without appointments takes its date from the due date.
     if (args.dueDate !== undefined) await refreshRepeat(ctx, job._id)
     await logActivity(ctx, {
@@ -149,8 +156,7 @@ export const setLines = businessMutation({
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
     const lines = await checkLines(ctx, args.lines)
-    await ctx.db.patch('jobs', job._id, { lines })
-    await recomputeJob(ctx, job._id)
+    await patchJob(ctx, job._id, { lines })
     await logActivity(ctx, {
       type: 'job.linesChanged',
       jobId: job._id,
@@ -183,10 +189,9 @@ export const writeOff = businessMutation({
     const already = job.writeOff?.amountCents ?? 0
     const amountCents = already + job.balanceCents
     if (job.balanceCents <= 0) fail('payment.zero')
-    await ctx.db.patch('jobs', job._id, {
+    await patchJob(ctx, job._id, {
       writeOff: { amountCents, note, at: Date.now(), by: ctx.member._id },
     })
-    await recomputeJob(ctx, job._id)
     await logActivity(ctx, {
       type: 'job.writtenOff',
       jobId: job._id,
@@ -204,8 +209,7 @@ export const removeWriteOff = businessMutation({
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
     if (!job.writeOff) return null
-    await ctx.db.patch('jobs', job._id, { writeOff: undefined })
-    await recomputeJob(ctx, job._id)
+    await patchJob(ctx, job._id, { writeOff: undefined })
     await logActivity(ctx, {
       type: 'job.writeOffRemoved',
       jobId: job._id,
@@ -269,6 +273,11 @@ export const board = businessQuery({
       v.object({
         group: vStageGroup,
         jobs: v.array(vJobRow),
+        /**
+         * Done jobs that still owe but are older than the cards shown, so the
+         * "owing" filter finds every one of them.
+         */
+        olderOwing: v.array(vJobRow),
         total: v.number(),
         owedCents: v.number(),
       }),
@@ -290,7 +299,8 @@ export const board = businessQuery({
         )
         .take(LIST_LIMIT)
       let column = boardColumn(group, jobs)
-      if (group === 'done' || group === 'cancelled') {
+      let olderOwing: typeof jobs = []
+      if (!isOpenGroup(group)) {
         // A long history outgrows one read, so the latest closed jobs come
         // from their own index, and what Done still owes from the owes index.
         const latest = await ctx.db
@@ -317,12 +327,24 @@ export const board = businessQuery({
           total: column.total,
           owedCents: boardColumn(group, owing).owedCents,
         }
+        const shown = new Set(column.jobs.map((job) => job._id))
+        olderOwing = boardColumn(
+          group,
+          owing.filter((job) => !shown.has(job._id)),
+          owing.length,
+        ).jobs
       }
-      const rows = []
-      for (const job of column.jobs) {
-        rows.push(await jobRow(ctx, job, lookups, now))
+      const rows = async (from: typeof jobs) => {
+        const out = []
+        for (const job of from) out.push(await jobRow(ctx, job, lookups, now))
+        return out
       }
-      columns.push({ ...column, group, jobs: rows })
+      columns.push({
+        ...column,
+        group,
+        jobs: await rows(column.jobs),
+        olderOwing: await rows(olderOwing),
+      })
     }
     const stages = await ctx.db
       .query('stages')
@@ -415,6 +437,8 @@ export const get = businessQuery({
       items,
       payments,
       costs: costs.sort((a, b) => b.date.localeCompare(a.date)),
+      fields: await activeFields(ctx, ctx.business._id, 'job'),
+      reminders: await openRemindersOn(ctx, ctx.business, { jobId: job._id }),
       timeline: await timeline(ctx, events),
     }
   },
@@ -425,30 +449,14 @@ export const setRepeat = businessMutation({
   args: {
     jobId: v.id('jobs'),
     every: v.number(),
-    unit: v.union(v.literal('week'), v.literal('month')),
+    unit: vRepeatUnit,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
-    if (!Number.isInteger(args.every) || args.every < 1 || args.every > 52) {
-      fail('invalid', { field: 'every' })
-    }
     if (!(await jobDate(ctx, job))) fail('job.noDate')
-    await ctx.db.patch('jobs', job._id, {
-      repeat: {
-        every: args.every,
-        unit: args.unit,
-        nextJobId: job.repeat?.nextJobId,
-      },
-    })
-    await refreshRepeat(ctx, job._id)
-    await logActivity(ctx, {
-      type: 'job.repeatSet',
-      jobId: job._id,
-      clientId: job.clientId,
-      data: { to: `${args.every} ${args.unit}` },
-    })
+    await setJobRepeat(ctx, job, args)
     return null
   },
 })

@@ -15,7 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatLongDay } from '#/i18n/dates'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { addMonths } from '../../../shared/dates'
 import { RULE_MONTHS } from '../../../shared/setup'
@@ -39,9 +39,9 @@ function RemindersSettings() {
   )
   const owner = settings?.role === 'owner'
   const save = (months: number | null) =>
-    void setRule({ businessId: business._id, months })
-      .then(() => toast.success(m.saved()))
-      .catch((error: unknown) => toast.error(errorMessage(error)))
+    void runChange(() => setRule({ businessId: business._id, months })).then(
+      (saved) => saved.done && toast.success(m.saved()),
+    )
 
   const moduleOff = settings !== undefined && !settings.modules.reminders
 

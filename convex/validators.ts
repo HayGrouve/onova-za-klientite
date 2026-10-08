@@ -1,4 +1,5 @@
 import { v } from 'convex/values'
+import { ACTIVITY_TYPES } from '../shared/activity'
 import { STAGE_COLORS, STAGE_GROUPS } from '../shared/stages'
 
 export const vWord = v.object({
@@ -86,54 +87,7 @@ export const vJobLine = v.object({
 
 export const vRepeatUnit = v.union(v.literal('week'), v.literal('month'))
 
-/** Closed list of activity events. Add a literal here before logging a new kind. */
-export const ACTIVITY_TYPES = [
-  'job.created',
-  'job.edited',
-  'job.stageChanged',
-  'job.linesChanged',
-  'job.itemsChanged',
-  'job.writtenOff',
-  'job.writeOffRemoved',
-  'job.cancelled',
-  'payment.added',
-  'payment.edited',
-  'payment.removed',
-  'credit.used',
-  'cost.added',
-  'cost.edited',
-  'cost.removed',
-  'client.created',
-  'client.merged',
-  'client.anonymized',
-  'client.edited',
-  'item.created',
-  'item.edited',
-  'item.moved',
-  'stage.added',
-  'stage.edited',
-  'stage.removed',
-  'stages.reordered',
-  'field.added',
-  'field.edited',
-  'field.archived',
-  'field.restored',
-  'setup.applied',
-  'settings.changed',
-  'reminder.added',
-  'reminder.closed',
-  'reminder.moved',
-  'reminder.reopened',
-  'job.repeatSet',
-  'job.repeatStopped',
-  'job.repeated',
-  'appointment.added',
-  'appointment.changed',
-  'appointment.cancelled',
-  'file.added',
-  'file.removed',
-] as const
-
+/** Closed list of activity events (shared/activity.ts, with each one's details). */
 export const vActivityType = v.union(
   ...ACTIVITY_TYPES.map((type) => v.literal(type)),
 )

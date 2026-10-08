@@ -4,7 +4,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { MethodPicker } from '#/components/money/method-picker'
 import type { PaymentMethod } from '#/components/money/method-picker'
-import { MoneyInput, moneyInputText } from '#/components/money/money-input'
+import { MoneyInput } from '#/components/money/money-input'
 import {
   ReviewAmount,
   ReviewSubmit,
@@ -24,7 +24,12 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { splitPayment } from '../../../shared/allocation'
-import { formatMoney, parseMoney, sumCents } from '../../../shared/money'
+import {
+  formatMoney,
+  moneyInputText,
+  parseMoney,
+  sumCents,
+} from '../../../shared/money'
 
 export type OpenJob = {
   _id: Id<'jobs'>

@@ -59,3 +59,12 @@ export function parseSortSearch<TKey extends string>(
     ? { sort: key, order: search.order }
     : { sort: key }
 }
+
+/** The address parser reads "12" as a number: words are kept as text. */
+export function textParam(value: unknown): string | undefined {
+  const text =
+    typeof value === 'string' || typeof value === 'number'
+      ? String(value)
+      : undefined
+  return text?.trim() ? text : undefined
+}

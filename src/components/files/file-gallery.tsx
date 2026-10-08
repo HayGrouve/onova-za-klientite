@@ -17,6 +17,7 @@ import {
 } from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { compressImage } from '#/lib/compress-image'
+import { runChange } from '#/lib/change'
 import { errorCode, errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 import { api } from '../../../convex/_generated/api'
@@ -99,15 +100,12 @@ export function FileGallery({
 
   async function onRemove(file: FileRow) {
     setRemoving(true)
-    try {
+    await runChange(async () => {
       await remove({ businessId, fileId: file._id })
       setOpenId(null)
-    } catch (error) {
-      toast.error(errorMessage(error))
-    } finally {
-      setRemoving(false)
-      setConfirming(false)
-    }
+    })
+    setRemoving(false)
+    setConfirming(false)
   }
 
   return (

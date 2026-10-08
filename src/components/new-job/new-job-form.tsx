@@ -13,20 +13,16 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { useBlocker, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
+import type { FunctionArgs } from 'convex/server'
 import { cn } from 'cn'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ClientPicker } from '#/components/new-job/client-picker'
-import { DiscardSheet } from '#/components/discard-sheet'
-import type {
-  ClientChoice,
-  ItemRef,
-  PaymentMethod,
-} from '#/components/new-job/types'
+import type { ItemRef, PaymentMethod } from '#/components/new-job/types'
 import { Stopwatch } from '#/components/stopwatch'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -43,51 +39,33 @@ import { Switch } from '#/components/ui/switch'
 import { Textarea } from '#/components/ui/textarea'
 import { repeatLabel } from '#/components/job/repeat-section'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { usePageGuard } from '#/hooks/use-discard-guard'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useWide } from '#/hooks/use-wide'
 import type { ActiveBusiness } from '#/hooks/use-viewer'
 import { formatDay, formatTime } from '#/i18n/dates'
+import { METHOD_LABEL } from '#/i18n/money'
 import { lower } from '#/i18n/words'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { recordTiming } from '#/lib/timing'
 import { m } from '#/paraglide/messages.js'
 import { todayInSofia } from '../../../shared/dates'
-import { formatMoney, parseMoney } from '../../../shared/money'
-import { matchItem } from '../../../shared/line-items'
+import { formatMoney } from '../../../shared/money'
+import { readDraft, saveArgs, startFixes } from '../../../shared/new-job-draft'
+import type { ClientChoice, DraftFixes } from '../../../shared/new-job-draft'
 import { exampleLine, parseLine } from '../../../shared/parse-line'
-import type { ParsedDate, ServiceRef } from '../../../shared/parse-line'
+import type { ServiceRef } from '../../../shared/parse-line'
 import { formatPhone } from '../../../shared/phone-format'
 import type { ClientCandidate } from '../../../shared/search'
 
 type Fixable = 'client' | 'title' | 'price' | 'deposit' | 'date'
 
-/** A hand fix, and what the line said when it was made. */
-type Fix<T> = { value: T; basis: string }
-
-function fix<T>(value: T, parsedValue: unknown): Fix<T> {
-  return { value, basis: JSON.stringify(parsedValue) }
-}
-
-/** The fix, while the line still reads the field the way it did. */
-function held<T>(
-  current: Fix<T> | undefined,
-  parsedValue: unknown,
-): T | undefined {
-  return current && current.basis === JSON.stringify(parsedValue)
-    ? current.value
-    : undefined
-}
-
-const METHODS: Array<{ value: PaymentMethod; label: () => string }> = [
-  { value: 'cash', label: m.method_cash },
-  { value: 'bank', label: m.method_bank },
-  { value: 'card', label: m.method_card },
-  { value: 'other', label: m.method_other },
-]
-
-function capitalize(text: string) {
-  return text.charAt(0).toLocaleUpperCase('bg') + text.slice(1)
-}
+const METHODS = [
+  'cash',
+  'bank',
+  'card',
+  'other',
+] as const satisfies Array<PaymentMethod>
 
 function ReadRow({
   label,
@@ -197,137 +175,45 @@ export function NewJobForm({
   const [saving, setSaving] = useState(false)
   const [fixing, setFixing] = useState<Fixable | null>(null)
   // Fixes made by hand. A fix holds until the line reads that field differently.
-  // An empty line reads no client, which is what the starting client is a fix of.
-  const [clientFix, setClientFix] = useState<
-    Fix<ClientChoice | null> | undefined
-  >(() =>
-    start
-      ? fix(
-          { kind: 'existing', id: start.client.id, name: start.client.name },
-          null,
-        )
-      : undefined,
-  )
-  const [titleFix, setTitleFix] = useState<Fix<string>>()
-  const [priceFix, setPriceFix] = useState<Fix<string>>()
-  const [depositFix, setDepositFix] = useState<Fix<string>>()
-  const [dateFix, setDateFix] = useState<Fix<ParsedDate | null>>()
-  const [itemFix, setItemFix] = useState<Fix<string[]>>()
+  const [fixes, setFixes] = useState<DraftFixes>(() => startFixes(start))
   const [depositMethod, setDepositMethod] = useState<PaymentMethod>('cash')
   const [depositDate, setDepositDate] = useState(today)
 
   const single = business.jobFlow === 'single'
   const { words } = business
-  const clientsById = useMemo(
-    () => new Map(clients.map((item) => [item.id, item])),
-    [clients],
-  )
-  const itemsByClient = useMemo(() => {
-    const byClient = new Map<string, ItemRef[]>()
-    for (const item of items) {
-      byClient.set(item.clientId, [
-        ...(byClient.get(item.clientId) ?? []),
-        item,
-      ])
-    }
-    return byClient
-  }, [items])
   const parsed = parseLine(text, {
     today,
     clients,
     services,
     noClientName: m.no_client(),
   })
-
-  const parsedClient: ClientChoice | null = !parsed.client
-    ? null
-    : parsed.client.kind === 'existing'
-      ? {
-          kind: 'existing',
-          id: parsed.client.id,
-          name: clientsById.get(parsed.client.id)?.name ?? '',
-        }
-      : parsed.client
-  const priceFromLine = parsed.priceCents ?? parsed.service?.priceCents ?? null
-  const client = held(clientFix, parsed.client)
-  const title = held(titleFix, parsed.title)
-  const price = held(priceFix, priceFromLine)
-  const date = held(dateFix, parsed.date)
-  const chosenClient = client === undefined ? parsedClient : client
-  const chosenPrice = price === undefined ? priceFromLine : parseMoney(price)
-  // Money received now is a deposit (labelled) or a plain payment (no label).
-  const isPayment = parsed.depositCents === null && parsed.paid !== null
-  const paymentFromLine =
-    parsed.depositCents ??
-    (parsed.paid ? (parsed.paid.cents ?? chosenPrice) : null)
-  const deposit = held(depositFix, [parsed.depositCents, parsed.paid])
-  const chosenDeposit =
-    deposit === undefined ? paymentFromLine : parseMoney(deposit)
-  const chosenDate = date === undefined ? parsed.date : date
-  const showDeposit =
-    business.depositsOnNewJob ||
-    parsed.depositCents !== null ||
-    parsed.paid !== null ||
-    chosenDeposit !== null
-  // An item belongs to one client, so fixing the client to another unlinks it.
-  const linkedItem =
-    start &&
-    chosenClient?.kind === 'existing' &&
-    chosenClient.id === start.client.id
-      ? start.item
-      : undefined
-  // A payment that covers the whole price can save the job as done.
-  const coversPrice =
-    isPayment &&
-    chosenDeposit !== null &&
-    chosenDeposit > 0 &&
-    chosenPrice !== null &&
-    chosenPrice > 0 &&
-    chosenDeposit >= chosenPrice
-
-  // The client's items: one a word of the line names is picked, the rest are one tap away.
-  const clientItems =
-    chosenClient?.kind === 'existing'
-      ? (itemsByClient.get(chosenClient.id) ?? [])
-      : []
-  const itemMatch = clientItems.length
-    ? matchItem(parsed.title, clientItems)
-    : null
-  const itemBasis = [
-    chosenClient?.kind === 'existing' ? chosenClient.id : null,
-    itemMatch?.id ?? null,
-  ]
-  // Started from an item, that item is picked until the line names another.
-  const startItems = linkedItem ? [linkedItem.id] : []
-  const pickedItems = clientItems.length
-    ? (held(itemFix, itemBasis) ?? (itemMatch ? [itemMatch.id] : startItems))
-    : startItems
-  // The item's word leaves the title only while its item is picked.
-  const chosenTitle =
-    title ??
-    (itemMatch && pickedItems.includes(itemMatch.id)
-      ? itemMatch.title
-      : parsed.title)
+  const draft = readDraft(parsed, fixes, {
+    clients,
+    items,
+    start,
+    depositsOnNewJob: business.depositsOnNewJob,
+  })
+  const {
+    client: chosenClient,
+    title: chosenTitle,
+    priceCents: chosenPrice,
+    receivedCents: chosenDeposit,
+    date: chosenDate,
+    isPayment,
+    linkedItem,
+    clientItems,
+    itemIds: pickedItems,
+  } = draft
   // A business set up for fixed-schedule work repeats new jobs by default (setup step 6).
   const [repeat, setRepeat] = useState(business.repeatDefault !== undefined)
 
   const setClient = (value: ClientChoice | null) =>
-    setClientFix(fix(value, parsed.client))
-  const setTitle = (value: string) => setTitleFix(fix(value, parsed.title))
-  const setPrice = (value: string) => setPriceFix(fix(value, priceFromLine))
-  const setDeposit = (value: string) =>
-    setDepositFix(fix(value, [parsed.depositCents, parsed.paid]))
-  const toggleItem = (itemId: string) =>
-    setItemFix(
-      fix(
-        pickedItems.includes(itemId)
-          ? pickedItems.filter((id) => id !== itemId)
-          : [...pickedItems, itemId],
-        itemBasis,
-      ),
-    )
-  const setDate = (value: ParsedDate | null) =>
-    setDateFix(fix(value, parsed.date))
+    setFixes(draft.fix.client(value))
+  const setTitle = (value: string) => setFixes(draft.fix.title(value))
+  const setPrice = (value: string) => setFixes(draft.fix.price(value))
+  const setDeposit = (value: string) => setFixes(draft.fix.received(value))
+  const toggleItem = (itemId: string) => setFixes(draft.fix.item(itemId))
+  const setDate = (value: typeof chosenDate) => setFixes(draft.fix.date(value))
   const onText = (value: string) => setText(value)
   // Back where "+" was opened: the item or the client (the new job is in its
   // list), otherwise Today.
@@ -342,8 +228,12 @@ export function NewJobForm({
         : navigate({ to: '/' })
 
   // Leaving with a line typed asks first, whether by the close button or the back button.
-  const leaving = useRef(false)
-  const dirty = text.trim() !== ''
+  const guard = usePageGuard(text.trim() !== '', {
+    title: m.new_discard_title(),
+    body: m.new_discard_body(),
+    discardLabel: m.new_discard(),
+    keepLabel: m.new_keep_writing(),
+  })
   // Esc closes "+" like the close button, at a desk; a dialog or menu open
   // above it (the discard question included) takes its own Esc.
   useEffect(() => {
@@ -359,11 +249,6 @@ export function NewJobForm({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
-  const blocker = useBlocker({
-    shouldBlockFn: useCallback(() => dirty && !leaving.current, [dirty]),
-    enableBeforeUnload: dirty,
-    withResolver: true,
   })
 
   const wide = useWide()
@@ -381,51 +266,26 @@ export function NewJobForm({
 
   const submit = async (markDone = false) => {
     setTried(true)
-    if (!chosenClient || !chosenTitle.trim()) {
+    const args = saveArgs(draft, {
+      flow: business.jobFlow,
+      received: { date: depositDate, method: depositMethod },
+      depositLabel: m.deposit_label(),
+      done: markDone,
+      repeat: repeat ? business.repeatDefault : undefined,
+    })
+    if (!args) {
       // A missing title opens its input; a missing client shows its picker.
-      if (!chosenTitle.trim()) setFixing('title')
-      setFailure({ id: Date.now(), client: !chosenClient })
-      return
-    }
-    if (!navigator.onLine) {
-      toast.error(m.offline_edit_blocked())
+      if (draft.missing.title) setFixing('title')
+      setFailure({ id: Date.now(), client: draft.missing.client })
       return
     }
     setSaving(true)
-    try {
-      const jobTitle = capitalize(chosenTitle.trim())
+    const ran = await runChange(async () => {
+      const jobTitle = args.title
+      // The draft's ids came from the server's own lists, so they are its ids.
       const { jobId } = await save({
         businessId: business._id,
-        client:
-          chosenClient.kind === 'existing'
-            ? { kind: 'existing', clientId: chosenClient.id as Id<'clients'> }
-            : chosenClient.kind === 'none'
-              ? { kind: 'none' }
-              : {
-                  kind: 'new',
-                  name: chosenClient.name,
-                  phone: chosenClient.phone,
-                },
-        title: jobTitle,
-        typedPriceCents: chosenPrice ?? undefined,
-        deposit:
-          chosenDeposit && chosenDeposit > 0
-            ? {
-                amountCents: chosenDeposit,
-                date: depositDate,
-                method: depositMethod,
-                // A payment is money received like a deposit, without the label.
-                label: isPayment ? undefined : m.deposit_label(),
-              }
-            : undefined,
-        when: single && chosenDate ? chosenDate : undefined,
-        dueDate: !single && chosenDate ? chosenDate.date : undefined,
-        itemIds: pickedItems.length
-          ? (pickedItems as Id<'items'>[])
-          : undefined,
-        done: markDone || undefined,
-        repeat:
-          repeat && business.repeatDefault ? business.repeatDefault : undefined,
+        ...(args as Omit<FunctionArgs<typeof api.newJob.save>, 'businessId'>),
       })
       recordTiming('newJob', Date.now() - startedAt)
       // Today may not list a far-off job, so the toast names it and opens it.
@@ -437,82 +297,34 @@ export function NewJobForm({
             void navigate({ to: '/jobs/$jobId', params: { jobId } }),
         },
       })
-      leaving.current = true
+      guard.release()
       await leave()
-    } catch (error) {
-      leaving.current = false
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!ran.done) setSaving(false)
   }
 
-  const byPhone =
-    chosenClient?.kind === 'existing' &&
-    parsed.phoneOwner?.id === chosenClient.id
   const sourceLabel =
-    chosenClient?.kind === 'existing'
-      ? byPhone
-        ? m.new_source_phone()
-        : m.new_source_existing()
-      : chosenClient?.kind === 'contact'
-        ? m.new_source_contact()
-        : chosenClient?.kind === 'new'
-          ? m.new_source_new()
-          : null
+    draft.clientSource === null || draft.clientSource === 'none'
+      ? null
+      : {
+          phone: m.new_source_phone,
+          existing: m.new_source_existing,
+          contact: m.new_source_contact,
+          new: m.new_source_new,
+        }[draft.clientSource]()
   const clientName =
     chosenClient &&
     (chosenClient.kind === 'none' ? m.no_client() : chosenClient.name)
-  // The phone under the name: the stored one for a client in the list, the typed one for a new client.
-  const phone =
-    chosenClient?.kind === 'existing'
-      ? clientsById.get(chosenClient.id)?.phones.at(0)
-      : chosenClient?.kind === 'new' || chosenClient?.kind === 'contact'
-        ? chosenClient.phone
-        : undefined
-  // Other clients the line could mean, one tap away: several matches, a phone that is
-  // somebody else's, or a new name a typo from a client.
-  const existingChoice = (candidate: ClientCandidate): ClientChoice => ({
-    kind: 'existing',
-    id: candidate.id,
-    name: candidate.name,
-  })
-  const alternatives: Array<{ choice: ClientChoice; label: string }> =
-    parsed.candidates.length > 1
-      ? parsed.candidates.map((candidate) => ({
-          choice: existingChoice(candidate),
-          label: candidate.name,
-        }))
-      : parsed.typedName && parsed.phoneOwner
-        ? [
-            {
-              choice: existingChoice(parsed.phoneOwner),
-              label: parsed.phoneOwner.name,
-            },
-            {
-              choice: {
-                kind: 'new',
-                name: parsed.typedName,
-                phone: parsed.phone ?? undefined,
-              },
-              label: m.new_create_client({ name: parsed.typedName }),
-            },
-          ]
-        : parsed.client?.kind === 'new' && parsed.similar.length
-          ? [
-              ...parsed.similar.map((candidate) => ({
-                choice: existingChoice(candidate),
-                label: m.new_similar({ name: candidate.name }),
-              })),
-              {
-                choice: {
-                  kind: 'new' as const,
-                  name: parsed.client.name,
-                  phone: parsed.client.phone,
-                },
-                label: m.new_create_client({ name: parsed.client.name }),
-              },
-            ]
-          : []
+  const { phone } = draft
+  const alternatives = draft.alternatives.map((item) => ({
+    choice: item.choice,
+    label:
+      item.as === 'create'
+        ? m.new_create_client({ name: item.name })
+        : item.as === 'similar'
+          ? m.new_similar({ name: item.name })
+          : item.name,
+  }))
   const isChosen = (choice: ClientChoice) =>
     chosenClient?.kind === choice.kind &&
     (choice.kind !== 'existing' ||
@@ -737,13 +549,11 @@ export function NewJobForm({
               chosenPrice !== null && (
                 <span className="flex flex-wrap items-center gap-2">
                   {formatMoney(chosenPrice)}
-                  {price === undefined &&
-                    parsed.priceCents === null &&
-                    parsed.service && (
-                      <Badge variant="secondary">
-                        {m.new_price_from_service()}
-                      </Badge>
-                    )}
+                  {draft.priceFromService && (
+                    <Badge variant="secondary">
+                      {m.new_price_from_service()}
+                    </Badge>
+                  )}
                 </span>
               )
             }
@@ -753,12 +563,7 @@ export function NewJobForm({
                 <MoneyInput
                   name="price"
                   label={m.new_price()}
-                  value={
-                    price ??
-                    (priceFromLine === null
-                      ? ''
-                      : formatMoney(priceFromLine).replace(/\s?€/, ''))
-                  }
+                  value={draft.priceText}
                   onChange={setPrice}
                 />
                 {done}
@@ -766,7 +571,7 @@ export function NewJobForm({
             )}
           </ReadRow>
 
-          {showDeposit && (
+          {draft.showReceived && (
             <ReadRow
               label={isPayment ? m.new_paid() : m.new_deposit()}
               icon={CoinsIcon}
@@ -775,7 +580,7 @@ export function NewJobForm({
               value={
                 chosenDeposit !== null &&
                 chosenDeposit > 0 &&
-                `${formatMoney(chosenDeposit)}, ${lower(METHODS.find((item) => item.value === depositMethod)!.label())}`
+                `${formatMoney(chosenDeposit)}, ${lower(METHOD_LABEL[depositMethod]())}`
               }
             >
               {fixing === 'deposit' && (
@@ -783,12 +588,7 @@ export function NewJobForm({
                   <MoneyInput
                     name="deposit"
                     label={isPayment ? m.new_paid() : m.new_deposit()}
-                    value={
-                      deposit ??
-                      (paymentFromLine === null
-                        ? ''
-                        : formatMoney(paymentFromLine).replace(/\s?€/, ''))
-                    }
+                    value={draft.receivedText}
                     onChange={setDeposit}
                   />
                   <ToggleGroup
@@ -802,8 +602,8 @@ export function NewJobForm({
                     className="w-full flex-wrap"
                   >
                     {METHODS.map((method) => (
-                      <ToggleGroupItem key={method.value} value={method.value}>
-                        {method.label()}
+                      <ToggleGroupItem key={method} value={method}>
+                        {METHOD_LABEL[method]()}
                       </ToggleGroupItem>
                     ))}
                   </ToggleGroup>
@@ -938,7 +738,7 @@ export function NewJobForm({
       </div>
 
       <div className="flex flex-col gap-2 border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        {coversPrice && (
+        {draft.coversPrice && (
           <Button
             size="xl"
             variant="outline"
@@ -960,15 +760,7 @@ export function NewJobForm({
           {m.new_save()}
         </Button>
       </div>
-      <DiscardSheet
-        open={blocker.status === 'blocked'}
-        onKeep={() => blocker.reset?.()}
-        onDiscard={() => blocker.proceed?.()}
-        title={m.new_discard_title()}
-        body={m.new_discard_body()}
-        discardLabel={m.new_discard()}
-        keepLabel={m.new_keep_writing()}
-      />
+      {guard.prompt}
     </main>
   )
 }

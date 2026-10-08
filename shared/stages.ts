@@ -1,7 +1,65 @@
+import { isOverdue } from './dates'
+
 /** The four fixed buckets every stage belongs to. Lists and money read these, never stage names. */
 export const STAGE_GROUPS = ['new', 'in_progress', 'done', 'cancelled'] as const
 
 export type StageGroup = (typeof STAGE_GROUPS)[number]
+
+/** New and In progress are open work; Done and Cancelled are closed. */
+export function isOpenGroup(group: StageGroup): boolean {
+  return group === 'new' || group === 'in_progress'
+}
+
+/** Overdue means late and still open: a Done or Cancelled job is never late. */
+export function isJobLate(
+  job: { stageGroup: StageGroup; dueDate?: string },
+  today: string,
+): boolean {
+  return isOpenGroup(job.stageGroup) && isOverdue(job.dueDate, today)
+}
+
+/** "When did I last do this one?": when the latest of the jobs reached Done. */
+export function lastDoneAt(
+  jobs: ReadonlyArray<{ stageGroup: StageGroup; doneAt?: number }>,
+): number | undefined {
+  let latest: number | undefined
+  for (const job of jobs) {
+    if (
+      job.stageGroup === 'done' &&
+      job.doneAt !== undefined &&
+      (latest === undefined || job.doneAt > latest)
+    ) {
+      latest = job.doneAt
+    }
+  }
+  return latest
+}
+
+/**
+ * What changes on a job when it enters a stage of `group`: when it reached
+ * Done (kept on a move within Done) and its cancel reason (kept only in
+ * Cancelled, a new one winning). Whether it owes follows from the group too:
+ * see `jobOwes`. The one rule for a stage change, a cancel, a regrouped stage
+ * and the board's instant move.
+ */
+export function enterGroup(
+  job: { stageGroup: StageGroup; doneAt?: number; cancelReason?: string },
+  group: StageGroup,
+  now: number,
+  cancelReason?: string,
+) {
+  return {
+    stageGroup: group,
+    doneAt:
+      group === 'done'
+        ? job.stageGroup === 'done'
+          ? (job.doneAt ?? now)
+          : now
+        : undefined,
+    cancelReason:
+      group === 'cancelled' ? (cancelReason ?? job.cancelReason) : undefined,
+  }
+}
 
 export const STAGE_COLORS = [
   'gray',

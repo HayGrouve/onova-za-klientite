@@ -8,6 +8,7 @@ import {
   isDueSoon,
   isOverdue,
   isValidDate,
+  isValidMonth,
   monthOf,
   monthRange,
   nextSofiaTime,
@@ -450,5 +451,15 @@ describe('stampMoment and parseMoment', () => {
         },
       ),
     )
+  })
+})
+
+describe('isValidMonth', () => {
+  it('is a year and a month 01–12', () => {
+    expect(isValidMonth('2026-10')).toBe(true)
+    expect(isValidMonth('2026-13')).toBe(false)
+    expect(isValidMonth('2026-00')).toBe(false)
+    expect(isValidMonth('2026-1')).toBe(false)
+    expect(isValidMonth('2026-10-01')).toBe(false)
   })
 })

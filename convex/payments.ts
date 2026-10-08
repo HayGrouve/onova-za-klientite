@@ -1,7 +1,12 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
-import { checkAllocations, splitPayment } from '../shared/allocation'
+import {
+  checkAllocations,
+  creditForJob,
+  jobOwedCents,
+  splitPayment,
+} from '../shared/allocation'
 import {
   paymentAmountRange,
   paymentPrepaidCents,
@@ -17,7 +22,14 @@ import {
 } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
 import { fail } from './lib/errors'
-import { recomputeMoney } from './lib/recompute'
+import {
+  payJob,
+  recordPayment,
+  removePayment,
+  rewritePayment,
+  spendCredit,
+} from './lib/ledger'
+import type { PaymentFields } from './lib/ledger'
 import { calendarDate, cents, optionalText } from './lib/validate'
 import { vPaymentMethod } from './validators'
 
@@ -39,44 +51,14 @@ function requireJobMoneyAccess(ctx: BusinessMutationCtx, job: Doc<'jobs'>) {
   }
 }
 
-async function insertPayment(
-  ctx: BusinessMutationCtx,
-  clientId: Id<'clients'>,
-  fields: {
-    amountCents: number
-    date: string
-    method: Doc<'payments'>['method']
-    label?: string
-    note?: string
-  },
-) {
-  return await ctx.db.insert('payments', {
-    businessId: ctx.business._id,
-    clientId,
+/** A payment's fields from the arguments, checked. */
+function checkedPayment(fields: PaymentFields): PaymentFields {
+  return {
     amountCents: fields.amountCents,
     date: calendarDate(fields.date, 'date'),
     method: fields.method,
     label: optionalText(fields.label, 'label', 100),
     note: optionalText(fields.note, 'note', 1000),
-    allocatedCents: 0,
-    createdBy: ctx.member._id,
-  })
-}
-
-async function allocate(
-  ctx: BusinessMutationCtx,
-  paymentId: Id<'payments'>,
-  clientId: Id<'clients'>,
-  allocations: Array<{ jobId: Id<'jobs'>; amountCents: number }>,
-) {
-  for (const allocation of allocations) {
-    await ctx.db.insert('allocations', {
-      businessId: ctx.business._id,
-      paymentId,
-      jobId: allocation.jobId,
-      clientId,
-      amountCents: allocation.amountCents,
-    })
   }
 }
 
@@ -102,24 +84,11 @@ export const addFromJob = businessMutation({
     const amountCents = cents(args.amountCents, 'amountCents')
     if (amountCents === 0) fail('payment.zero')
 
-    const paymentId = await insertPayment(ctx, job.clientId, {
-      ...args,
-      amountCents,
-    })
-    const toJob = Math.min(
-      amountCents,
-      Math.max(job.owes ? job.balanceCents : 0, 0),
+    const paymentId = await payJob(
+      ctx,
+      job._id,
+      checkedPayment({ ...args, amountCents }),
     )
-    if (toJob > 0) {
-      await allocate(ctx, paymentId, job.clientId, [
-        { jobId: job._id, amountCents: toJob },
-      ])
-    }
-    await recomputeMoney(ctx, {
-      paymentIds: [paymentId],
-      jobIds: [job._id],
-      clientIds: [job.clientId],
-    })
     await logActivity(ctx, {
       type: 'payment.added',
       jobId: job._id,
@@ -180,16 +149,12 @@ export const addFromClient = businessMutation({
       fail('payment.signMismatch')
     if (check === 'exceedsPayment') fail('payment.exceeds')
 
-    const paymentId = await insertPayment(ctx, client._id, {
-      ...args,
-      amountCents,
-    })
-    await allocate(ctx, paymentId, client._id, allocations)
-    await recomputeMoney(ctx, {
-      paymentIds: [paymentId],
-      jobIds: allocations.map((allocation) => allocation.jobId),
-      clientIds: [client._id],
-    })
+    const paymentId = await recordPayment(
+      ctx,
+      client._id,
+      checkedPayment({ ...args, amountCents }),
+      allocations,
+    )
     await logActivity(ctx, {
       type: 'payment.added',
       clientId: client._id,
@@ -229,22 +194,17 @@ export const refund = businessMutation({
       fail('credit.notEnough')
     }
 
-    const paymentId = await insertPayment(ctx, client._id, {
-      amountCents: -amountCents,
-      date: args.date,
-      method: args.method,
-      note: args.note,
-    })
-    if (job) {
-      await allocate(ctx, paymentId, client._id, [
-        { jobId: job._id, amountCents: -amountCents },
-      ])
-    }
-    await recomputeMoney(ctx, {
-      paymentIds: [paymentId],
-      jobIds: job ? [job._id] : [],
-      clientIds: [client._id],
-    })
+    const paymentId = await recordPayment(
+      ctx,
+      client._id,
+      checkedPayment({
+        amountCents: -amountCents,
+        date: args.date,
+        method: args.method,
+        note: args.note,
+      }),
+      job ? [{ jobId: job._id, amountCents: -amountCents }] : [],
+    )
     await logActivity(ctx, {
       type: 'payment.added',
       clientId: client._id,
@@ -267,42 +227,11 @@ export const useCredit = businessMutation({
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
     const client = await getOwned(ctx, 'clients', job.clientId)
-    const available = Math.min(
-      client.creditCents,
-      job.owes ? job.balanceCents : 0,
-    )
     const wanted =
       args.amountCents === undefined
-        ? available
+        ? creditForJob(client.creditCents, job)
         : cents(args.amountCents, 'amountCents')
-    if (wanted <= 0 || available <= 0) fail('credit.notEnough')
-    if (wanted > available) fail('credit.notEnough')
-
-    const payments = await ctx.db
-      .query('payments')
-      .withIndex('by_client', (q) => q.eq('clientId', client._id))
-      .collect()
-    let left = wanted
-    const touched: Array<Id<'payments'>> = []
-    for (const payment of payments) {
-      if (left === 0) break
-      const free = payment.amountCents - payment.allocatedCents
-      if (payment.amountCents <= 0 || free <= 0) continue
-      const take = Math.min(free, left)
-      await allocate(ctx, payment._id, client._id, [
-        { jobId: job._id, amountCents: take },
-      ])
-      touched.push(payment._id)
-      left -= take
-    }
-    // Credit can sit behind a refund that pays it back; that credit isn't spendable.
-    if (left > 0) fail('credit.notEnough')
-
-    await recomputeMoney(ctx, {
-      paymentIds: touched,
-      jobIds: [job._id],
-      clientIds: [client._id],
-    })
+    await spendCredit(ctx, job._id, wanted)
     await logActivity(ctx, {
       type: 'credit.used',
       jobId: job._id,
@@ -320,20 +249,7 @@ export const remove = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const payment = await getOwned(ctx, 'payments', args.paymentId)
-    const allocations = await ctx.db
-      .query('allocations')
-      .withIndex('by_payment', (q) => q.eq('paymentId', payment._id))
-      .collect()
-    for (const allocation of allocations)
-      await ctx.db.delete('allocations', allocation._id)
-    await ctx.db.delete('payments', payment._id)
-
-    // Removing a payment can leave its client's credit negative only if that
-    // credit was already spent elsewhere; recompute shows it as it is.
-    await recomputeMoney(ctx, {
-      jobIds: allocations.map((allocation) => allocation.jobId),
-      clientIds: [payment.clientId],
-    })
+    await removePayment(ctx, payment)
     await logActivity(ctx, {
       type: 'payment.removed',
       clientId: payment.clientId,
@@ -372,11 +288,11 @@ async function loadEditState(ctx: QueryCtx, payment: Doc<'payments'>) {
       jobId: job._id,
       allocatedCents: onJob.get(job._id) ?? 0,
       paidCents: job.paidCents,
-      roomCents: job.owes ? job.balanceCents : 0,
+      roomCents: jobOwedCents(job),
     })),
     clientCreditCents: client?.creditCents ?? 0,
   }
-  return { state, rows, jobs }
+  return { state, jobs }
 }
 
 /**
@@ -482,7 +398,9 @@ export const update = businessMutation({
       return null
     }
 
-    const { state, rows, jobs } = await loadEditState(ctx, payment)
+    const { state, jobs } = await loadEditState(ctx, payment)
+    let allocations:
+      Array<{ jobId: Id<'jobs'>; amountCents: number }> | undefined
     if (amountChanged) {
       const plan = planPaymentEdit(state, amountCents)
       if (!plan.ok) {
@@ -503,27 +421,18 @@ export const update = businessMutation({
           ),
         )
       if (!same) {
-        for (const row of rows) await ctx.db.delete('allocations', row._id)
-        await allocate(
-          ctx,
-          payment._id,
-          payment.clientId,
-          plan.allocations.map((allocation) => ({
-            jobId: allocation.jobId,
-            amountCents: sign * allocation.amountCents,
-          })),
-        )
+        allocations = plan.allocations.map((allocation) => ({
+          jobId: allocation.jobId,
+          amountCents: sign * allocation.amountCents,
+        }))
       }
     }
-    await ctx.db.patch('payments', payment._id, {
-      amountCents: sign * amountCents,
-      ...fields,
-    })
-    await recomputeMoney(ctx, {
-      paymentIds: [payment._id],
-      jobIds: [...jobs.keys()],
-      clientIds: [payment.clientId],
-    })
+    await rewritePayment(
+      ctx,
+      payment,
+      { amountCents: sign * amountCents, ...fields },
+      allocations,
+    )
     await logActivity(ctx, {
       type: 'payment.edited',
       clientId: payment.clientId,

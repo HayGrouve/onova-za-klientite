@@ -24,7 +24,9 @@ import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
-import { isJobLate } from '../../../shared/today'
+import { jobOwedCents } from '../../../shared/allocation'
+import { isJobLate } from '../../../shared/stages'
+import { hasRole } from '../../../shared/roles'
 
 type TodayData = FunctionReturnType<typeof api.today.list>
 type AppointmentRow = TodayData['appointments'][number]
@@ -41,11 +43,10 @@ const TIME = new Intl.DateTimeFormat('bg-BG', {
  * Lists to act on, never charts (design doc, "Simple first").
  */
 export function TodayWide({ data, today }: { data: TodayData; today: string }) {
-  const { business, businesses } = useViewer()
+  const { business } = useViewer()
   const { words, modules } = business
-  const role = businesses.find((item) => item._id === business._id)?.role
   // Level 2: a Worker sees no totals, so the money tiles stay out.
-  const seesMoney = role === 'owner' || role === 'manager'
+  const seesMoney = hasRole(business.role, 'manager')
   const money = useQuery(
     api.money.summary,
     seesMoney ? { businessId: business._id, month: monthOf(today) } : 'skip',
@@ -314,7 +315,7 @@ function AgendaRow({ item, today }: { item: AppointmentRow; today: string }) {
   const { job } = item
   if (!job) return null
   const late = isJobLate(job, today)
-  const owes = job.owes && job.balanceCents > 0
+  const owes = jobOwedCents(job) > 0
   return (
     <li>
       <Link
