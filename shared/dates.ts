@@ -46,6 +46,13 @@ export function dateInSofia(ms: number): string {
   return fromDayNumber(Math.floor((ms + sofiaOffsetMinutes(ms) * MINUTE) / DAY))
 }
 
+/** What the Sofia wall clock reads at that moment. */
+export function clockInSofia(ms: number): { hour: number; minute: number } {
+  const local = ms + sofiaOffsetMinutes(ms) * MINUTE
+  const minuteOfDay = Math.floor((((local % DAY) + DAY) % DAY) / MINUTE)
+  return { hour: Math.floor(minuteOfDay / 60), minute: minuteOfDay % 60 }
+}
+
 /**
  * A moment as Sofia reads it, for places that must say exactly when
  * ("8.10.2026, 15:01"): day and month as the rest of the app writes them, the
@@ -53,10 +60,8 @@ export function dateInSofia(ms: number): string {
  */
 export function formatDateTime(ms: number): string {
   const [y, m, d] = parts(dateInSofia(ms))
-  const local = ms + sofiaOffsetMinutes(ms) * MINUTE
-  const minuteOfDay = Math.floor((((local % DAY) + DAY) % DAY) / MINUTE)
-  const hour = Math.floor(minuteOfDay / 60)
-  return `${d}.${m}.${y}, ${pad(hour)}:${pad(minuteOfDay % 60)}`
+  const { hour, minute } = clockInSofia(ms)
+  return `${d}.${m}.${y}, ${pad(hour)}:${pad(minute)}`
 }
 
 export function todayInSofia(nowMs: number): string {

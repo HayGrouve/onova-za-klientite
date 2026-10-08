@@ -397,6 +397,80 @@ describe('parseLine: dates', () => {
   it('an impossible date is not a date', () => {
     expect(parse('Иван Петров, шкаф, 31.02').date).toBeNull()
   })
+
+  it('a year of three digits is not a year', () => {
+    expect(parseDate('12.10.202', TODAY)).toBeNull()
+    expect(parseDate('12.10.2027', TODAY)).toEqual({ date: '2027-10-12' })
+    expect(parseDate('12.10.27', TODAY)).toEqual({ date: '2027-10-12' })
+  })
+})
+
+describe('parseLine: a time on its own', () => {
+  const morning = { hour: 9, minute: 15 }
+
+  it.each([
+    ['11:00', 11, 0],
+    ['11:00 ч', 11, 0],
+    ['в 11:00', 11, 0],
+    ['от 11:00', 11, 0],
+    ['от 9:30 ч', 9, 30],
+    ['в 11', 11, 0],
+    ['9:30', 9, 30],
+  ])(
+    '"%s" is today at that time while it is still ahead',
+    (segment, hour, minute) => {
+      expect(parseDate(segment, TODAY, morning)).toEqual({
+        date: TODAY,
+        time: { hour, minute },
+      })
+    },
+  )
+
+  it('is tomorrow when that time has already passed today', () => {
+    expect(parseDate('11:00', TODAY, { hour: 12, minute: 0 })).toEqual({
+      date: '2026-10-08',
+      time: { hour: 11, minute: 0 },
+    })
+    // Right now is already past.
+    expect(parseDate('11:00', TODAY, { hour: 11, minute: 0 })?.date).toBe(
+      '2026-10-08',
+    )
+    expect(parseDate('11:01', TODAY, { hour: 11, minute: 0 })?.date).toBe(TODAY)
+  })
+
+  it('is today when the clock is not known', () => {
+    expect(parseDate('11:00', TODAY)).toEqual({
+      date: TODAY,
+      time: { hour: 11, minute: 0 },
+    })
+  })
+
+  it('is not a time when the hour or minute cannot be one', () => {
+    expect(parseDate('25:00', TODAY, morning)).toBeNull()
+    expect(parseDate('11:60', TODAY, morning)).toBeNull()
+    expect(parseDate('в 24', TODAY, morning)).toBeNull()
+  })
+
+  it('a bare number is still a price, not an hour', () => {
+    expect(parseDate('11', TODAY, morning)).toBeNull()
+    expect(parseDate('950', TODAY, morning)).toBeNull()
+    expect(parseDate('от 5', TODAY, morning)).toBeNull()
+  })
+
+  it('is read as the date of the line, as its own segment or at the end of the title', () => {
+    const at = (text: string, now = morning) => parseLine(text, { ...ctx, now })
+    expect(at('Иван Петров, шкаф, 11:00').date).toEqual({
+      date: TODAY,
+      time: { hour: 11, minute: 0 },
+    })
+    const tail = at('Иван Петров, шкаф 950 в 11:00', { hour: 13, minute: 0 })
+    expect(tail.date).toEqual({
+      date: '2026-10-08',
+      time: { hour: 11, minute: 0 },
+    })
+    expect(tail.title).toBe('шкаф')
+    expect(tail.priceCents).toBe(95000)
+  })
 })
 
 describe('parseLine: money already received', () => {

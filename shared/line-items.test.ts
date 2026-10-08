@@ -50,15 +50,25 @@ describe('matchItem', () => {
     )
   })
 
-  it('links the item but leaves the title alone when taking the word out is not clearly right', () => {
-    // In the middle of the title.
+  it('takes the item out wherever it sits in the title', () => {
+    // In the middle: the words around it still read as one.
     expect(matchItem('смяна на Daikin филтри', items)).toEqual({
       id: 'daikin',
-      title: 'смяна на Daikin филтри',
+      title: 'смяна на филтри',
     })
     // At the front.
-    expect(matchItem('Daikin филтри', items)?.title).toBe('Daikin филтри')
-    // Nothing would be left.
+    expect(matchItem('Daikin филтри', items)?.title).toBe('филтри')
+    expect(matchItem('филтри Daikin ремонт', items)?.title).toBe(
+      'филтри ремонт',
+    )
+  })
+
+  it('drops a preposition left at the front or the end', () => {
+    expect(matchItem('на Daikin филтри', items)?.title).toBe('филтри')
+    expect(matchItem('филтри за Daikin', items)?.title).toBe('филтри')
+  })
+
+  it('leaves the title as written when nothing would be left', () => {
     expect(matchItem('Daikin', items)).toEqual({
       id: 'daikin',
       title: 'Daikin',

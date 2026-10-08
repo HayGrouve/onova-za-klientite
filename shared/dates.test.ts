@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  clockInSofia,
   formatDateTime,
   addDays,
   addMonths,
@@ -482,5 +483,18 @@ describe('formatDateTime', () => {
       '29.3.2026, 02:59',
     )
     expect(formatDateTime(Date.UTC(2026, 2, 29, 1, 0))).toBe('29.3.2026, 04:00')
+  })
+})
+
+describe('clockInSofia', () => {
+  it('reads the Sofia wall clock, summer and winter', () => {
+    expect(clockInSofia(Date.UTC(2026, 9, 8, 0, 1))).toEqual({
+      hour: 3,
+      minute: 1,
+    })
+    expect(clockInSofia(Date.UTC(2026, 0, 5, 22, 30))).toEqual({
+      hour: 0,
+      minute: 30,
+    })
   })
 })
