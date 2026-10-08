@@ -133,7 +133,7 @@ function WideJobsPage() {
           />
           <ViewLink view="table" icon={TableIcon} label={m.jobs_view_table()} />
         </nav>
-        <InputGroup className="mb-1 ml-auto h-10 w-72 bg-card">
+        <InputGroup className="mb-1 ml-auto h-10 w-80 bg-card">
           <InputGroupAddon>
             <MagnifyingGlassIcon />
           </InputGroupAddon>
