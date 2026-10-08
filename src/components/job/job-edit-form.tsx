@@ -24,7 +24,7 @@ import {
 } from '#/components/ui/input-group'
 import { Spinner } from '#/components/ui/spinner'
 import { Textarea } from '#/components/ui/textarea'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { moneyInputText, parseMoney } from '../../../shared/money'
 
@@ -87,7 +87,7 @@ export function JobEditForm({
       return
     }
     setSaving(true)
-    try {
+    const saved = await runChange(async () => {
       await update({
         businessId,
         jobId: job._id,
@@ -102,10 +102,8 @@ export function JobEditForm({
       })
       toast.success(m.saved())
       onDone()
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!saved.done) setSaving(false)
   }
 
   return (

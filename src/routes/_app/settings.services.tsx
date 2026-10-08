@@ -3,7 +3,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
@@ -19,7 +18,7 @@ import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, moneyInputText, parseMoney } from '../../../shared/money'
 
@@ -53,10 +52,12 @@ function ServicesSettings() {
     const ids = active.map((service) => service._id)
     const [moved] = ids.splice(index, 1)
     ids.splice(index + by, 0, moved)
-    void reorder({
-      businessId: business._id,
-      serviceIds: [...ids, ...archived.map((s) => s._id)],
-    }).catch((error: unknown) => toast.error(errorMessage(error)))
+    void runChange(() =>
+      reorder({
+        businessId: business._id,
+        serviceIds: [...ids, ...archived.map((s) => s._id)],
+      }),
+    )
   }
   const row = (service: Service, index?: number) => (
     <li key={service._id} className="flex items-center gap-1 pr-2">

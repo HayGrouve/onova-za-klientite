@@ -4,7 +4,6 @@ import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ConfirmAction } from '#/components/confirm-action'
@@ -28,7 +27,7 @@ import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
 import { GROUP_LABEL, GROUP_MEANING } from '#/i18n/groups'
 import { lower } from '#/i18n/words'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import {
   STAGE_GROUPS,
@@ -94,9 +93,7 @@ function StagesSettings() {
     const ids = groupedOrder(stages)
     const index = ids.indexOf(stageId)
     ;[ids[index], ids[index + by]] = [ids[index + by], ids[index]]
-    void reorder({ businessId: business._id, stageIds: ids }).catch(
-      (error: unknown) => toast.error(errorMessage(error)),
-    )
+    void runChange(() => reorder({ businessId: business._id, stageIds: ids }))
   }
 
   return (

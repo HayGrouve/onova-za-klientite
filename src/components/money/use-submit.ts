@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 
 /**
@@ -12,21 +12,12 @@ import { m } from '#/paraglide/messages.js'
 export function useSubmit(onDone?: () => void) {
   const [busy, setBusy] = useState(false)
   const run = async (action: () => Promise<unknown>, success = m.saved()) => {
-    // View offline, edit online (ADR 0010): don't queue changes without a connection.
-    if (!navigator.onLine) {
-      toast.error(m.offline_edit_blocked())
-      return
-    }
     setBusy(true)
-    try {
-      await action()
-      toast.success(success)
-      if (onDone) onDone()
-      else setBusy(false)
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setBusy(false)
-    }
+    const result = await runChange(action)
+    if (!result.done) return setBusy(false)
+    toast.success(success)
+    if (onDone) onDone()
+    else setBusy(false)
   }
   return { busy, run }
 }

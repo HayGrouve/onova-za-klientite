@@ -8,6 +8,7 @@ import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { Switch } from '#/components/ui/switch'
 import { useViewer } from '#/hooks/use-viewer'
+import { runChange } from '#/lib/change'
 import { errorMessage } from '#/lib/errors'
 import { saveOutcome } from '#/lib/import-outcome'
 import { m } from '#/paraglide/messages.js'
@@ -117,7 +118,7 @@ export function PreviewStep({
     )
     let created = 0
     setPhase({ name: 'running', done: 0, total: chosen.length })
-    try {
+    const ran = await runChange(async () => {
       // New fields first, only for the columns the chosen rows use.
       const fieldIds: Record<string, string> = {}
       for (const [column, target] of Object.entries(columnFields)) {
@@ -158,10 +159,8 @@ export function PreviewStep({
         })
       }
       finish(created, false)
-    } catch (error) {
-      toast.error(errorMessage(error))
-      finish(created, true)
-    }
+    })
+    if (!ran.done) finish(created, true)
   }
 
   const running = phase.name === 'running'

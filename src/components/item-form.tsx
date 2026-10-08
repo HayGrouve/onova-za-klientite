@@ -18,7 +18,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
 import { useWide } from '#/hooks/use-wide'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 
 export function ItemForm({
@@ -65,7 +65,7 @@ export function ItemForm({
       return
     }
     setSaving(true)
-    try {
+    const saved = await runChange(async () => {
       const values = { name, extra: activeValues(fields, extra) }
       if (item) {
         await update({ businessId, itemId: item._id, ...values })
@@ -74,10 +74,8 @@ export function ItemForm({
         onSaved(await create({ businessId, clientId, jobId, ...values }))
       }
       toast.success(m.saved())
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!saved.done) setSaving(false)
   }
 
   return (

@@ -4,7 +4,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { patchSettings } from '#/components/settings/optimistic'
 import { Button } from '#/components/ui/button'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import type { Modules } from '../../../shared/setup'
 
@@ -39,12 +39,12 @@ export function ModuleOff({
           variant="outline"
           className="h-11 w-fit"
           onClick={() =>
-            void setModules({
-              businessId,
-              modules: { ...modules, [module]: true },
-            })
-              .then(() => toast.success(m.saved()))
-              .catch((error: unknown) => toast.error(errorMessage(error)))
+            void runChange(() =>
+              setModules({
+                businessId,
+                modules: { ...modules, [module]: true },
+              }),
+            ).then((saved) => saved.done && toast.success(m.saved()))
           }
         >
           {m.module_turn_on()}

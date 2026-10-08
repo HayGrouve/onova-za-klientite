@@ -8,7 +8,7 @@ import { Button } from '#/components/ui/button'
 import { FieldError } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import {
   formatMoney,
@@ -138,7 +138,7 @@ export function LinesEditor({
       return
     }
     setSaving(true)
-    try {
+    const saved = await runChange(async () => {
       await setLines({
         businessId,
         jobId: job._id,
@@ -152,10 +152,8 @@ export function LinesEditor({
       })
       toast.success(m.saved())
       onDone()
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!saved.done) setSaving(false)
   }
 
   return (

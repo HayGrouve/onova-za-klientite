@@ -23,7 +23,7 @@ import { Spinner } from '#/components/ui/spinner'
 import { usePageGuard } from '#/hooks/use-discard-guard'
 import { useViewer } from '#/hooks/use-viewer'
 import { compressImage } from '#/lib/compress-image'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { summaryContacts } from '#/lib/job-summary'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney } from '../../../shared/money'
@@ -245,7 +245,7 @@ function Logo({
 
   const upload = async (file: File) => {
     setUploading(true)
-    try {
+    await runChange(async () => {
       const blob = await compressImage(file)
       const url = await generateUploadUrl({ businessId: business._id })
       const response = await fetch(url, {
@@ -260,11 +260,8 @@ function Logo({
         target: { kind: 'logo' },
       })
       if ('rejected' in result) toast.error(m.files_rejected())
-    } catch (error) {
-      toast.error(errorMessage(error))
-    } finally {
-      setUploading(false)
-    }
+    })
+    setUploading(false)
   }
 
   return (
@@ -310,10 +307,9 @@ function Logo({
               variant="ghost"
               className="h-11"
               onConfirm={() =>
-                void remove({
-                  businessId: business._id,
-                  fileId: current._id,
-                }).catch((error: unknown) => toast.error(errorMessage(error)))
+                void runChange(() =>
+                  remove({ businessId: business._id, fileId: current._id }),
+                )
               }
             />
           )}

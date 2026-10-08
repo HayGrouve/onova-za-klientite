@@ -46,7 +46,7 @@ import type { ActiveBusiness } from '#/hooks/use-viewer'
 import { formatDay, formatTime } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { lower } from '#/i18n/words'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { recordTiming } from '#/lib/timing'
 import { m } from '#/paraglide/messages.js'
 import { todayInSofia } from '../../../shared/dates'
@@ -279,12 +279,8 @@ export function NewJobForm({
       setFailure({ id: Date.now(), client: draft.missing.client })
       return
     }
-    if (!navigator.onLine) {
-      toast.error(m.offline_edit_blocked())
-      return
-    }
     setSaving(true)
-    try {
+    const ran = await runChange(async () => {
       const jobTitle = args.title
       // The draft's ids came from the server's own lists, so they are its ids.
       const { jobId } = await save({
@@ -303,10 +299,8 @@ export function NewJobForm({
       })
       guard.release()
       await leave()
-    } catch (error) {
-      toast.error(errorMessage(error))
-      setSaving(false)
-    }
+    })
+    if (!ran.done) setSaving(false)
   }
 
   const sourceLabel =

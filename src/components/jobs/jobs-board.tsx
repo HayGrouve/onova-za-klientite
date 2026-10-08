@@ -74,14 +74,31 @@ export function JobsBoard({
   // Level 2: a Worker cannot change stages, so their cards don't move.
   const canMove = role === 'owner' || role === 'manager'
   const board = useQuery(api.jobs.board, { businessId: business._id })
-  const move = useMoveJob()
+  const { move, announce } = useMoveJob()
   const [ruleFor, setRuleFor] = useState<Card | null>(null)
+  // The move's toast waits while the reminder rule's offer covers the board.
+  const afterRuleOffer = useRef<(() => void) | null>(null)
 
   const stagesOf = (group: StageGroup) =>
     board?.stages.filter((stage) => stage.group === group) ?? []
   const moveTo = (card: Card, target: Target) => {
     if (target !== 'cancelled' && target._id === card.stageId) return
-    void move(card, target).then((offer) => offer && setRuleFor(card))
+    const previous = board?.stages.find((stage) => stage._id === card.stageId)
+    void move(card, target).then(({ moved, offerRule }) => {
+      if (!moved || target === 'cancelled') return
+      const say = () => announce(card, target, previous)
+      if (offerRule) {
+        afterRuleOffer.current = say
+        setRuleFor(card)
+      } else {
+        say()
+      }
+    })
+  }
+  const closeRuleOffer = () => {
+    setRuleFor(null)
+    afterRuleOffer.current?.()
+    afterRuleOffer.current = null
   }
   const { drag, press, wasDragged } = useCardDrag((card, key) => {
     const [kind, id] = key.split(':')
@@ -133,7 +150,7 @@ export function JobsBoard({
           <CardFace card={drag.card} today={today} />
         </div>
       )}
-      <RuleReminderSheet job={ruleFor} onClose={() => setRuleFor(null)} />
+      <RuleReminderSheet job={ruleFor} onClose={closeRuleOffer} />
     </>
   )
 }

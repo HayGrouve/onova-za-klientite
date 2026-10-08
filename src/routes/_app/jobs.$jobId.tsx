@@ -57,11 +57,11 @@ import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { DetailSheet, useDetailSheet } from '#/components/detail-sheet'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
-import { useMoveJob } from '#/hooks/use-move-job'
+import { STAGE_TOAST, useMoveJob } from '#/hooks/use-move-job'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import {
   creditForJob,
@@ -94,11 +94,6 @@ type OpenSheet =
   | { kind: 'writeOff' }
   | { kind: 'cost'; cost?: Doc<'costs'> }
   | { kind: 'reminder' }
-
-type StageRef = { _id: Id<'stages'>; name: string; group: StageGroup }
-
-/** One toast at a time for stage changes: a new one replaces the last. */
-const STAGE_TOAST = 'stage-moved'
 
 // The current stage is the one filled chip; colour follows its group (D53).
 const CURRENT_STAGE: Record<StageGroup, string> = {
@@ -140,7 +135,7 @@ function JobPage() {
   })
   usePageTitle(data?.job.title)
   const services = useQuery(api.services.list, { businessId: business._id })
-  const move = useMoveJob()
+  const { move, announce } = useMoveJob()
   const applyCredit = useMutation(api.payments.useCredit)
   const removeWriteOff = useMutation(api.jobs.removeWriteOff)
   // The edit, lines, appointment and cost forms ask before dropping what was typed.
@@ -169,42 +164,7 @@ function JobPage() {
     : m.job_profit_so_far()
   const late = isJobLate(job, today)
 
-  // Tells the person which stage the job is in now, with a way back. Reaching
-  // Done with a balance also offers the payment.
-  const announceMove = (target: StageRef, previous: StageRef | undefined) => {
-    const undo = previous
-      ? {
-          label: m.undo(),
-          onClick: () =>
-            void move(
-              {
-                _id: job._id,
-                stageGroup: target.group,
-                isNoClient: client?.isNoClient ?? false,
-              },
-              previous,
-            ),
-        }
-      : undefined
-    const offerPayment =
-      target.group === 'done' &&
-      job.stageGroup !== 'done' &&
-      job.balanceCents > 0
-    toast.success(m.job_stage_moved({ stage: target.name }), {
-      id: STAGE_TOAST,
-      duration: offerPayment ? 10_000 : 6000,
-      ...(offerPayment
-        ? {
-            action: {
-              label: m.pay_add(),
-              onClick: () => sheet.open({ kind: 'payment' }),
-            },
-            cancel: undo,
-          }
-        : { action: undo }),
-    })
-  }
-  const moveTo = (stageId: Id<'stages'>) => {
+  const moveTo = async (stageId: Id<'stages'>) => {
     const target = data.stages.find((stage) => stage._id === stageId)
     const previous = data.stages.find((stage) => stage._id === job.stageId)
     if (!target) return
@@ -212,21 +172,34 @@ function JobPage() {
       _id: job._id,
       stageGroup: job.stageGroup,
       isNoClient: client?.isNoClient ?? false,
+      balanceCents: job.balanceCents,
     }
-    void move(moving, target, (offerRule) => {
-      // Q5: reaching Done offers the reminder rule's reminder, pre-filled. Its
-      // sheet covers the page, so the toast comes once the sheet is closed.
-      if (offerRule) {
-        afterRuleOffer.current = () => announceMove(target, previous)
-        setRuleOffer({
-          _id: job._id,
-          title: job.title,
-          itemId: job.itemIds.at(0),
-        })
-      } else {
-        announceMove(target, previous)
-      }
-    })
+    const { moved, offerRule } = await move(moving, target)
+    if (!moved) return
+    const say = () =>
+      announce(moving, target, previous, () => sheet.open({ kind: 'payment' }))
+    // Q5: reaching Done offers the reminder rule's reminder, pre-filled. Its
+    // sheet covers the page, so the toast comes once the sheet is closed.
+    if (offerRule) {
+      afterRuleOffer.current = say
+      setRuleOffer({
+        _id: job._id,
+        title: job.title,
+        itemId: job.itemIds.at(0),
+      })
+    } else {
+      say()
+    }
+  }
+  const spendCredit = async () => {
+    setUsingCredit(true)
+    const used = await runChange(() =>
+      applyCredit({ businessId: business._id, jobId: job._id }),
+    )
+    if (used.done) {
+      toast.success(m.credit_used({ amount: formatMoney(used.value) }))
+    }
+    setUsingCredit(false)
   }
   const closeRuleOffer = () => {
     setRuleOffer(null)
@@ -344,7 +317,7 @@ function JobPage() {
                     onValueChange={(next: string[]) => {
                       // The current stage can't be switched off: only a move counts.
                       if (next[0] && next[0] !== job.stageId)
-                        moveTo(next[0] as Id<'stages'>)
+                        void moveTo(next[0] as Id<'stages'>)
                     }}
                     className="w-full flex-wrap"
                   >
@@ -532,22 +505,7 @@ function JobPage() {
                         variant="outline"
                         busy={usingCredit}
                         className="h-10 border-primary bg-background text-primary hover:bg-primary/10 dark:bg-background dark:hover:bg-primary/15"
-                        onConfirm={() => {
-                          setUsingCredit(true)
-                          void applyCredit({
-                            businessId: business._id,
-                            jobId: job._id,
-                          })
-                            .then((cents) =>
-                              toast.success(
-                                m.credit_used({ amount: formatMoney(cents) }),
-                              ),
-                            )
-                            .catch((error: unknown) =>
-                              toast.error(errorMessage(error)),
-                            )
-                            .finally(() => setUsingCredit(false))
-                        }}
+                        onConfirm={() => void spendCredit()}
                       />
                     </div>
                   </div>
@@ -563,11 +521,11 @@ function JobPage() {
                       variant="ghost"
                       className="h-9 shrink-0"
                       onClick={() =>
-                        void removeWriteOff({
-                          businessId: business._id,
-                          jobId: job._id,
-                        }).catch((error: unknown) =>
-                          toast.error(errorMessage(error)),
+                        void runChange(() =>
+                          removeWriteOff({
+                            businessId: business._id,
+                            jobId: job._id,
+                          }),
                         )
                       }
                     >
@@ -969,9 +927,9 @@ function ItemsPicker({
       <Button
         size="xl"
         onClick={() =>
-          void setItems({ businessId, jobId: job._id, itemIds: chosen })
-            .then(onDone)
-            .catch((error: unknown) => toast.error(errorMessage(error)))
+          void runChange(() =>
+            setItems({ businessId, jobId: job._id, itemIds: chosen }),
+          ).then((saved) => saved.done && onDone())
         }
       >
         {m.save()}

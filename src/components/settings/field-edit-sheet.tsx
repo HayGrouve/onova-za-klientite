@@ -17,7 +17,7 @@ import { Input } from '#/components/ui/input'
 import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { Switch } from '#/components/ui/switch'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { canChangeFieldType } from '../../../shared/fields'
 import type { FieldType } from '../../../shared/fields'
@@ -150,14 +150,11 @@ function OptionsList({
 
   const save = async (action: () => Promise<unknown>) => {
     setBusy(true)
-    try {
+    await runChange(async () => {
       await action()
       toast.success(m.saved())
-    } catch (error) {
-      toast.error(errorMessage(error))
-    } finally {
-      setBusy(false)
-    }
+    })
+    setBusy(false)
   }
 
   return (

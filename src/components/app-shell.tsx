@@ -23,7 +23,6 @@ import type { LinkProps } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { cn } from 'cn'
 import { useEffect } from 'react'
-import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
@@ -44,7 +43,7 @@ import { OfflineBanner } from '#/components/offline/offline-banner'
 import { Tip } from '#/components/tip'
 import { buttonVariants } from '#/components/ui/button'
 import { TooltipProvider } from '#/components/ui/tooltip'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { initials } from '#/lib/initials'
 import { wipeSnapshots } from '#/lib/offline-store'
 import { isShortcut, shortcutBlockedAt } from '#/lib/shortcuts'
@@ -354,9 +353,11 @@ export function BusinessSwitcher() {
 
   const switchTo = (businessId: string) => {
     if (businessId === business._id) return
-    setActive({ businessId: businessId as Id<'businesses'> })
-      .then(() => navigate({ to: '/' }))
-      .catch((error: unknown) => toast.error(errorMessage(error)))
+    void runChange(() =>
+      setActive({ businessId: businessId as Id<'businesses'> }),
+    ).then((switched) => {
+      if (switched.done) void navigate({ to: '/' })
+    })
   }
 
   if (businesses.length < 2) {

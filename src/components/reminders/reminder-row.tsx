@@ -17,7 +17,7 @@ import {
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
-import { errorMessage } from '#/lib/errors'
+import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { isOverdue } from '../../../shared/dates'
 import { SNOOZE_PICKS, pickReminderDate } from '../../../shared/reminders'
@@ -54,45 +54,32 @@ export function ReminderRow({
   const snooze = useMutation(api.reminders.snooze)
   const late = date !== undefined && isOverdue(date, today)
   const scope = { businessId: business._id, reminderId }
-  const fail = (error: unknown) => toast.error(errorMessage(error))
   const undoable = (message: string, undo: () => Promise<unknown>) =>
     toast(message, {
       duration: UNDO_MS,
       action: {
         label: m.reminder_undo(),
-        onClick: () => void undo().catch(fail),
+        onClick: () => void runChange(undo),
       },
     })
-  // View offline, edit online (ADR 0010).
-  const online = () => {
-    if (navigator.onLine) return true
-    toast.error(m.offline_edit_blocked())
-    return false
-  }
 
-  const finish = (status: 'done' | 'dismissed') => {
-    if (!online()) return
-    void close({ ...scope, status })
-      .then(() =>
-        undoable(
-          status === 'done'
-            ? m.reminder_done_toast()
-            : m.reminder_dismissed_toast(),
-          () => reopen(scope),
-        ),
-      )
-      .catch(fail)
+  const finish = async (status: 'done' | 'dismissed') => {
+    const closed = await runChange(() => close({ ...scope, status }))
+    if (!closed.done) return
+    undoable(
+      status === 'done'
+        ? m.reminder_done_toast()
+        : m.reminder_dismissed_toast(),
+      () => reopen(scope),
+    )
   }
-  const postpone = (to: string) => {
-    if (!online()) return
-    void snooze({ ...scope, date: to })
-      .then((from) => {
-        if (from === null) return
-        undoable(m.reminder_snoozed_toast({ when: formatDay(to, today) }), () =>
-          snooze({ ...scope, date: from }),
-        )
-      })
-      .catch(fail)
+  const postpone = async (to: string) => {
+    const moved = await runChange(() => snooze({ ...scope, date: to }))
+    if (!moved.done || moved.value === null) return
+    const from = moved.value
+    undoable(m.reminder_snoozed_toast({ when: formatDay(to, today) }), () =>
+      snooze({ ...scope, date: from }),
+    )
   }
 
   const text = (
@@ -152,7 +139,7 @@ export function ReminderRow({
           <Button
             variant="outline"
             className="h-11 rounded-xl px-2.5 hover:bg-green-100 hover:text-green-800 dark:hover:bg-green-950 dark:hover:text-green-300"
-            onClick={() => finish('done')}
+            onClick={() => void finish('done')}
           >
             <CheckIcon weight="bold" data-icon="inline-start" />
             {m.reminder_done()}
@@ -173,7 +160,7 @@ export function ReminderRow({
               <DropdownMenuItem
                 key={pick}
                 className="min-h-10"
-                onClick={() => postpone(pickReminderDate(today, pick))}
+                onClick={() => void postpone(pickReminderDate(today, pick))}
               >
                 {PICK_LABEL[pick]()}
               </DropdownMenuItem>
@@ -184,7 +171,7 @@ export function ReminderRow({
           <Button
             variant="ghost"
             className="h-11 rounded-xl px-2.5 text-muted-foreground"
-            onClick={() => finish('dismissed')}
+            onClick={() => void finish('dismissed')}
           >
             <XIcon data-icon="inline-start" />
             {m.reminder_dismiss()}
