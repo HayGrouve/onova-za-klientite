@@ -134,6 +134,22 @@ export async function getLiveClient(
 }
 
 /**
+ * `getLiveClient` for a payment that only settles money on records that
+ * already exist (a payment on the client's open jobs, a refund). Anonymize
+ * keeps the jobs and the money, so settling them stays possible afterwards.
+ * A merged client is still refused: its jobs and credit moved to the
+ * survivor, and a stale tab must not act on the old record.
+ */
+export async function getSettlingClient(
+  ctx: QueryCtx & { business: Doc<'businesses'> },
+  clientId: Id<'clients'>,
+): Promise<Doc<'clients'>> {
+  const client = await getOwned(ctx, 'clients', clientId)
+  if (client.mergedIntoId !== undefined) fail('client.merged')
+  return client
+}
+
+/**
  * `getOwned` for an id that came from the address bar, where any text can
  * arrive: text that is no id, or the id of another table, is `notFound` too
  * (D16), instead of an argument error the client could not tell apart.

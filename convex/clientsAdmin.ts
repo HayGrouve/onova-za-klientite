@@ -286,6 +286,8 @@ export const anonymize = businessMutation({
       .collect()) {
       await ctx.db.patch('jobs', job._id, {
         searchText: await jobSearchText(ctx, job),
+        // A series does not go on for an anonymized client.
+        ...(job.nextRepeatOn !== undefined ? { nextRepeatOn: undefined } : {}),
       })
     }
     await logActivity(ctx, { type: 'client.anonymized', clientId })

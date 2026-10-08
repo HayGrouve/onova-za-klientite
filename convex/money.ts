@@ -1,9 +1,55 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
+import type { QueryCtx } from './_generated/server'
 import { isValidMonth, monthRange } from '../shared/dates'
 import { sumCents } from '../shared/money'
 import { businessQuery, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
+
+/**
+ * The month's figures both Today and the Money screen show: what was
+ * received, the costs and the profit in the month, and what is still owed
+ * now with the jobs that owe it. One place, so the two can never disagree.
+ * The rows are returned for the Money screen's lists.
+ */
+async function monthFigures(
+  ctx: QueryCtx,
+  businessId: Id<'businesses'>,
+  month: string,
+) {
+  const { from, to } = monthRange(month)
+  const payments = await ctx.db
+    .query('payments')
+    .withIndex('by_business_date', (q) =>
+      q.eq('businessId', businessId).gte('date', from).lte('date', to),
+    )
+    .collect()
+  const costs = await ctx.db
+    .query('costs')
+    .withIndex('by_business_date', (q) =>
+      q.eq('businessId', businessId).gte('date', from).lte('date', to),
+    )
+    .collect()
+  const owing = await ctx.db
+    .query('jobs')
+    .withIndex('by_business_owes', (q) =>
+      q.eq('businessId', businessId).eq('owes', true),
+    )
+    .collect()
+  const receivedCents = sumCents(payments.map((payment) => payment.amountCents))
+  const costCents = sumCents(costs.map((cost) => cost.amountCents))
+  return {
+    payments,
+    costs,
+    owing,
+    receivedCents,
+    costCents,
+    profitCents: receivedCents - costCents,
+    stillOwedCents: sumCents(owing.map((job) => job.balanceCents)),
+    owingJobs: owing.length,
+    doneOwingJobs: owing.filter((job) => job.stageGroup === 'done').length,
+  }
+}
 
 /**
  * The four figures Today shows, without the lists the Money screen builds:
@@ -23,36 +69,13 @@ export const headline = businessQuery({
     // Level 2: a Worker sees no totals.
     requireRole(ctx.member, 'manager')
     if (!isValidMonth(month)) fail('invalid', { field: 'month' })
-    const businessId = ctx.business._id
-    const { from, to } = monthRange(month)
-    const payments = await ctx.db
-      .query('payments')
-      .withIndex('by_business_date', (q) =>
-        q.eq('businessId', businessId).gte('date', from).lte('date', to),
-      )
-      .collect()
-    const costs = await ctx.db
-      .query('costs')
-      .withIndex('by_business_date', (q) =>
-        q.eq('businessId', businessId).gte('date', from).lte('date', to),
-      )
-      .collect()
-    const owing = await ctx.db
-      .query('jobs')
-      .withIndex('by_business_owes', (q) =>
-        q.eq('businessId', businessId).eq('owes', true),
-      )
-      .collect()
-    const receivedCents = sumCents(
-      payments.map((payment) => payment.amountCents),
-    )
+    const figures = await monthFigures(ctx, ctx.business._id, month)
     return {
-      stillOwedCents: sumCents(owing.map((job) => job.balanceCents)),
-      owingJobs: owing.length,
-      doneOwingJobs: owing.filter((job) => job.stageGroup === 'done').length,
-      receivedCents,
-      profitCents:
-        receivedCents - sumCents(costs.map((cost) => cost.amountCents)),
+      stillOwedCents: figures.stillOwedCents,
+      owingJobs: figures.owingJobs,
+      doneOwingJobs: figures.doneOwingJobs,
+      receivedCents: figures.receivedCents,
+      profitCents: figures.profitCents,
     }
   },
 })
@@ -119,27 +142,15 @@ export const summary = businessQuery({
     requireRole(ctx.member, 'manager')
     if (!isValidMonth(month)) fail('invalid', { field: 'month' })
     const businessId = ctx.business._id
-    const { from, to } = monthRange(month)
-
-    const payments = await ctx.db
-      .query('payments')
-      .withIndex('by_business_date', (q) =>
-        q.eq('businessId', businessId).gte('date', from).lte('date', to),
-      )
-      .collect()
-    const costs = await ctx.db
-      .query('costs')
-      .withIndex('by_business_date', (q) =>
-        q.eq('businessId', businessId).gte('date', from).lte('date', to),
-      )
-      .collect()
-
-    const owing = await ctx.db
-      .query('jobs')
-      .withIndex('by_business_owes', (q) =>
-        q.eq('businessId', businessId).eq('owes', true),
-      )
-      .collect()
+    const {
+      payments,
+      costs,
+      owing,
+      receivedCents,
+      costCents,
+      profitCents,
+      stillOwedCents,
+    } = await monthFigures(ctx, ctx.business._id, month)
     const byClient = new Map<
       Id<'clients'>,
       {
@@ -252,15 +263,11 @@ export const summary = businessQuery({
       })
     }
 
-    const receivedCents = sumCents(
-      payments.map((payment) => payment.amountCents),
-    )
-    const costCents = sumCents(costs.map((cost) => cost.amountCents))
     return {
       receivedCents,
       costCents,
-      profitCents: receivedCents - costCents,
-      stillOwedCents: sumCents(owing.map((job) => job.balanceCents)),
+      profitCents,
+      stillOwedCents,
       creditHeldCents: sumCents(withCredit.map((client) => client.creditCents)),
       whoOwesMe,
       payments: paymentRows,

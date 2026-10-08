@@ -74,7 +74,10 @@ function sofiaClock(ms: number) {
 async function seriesActor(ctx: MutationCtx, job: Doc<'jobs'>) {
   const creator = await ctx.db.get('memberships', job.createdBy)
   const creatorUser = creator ? await ctx.db.get('users', creator.userId) : null
-  if (creator && creatorUser) return { member: creator, user: creatorUser }
+  // A deactivated creator can no longer act: treat them like a missing one.
+  if (creator && creator.deactivatedAt === undefined && creatorUser) {
+    return { member: creator, user: creatorUser }
+  }
   const members = await ctx.db
     .query('memberships')
     .withIndex('by_business_user', (q) => q.eq('businessId', job.businessId))
@@ -85,6 +88,29 @@ async function seriesActor(ctx: MutationCtx, job: Doc<'jobs'>) {
     if (user) return { member, user }
   }
   return null
+}
+
+/**
+ * The client a series carries on with: the job's own, or the survivor when it
+ * was merged into another (the chain is followed). Null when that client is
+ * anonymized or gone: a series does not go on for it.
+ */
+async function seriesClient(ctx: MutationCtx, job: Doc<'jobs'>) {
+  let client = await ctx.db.get('clients', job.clientId)
+  const seen = new Set<Id<'clients'>>()
+  while (client?.mergedIntoId !== undefined && !seen.has(client._id)) {
+    seen.add(client._id)
+    client = await ctx.db.get('clients', client.mergedIntoId)
+  }
+  if (
+    !client ||
+    client.mergedIntoId !== undefined ||
+    client.anonymizedAt !== undefined ||
+    client.businessId !== job.businessId
+  ) {
+    return null
+  }
+  return client
 }
 
 /**
@@ -103,6 +129,13 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
   const actor = business ? await seriesActor(ctx, job) : null
   if (!business || !actor) {
     // Nobody can create it: stop the run from trying again every day.
+    if (job.nextRepeatOn !== undefined)
+      await ctx.db.patch('jobs', job._id, { nextRepeatOn: undefined })
+    return null
+  }
+  const client = await seriesClient(ctx, job)
+  if (!client) {
+    // The client is anonymized (or gone): the series ends here.
     if (job.nextRepeatOn !== undefined)
       await ctx.db.patch('jobs', job._id, { nextRepeatOn: undefined })
     return null
@@ -126,7 +159,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
   const now = Date.now()
   const nextId = await insertJob(ctx, {
     businessId: business._id,
-    clientId: job.clientId,
+    clientId: client._id,
     title: job.title,
     stageId: stage._id,
     stageGroup: stage.group,
@@ -166,7 +199,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     await ctx.db.insert('appointments', {
       businessId: business._id,
       jobId: nextId,
-      clientId: job.clientId,
+      clientId: client._id,
       start,
       end:
         source.end === undefined
@@ -184,7 +217,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
   await logActivity(as, {
     type: 'job.created',
     jobId: nextId,
-    clientId: job.clientId,
+    clientId: client._id,
     data: { name: job.title },
   })
   await logActivity(as, {

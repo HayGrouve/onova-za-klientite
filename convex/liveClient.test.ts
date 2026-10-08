@@ -117,6 +117,12 @@ const WRITES: Record<string, (e: Env) => Promise<unknown>> = {
     }),
 }
 
+/**
+ * Paths that only settle money on existing records. They are refused for a
+ * merged client (its credit and jobs moved on) but stay open after anonymize.
+ */
+const SETTLES = new Set(['payments.addFromClient', 'payments.refund'])
+
 const REFUSAL: Record<Dead, RegExp> = {
   merged: /client\.merged/,
   anonymized: /client\.anonymized/,
@@ -135,6 +141,7 @@ async function rowCounts(t: TestConvex) {
 describe('a write to a merged or anonymized client is refused', () => {
   for (const how of ['merged', 'anonymized'] as const) {
     for (const [name, write] of Object.entries(WRITES)) {
+      if (how === 'anonymized' && SETTLES.has(name)) continue
       it(`${name} on a ${how} client`, async () => {
         const env = await setup(how)
         const before = await rowCounts(env.t)
@@ -143,6 +150,77 @@ describe('a write to a merged or anonymized client is refused', () => {
       })
     }
   }
+
+  it('an anonymized client still takes a refund of a job payment and of client credit', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Иван Петров',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Шкаф',
+      typedPriceCents: 10000,
+    })
+    // 100.00 paid on the job, and 20.00 more kept as credit.
+    await owner.mutation(api.payments.addFromJob, {
+      businessId,
+      jobId,
+      amountCents: 12000,
+      date: DATE,
+      method: 'cash',
+    })
+    await owner.mutation(api.clientsAdmin.anonymize, { businessId, clientId })
+    await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      jobId,
+      amountCents: 4000,
+      date: DATE,
+      method: 'cash',
+    })
+    await owner.mutation(api.payments.refund, {
+      businessId,
+      clientId,
+      amountCents: 2000,
+      date: DATE,
+      method: 'cash',
+    })
+    const after = await t.run(async (ctx) => ({
+      client: (await ctx.db.get('clients', clientId))!,
+      job: (await ctx.db.get('jobs', jobId))!,
+    }))
+    expect(after.job.paidCents).toBe(6000)
+    expect(after.client.creditCents).toBe(0)
+    expect(after.client.anonymizedAt).toBeDefined()
+  })
+
+  it('an anonymized client still takes a payment on an existing open job', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Иван Петров',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Шкаф',
+      typedPriceCents: 10000,
+    })
+    await owner.mutation(api.clientsAdmin.anonymize, { businessId, clientId })
+    await owner.mutation(api.payments.addFromClient, {
+      businessId,
+      clientId,
+      amountCents: 10000,
+      date: DATE,
+      method: 'cash',
+    })
+    const job = await t.run((ctx) => ctx.db.get('jobs', jobId))
+    expect(job?.paidCents).toBe(10000)
+  })
 
   it('merge still takes a merged or anonymized client as `from`, and anonymize works on any', async () => {
     const env = await setup('anonymized')
