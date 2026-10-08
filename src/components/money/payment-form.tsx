@@ -161,16 +161,18 @@ export function PaymentForm({
       method,
       label: label || undefined,
     }
-    void run(() =>
-      target.kind === 'job'
-        ? fromJob({ ...common, jobId: target.jobId })
-        : fromClient({
-            ...common,
-            clientId: target.clientId,
-            allocations: split
-              .filter((row) => row.cents > 0)
-              .map((row) => ({ jobId: row.job._id, amountCents: row.cents })),
-          }),
+    void run(
+      () =>
+        target.kind === 'job'
+          ? fromJob({ ...common, jobId: target.jobId })
+          : fromClient({
+              ...common,
+              clientId: target.clientId,
+              allocations: split
+                .filter((row) => row.cents > 0)
+                .map((row) => ({ jobId: row.job._id, amountCents: row.cents })),
+            }),
+      m.toast_pay_added({ amount: formatMoney(amountCents) }),
     )
   }
 
@@ -296,7 +298,10 @@ export function PaymentForm({
       </FieldGroup>
       <ReviewSubmit
         review={review}
-        label={m.pay_save()}
+        label={m.review_next()}
+        confirmLabel={m.review_confirm_pay({
+          amount: formatMoney(amountCents ?? 0),
+        })}
         busy={busy}
         onConfirm={record}
         summary={

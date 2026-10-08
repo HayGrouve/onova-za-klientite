@@ -115,6 +115,7 @@ function PaymentSheetBody({
           <PaymentEditForm
             businessId={businessId}
             payment={payment}
+            today={today}
             onDone={onClose}
             onCancel={() => setMode('view')}
           />
