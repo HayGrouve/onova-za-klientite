@@ -35,12 +35,7 @@ import { Panel, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Button, buttonVariants } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { useSheetGuard } from '#/hooks/use-discard-guard'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
@@ -418,30 +413,23 @@ function MoneyPage() {
         today={today}
         onClose={() => setOpenPayment(null)}
       />
-      <Sheet
+      <BottomSheet
         open={costPanel !== null}
-        onOpenChange={(open) => !open && guard.close(() => setCostPanel(null))}
+        onClose={() => guard.close(() => setCostPanel(null))}
+        title={m.cost_general()}
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>{m.cost_general()}</SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {costPanel && (
-              <CostForm
-                businessId={business._id}
-                cost={costPanel.cost}
-                today={today}
-                onDone={() => setCostPanel(null)}
-                onDirtyChange={guard.setDirty}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+        <div className="px-4 pb-6">
+          {costPanel && (
+            <CostForm
+              businessId={business._id}
+              cost={costPanel.cost}
+              today={today}
+              onDone={() => setCostPanel(null)}
+              onDirtyChange={guard.setDirty}
+            />
+          )}
+        </div>
+      </BottomSheet>
       {guard.prompt}
     </>
   )

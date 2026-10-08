@@ -15,12 +15,7 @@ import { Flash, SettingsPreview } from '#/components/settings/settings-preview'
 import { Button } from '#/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { lower } from '#/i18n/words'
@@ -159,27 +154,20 @@ function ServicesSettings() {
           </ListCard>
         </section>
       )}
-      <Sheet
+      <BottomSheet
         open={panel !== null}
-        onOpenChange={(open) => !open && setPanel(null)}
+        onClose={() => setPanel(null)}
+        title={panel?.service?.name ?? m.services_add()}
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>{panel?.service?.name ?? m.services_add()}</SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {panel && (
-              <ServiceForm
-                service={panel.service}
-                onDone={() => setPanel(null)}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+        <div className="px-4 pb-6">
+          {panel && (
+            <ServiceForm
+              service={panel.service}
+              onDone={() => setPanel(null)}
+            />
+          )}
+        </div>
+      </BottomSheet>
     </SettingsPage>
   )
 }

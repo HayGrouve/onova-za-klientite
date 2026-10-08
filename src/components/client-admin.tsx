@@ -15,12 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { InputGroup, InputGroupInput } from '#/components/ui/input-group'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
@@ -66,39 +61,32 @@ export function ClientAdmin({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Sheet
+      <BottomSheet
         open={panel !== null}
-        onOpenChange={(open) => !open && setPanel(null)}
+        onClose={() => setPanel(null)}
+        title={
+          panel === 'merge'
+            ? m.client_merge_title()
+            : m.client_anonymize_title()
+        }
       >
-        <SheetContent
-          side="bottom"
-          className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-        >
-          <SheetHeader>
-            <SheetTitle>
-              {panel === 'merge'
-                ? m.client_merge_title()
-                : m.client_anonymize_title()}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-6">
-            {panel === 'merge' && (
-              <MergePicker
-                businessId={businessId}
-                client={client}
-                onDone={() => setPanel(null)}
-              />
-            )}
-            {panel === 'anonymize' && (
-              <Anonymize
-                businessId={businessId}
-                clientId={client._id}
-                onDone={() => setPanel(null)}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+        <div className="px-4 pb-6">
+          {panel === 'merge' && (
+            <MergePicker
+              businessId={businessId}
+              client={client}
+              onDone={() => setPanel(null)}
+            />
+          )}
+          {panel === 'anonymize' && (
+            <Anonymize
+              businessId={businessId}
+              clientId={client._id}
+              onDone={() => setPanel(null)}
+            />
+          )}
+        </div>
+      </BottomSheet>
     </>
   )
 }

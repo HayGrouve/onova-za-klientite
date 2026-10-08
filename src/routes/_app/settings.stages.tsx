@@ -22,12 +22,7 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '#/components/ui/sheet'
+import { BottomSheet } from '#/components/bottom-sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { useViewer } from '#/hooks/use-viewer'
@@ -203,29 +198,22 @@ function StagesSettings() {
               </section>
             )
           })}
-          <Sheet
+          <BottomSheet
             open={panel !== null}
-            onOpenChange={(open) => !open && setPanel(null)}
+            onClose={() => setPanel(null)}
+            title={panel?.stage?.name ?? m.stages_add()}
           >
-            <SheetContent
-              side="bottom"
-              className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
-            >
-              <SheetHeader>
-                <SheetTitle>{panel?.stage?.name ?? m.stages_add()}</SheetTitle>
-              </SheetHeader>
-              <div className="px-4 pb-6">
-                {panel && (
-                  <StageForm
-                    stage={panel.stage}
-                    group={panel.group}
-                    stages={settings.stages}
-                    onDone={() => setPanel(null)}
-                  />
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+            <div className="px-4 pb-6">
+              {panel && (
+                <StageForm
+                  stage={panel.stage}
+                  group={panel.group}
+                  stages={settings.stages}
+                  onDone={() => setPanel(null)}
+                />
+              )}
+            </div>
+          </BottomSheet>
         </>
       )}
     </SettingsPage>
