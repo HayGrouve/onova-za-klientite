@@ -1,9 +1,11 @@
 import { RepeatIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
+import { ConfirmAction } from '#/components/confirm-action'
 import { useSubmit } from '#/components/money/use-submit'
 import { REPEAT_LABEL } from '#/components/setup/steps'
 import { Button, buttonVariants } from '#/components/ui/button'
@@ -45,6 +47,8 @@ export function RepeatSection({
   const setRepeat = useMutation(api.jobs.setRepeat)
   const stopRepeat = useMutation(api.jobs.stopRepeat)
   const { busy, run } = useSubmit()
+  // How often is asked only once someone means to repeat the job.
+  const [choosing, setChoosing] = useState(false)
   const active = job.repeat && job.repeat.stoppedAt === undefined
   const dated = { appointments, dueDate: job.dueDate }
 
@@ -61,23 +65,41 @@ export function RepeatSection({
               date={nextJobDate(dated, job.repeat)}
             />
           </div>
-          <Button
-            variant="outline"
-            className="h-11 rounded-xl"
-            disabled={busy}
-            onClick={() =>
-              void run(
-                () => stopRepeat({ businessId: business._id, jobId: job._id }),
-                m.repeat_stopped(),
-              )
-            }
-          >
-            {m.repeat_stop()}
-          </Button>
+          <div className="w-full">
+            <ConfirmAction
+              variant="outline"
+              label={m.repeat_stop()}
+              question={m.repeat_stop_question()}
+              busy={busy}
+              onConfirm={() => {
+                // Stopped, it shows the one "Repeat" line again, not the intervals.
+                setChoosing(false)
+                void run(
+                  () =>
+                    stopRepeat({ businessId: business._id, jobId: job._id }),
+                  m.repeat_stopped(),
+                )
+              }}
+            />
+          </div>
         </PanelBody>
       ) : !pickJobDate(dated) ? (
         <PanelBody className="text-sm text-muted-foreground">
           {m.repeat_needs_date()}
+        </PanelBody>
+      ) : !choosing ? (
+        <PanelBody className="flex items-center justify-between gap-3 py-2 pr-2">
+          <span className="text-sm text-muted-foreground">
+            {m.repeat_off()}
+          </span>
+          <Button
+            variant="ghost"
+            className="h-9 text-primary"
+            onClick={() => setChoosing(true)}
+          >
+            <RepeatIcon data-icon="inline-start" />
+            {m.repeat_start()}
+          </Button>
         </PanelBody>
       ) : (
         <PanelBody className="flex flex-col gap-3">
@@ -109,6 +131,13 @@ export function RepeatSection({
                 {REPEAT_LABEL[choice.key]()}
               </Button>
             ))}
+            <Button
+              variant="ghost"
+              className="h-11 rounded-xl"
+              onClick={() => setChoosing(false)}
+            >
+              {m.cancel()}
+            </Button>
           </div>
         </PanelBody>
       )}

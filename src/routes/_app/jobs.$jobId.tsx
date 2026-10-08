@@ -1,9 +1,8 @@
 import {
   CalendarBlankIcon,
-  CheckIcon,
   ClockCounterClockwiseIcon,
+  DotsThreeIcon,
   FlagIcon,
-  FlowArrowIcon,
   ListBulletsIcon,
   MapPinIcon,
   NoteIcon,
@@ -30,6 +29,7 @@ import { AddressLink } from '#/components/address-link'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { AppointmentForm } from '#/components/job/appointment-form'
+import { StagePicker } from '#/components/job/stage-picker'
 import { RepeatSection } from '#/components/job/repeat-section'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { RemindersPanel } from '#/components/reminders/reminders-panel'
@@ -48,11 +48,18 @@ import { Hint } from '#/components/hint'
 import { InitialsAvatar } from '#/components/initials-avatar'
 import { formatMoment } from '#/components/job-row'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { MoreSection } from '#/components/more-section'
 import { DetailError } from '#/components/not-found'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { DetailSheet, useDetailSheet } from '#/components/detail-sheet'
 import { usePageTitle } from '#/hooks/use-page-title'
@@ -70,13 +77,13 @@ import {
   jobProfitIsFinal,
   refundSources,
 } from '../../../shared/allocation'
+import { dateInSofia } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
 import { formatQuantity } from '../../../shared/quantity'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
 import { hasRole } from '../../../shared/roles'
 import { isJobLate } from '../../../shared/stages'
-import type { StageGroup } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/jobs/$jobId')({
   staticData: { layout: 'wide' },
@@ -95,16 +102,6 @@ type OpenSheet =
   | { kind: 'writeOff' }
   | { kind: 'cost'; cost?: Doc<'costs'> }
   | { kind: 'reminder' }
-
-// The current stage is the one filled chip; colour follows its group (D53).
-const CURRENT_STAGE: Record<StageGroup, string> = {
-  new: 'aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground',
-  in_progress:
-    'aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground',
-  done: 'aria-pressed:bg-green-600 aria-pressed:text-white aria-pressed:hover:bg-green-600 aria-pressed:hover:text-white',
-  cancelled:
-    'aria-pressed:bg-destructive aria-pressed:text-white aria-pressed:hover:bg-destructive aria-pressed:hover:text-white',
-}
 
 /** One fact about the job, with an icon in front. */
 function InfoRow({
@@ -151,6 +148,7 @@ function JobPage() {
   const afterRuleOffer = useRef<(() => void) | null>(null)
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const [usingCredit, setUsingCredit] = useState(false)
+  const [undoingWriteOff, setUndoingWriteOff] = useState(false)
   const { words, modules } = business
 
   // A toast's undo and payment buttons belong to this job's page.
@@ -166,6 +164,32 @@ function JobPage() {
   const late = isJobLate(job, today)
   // Workers see the stage; moving a job is for managers, as on the board.
   const canMove = hasRole(business.role, 'manager')
+  const nextVisit = modules.appointments
+    ? data.appointments.find(
+        (appointment) => dateInSofia(appointment.start) >= today,
+      )
+    : undefined
+  const canRefund = job.paidCents > 0
+  const canWriteOff = jobOwedCents(job) > 0 && job.paidCents < job.priceCents
+  // The folded parts, by name, with how many each holds.
+  const counted = (title: string, count: number) =>
+    count > 0 ? `${title}: ${count}` : title
+  const moreSummary = [
+    ...(modules.appointments
+      ? [counted(words.appointment.plural, data.appointments.length)]
+      : []),
+    counted(m.job_lines(), job.lines.length),
+    ...(modules.costs ? [counted(m.job_costs(), data.costs.length)] : []),
+    ...(modules.items && client && !client.isNoClient
+      ? [counted(words.item.plural, data.items.length)]
+      : []),
+    m.repeat_title(),
+    ...(modules.reminders && client && !client.isNoClient
+      ? [counted(m.reminder_list(), data.reminders.length)]
+      : []),
+    m.job_files(),
+    counted(m.job_history(), data.timeline.length),
+  ]
 
   const moveTo = async (stageId: Id<'stages'>) => {
     const target = data.stages.find((stage) => stage._id === stageId)
@@ -203,6 +227,13 @@ function JobPage() {
       toast.success(m.credit_used({ amount: formatMoney(used.value) }))
     }
     setUsingCredit(false)
+  }
+  const undoWriteOff = async () => {
+    setUndoingWriteOff(true)
+    await runChange(() =>
+      removeWriteOff({ businessId: business._id, jobId: job._id }),
+    )
+    setUndoingWriteOff(false)
   }
   const closeRuleOffer = () => {
     setRuleOffer(null)
@@ -244,14 +275,15 @@ function JobPage() {
         </div>
       </header>
 
-      {/* A wide screen puts the work and its money on the left, and the
-          dates, files and history on the right. */}
+      {/* The page opens on who, where and when, the stage and the money:
+          the few things done on every visit. Everything else is folded
+          under "More". A wide screen keeps the fold in the right rail. */}
       <Columns
         layout="main-side"
         slots={[
           {
             key: 'info',
-            node: (client || job.address || job.dueDate) && (
+            node: (client || job.address || job.dueDate || nextVisit) && (
               <div className="mx-4 flex animate-rise flex-col divide-y divide-border/70 overflow-hidden surface">
                 {client && (
                   <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4">
@@ -283,6 +315,35 @@ function JobPage() {
                     )}
                   </div>
                 )}
+                {/* The next visit stays in view while the list of them is folded. */}
+                {nextVisit && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      sheet.open({
+                        kind: 'appointment',
+                        appointment: nextVisit,
+                      })
+                    }
+                    className="flex min-h-11 w-full items-center gap-3 pressable px-4 py-2 text-left text-sm"
+                  >
+                    <CalendarBlankIcon
+                      aria-hidden
+                      className="size-5 shrink-0 opacity-80"
+                    />
+                    <span className="min-w-0 break-words">
+                      <span className="font-medium">
+                        {formatMoment(nextVisit.start, nextVisit.allDay, today)}
+                      </span>
+                      {nextVisit.label && (
+                        <span className="text-muted-foreground">
+                          {' '}
+                          · {nextVisit.label}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                )}
                 {job.address && (
                   <InfoRow icon={MapPinIcon} className="text-muted-foreground">
                     <AddressLink address={job.address} />
@@ -308,105 +369,19 @@ function JobPage() {
           {
             key: 'stage',
             node: (
-              <Panel
-                title={m.job_stage()}
-                icon={FlowArrowIcon}
-                hint={
-                  canMove && <Hint term={m.job_stage()}>{m.hint_stage()}</Hint>
-                }
+              <StagePicker
+                stages={data.stages}
+                currentId={job.stageId}
+                jobTitle={job.title}
+                onMove={(stageId) => void moveTo(stageId)}
+                readOnly={!canMove}
               >
-                <PanelBody>
-                  <ToggleGroup
-                    aria-label={m.job_stage()}
-                    disabled={!canMove}
-                    value={[job.stageId]}
-                    onValueChange={(next: string[]) => {
-                      // The current stage can't be switched off: only a move counts.
-                      if (next[0] && next[0] !== job.stageId)
-                        void moveTo(next[0] as Id<'stages'>)
-                    }}
-                    className="w-full flex-wrap"
-                  >
-                    {data.stages.map((stage) => {
-                      const current = stage._id === job.stageId
-                      if (!canMove && !current) return null
-                      return (
-                        <ToggleGroupItem
-                          key={stage._id}
-                          value={stage._id}
-                          className={cn(
-                            'h-9 max-w-full rounded-full px-3.5 whitespace-normal ring-offset-0 duration-200 active:scale-95 disabled:opacity-100',
-                            current
-                              ? cn('shadow-sm', CURRENT_STAGE[stage.group])
-                              : cn(
-                                  'bg-card ring-1 ring-border ring-inset hover:bg-muted',
-                                  stage.group === 'cancelled'
-                                    ? 'text-destructive'
-                                    : 'text-foreground/80',
-                                ),
-                          )}
-                        >
-                          {current && (
-                            <CheckIcon
-                              aria-hidden
-                              className="size-4"
-                              weight="bold"
-                            />
-                          )}
-                          {stage.name}
-                        </ToggleGroupItem>
-                      )
-                    })}
-                  </ToggleGroup>
-                  {job.cancelReason && job.stageGroup === 'cancelled' && (
-                    <p className="pt-3 text-sm break-words text-muted-foreground">
-                      {m.job_cancel_reason()}: {job.cancelReason}
-                    </p>
-                  )}
-                </PanelBody>
-              </Panel>
-            ),
-          },
-          {
-            key: 'appointments',
-            side: true,
-            node: modules.appointments && (
-              <Panel
-                title={words.appointment.plural}
-                icon={CalendarBlankIcon}
-                action={editButton(
-                  () => sheet.open({ kind: 'appointment' }),
-                  m.job_add_appointment(),
-                  PlusIcon,
+                {job.cancelReason && job.stageGroup === 'cancelled' && (
+                  <p className="text-sm break-words text-muted-foreground">
+                    {m.job_cancel_reason()}: {job.cancelReason}
+                  </p>
                 )}
-              >
-                <PanelList>
-                  {data.appointments.map((appointment) => (
-                    <li key={appointment._id}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          sheet.open({ kind: 'appointment', appointment })
-                        }
-                        className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-3 text-left"
-                      >
-                        <span className="font-medium">
-                          {formatMoment(
-                            appointment.start,
-                            appointment.allDay,
-                            today,
-                          )}
-                        </span>
-                        {appointment.label && (
-                          <span className="min-w-0 truncate text-sm text-muted-foreground">
-                            {appointment.label}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </PanelList>
-              </Panel>
+              </StagePicker>
             ),
           },
           {
@@ -419,28 +394,47 @@ function JobPage() {
                   <>
                     <Button
                       size="xl"
+                      className="flex-1"
                       onClick={() => sheet.open({ kind: 'payment' })}
                     >
                       <PlusIcon data-icon="inline-start" />
                       {m.pay_add()}
                     </Button>
-                    {job.paidCents > 0 && (
-                      <Button
-                        variant="outline"
-                        size="xl"
-                        onClick={() => sheet.open({ kind: 'refund' })}
-                      >
-                        {m.refund_add()}
-                      </Button>
-                    )}
-                    {job.owes && job.paidCents < job.priceCents && (
-                      <Button
-                        variant="ghost"
-                        size="xl"
-                        onClick={() => sheet.open({ kind: 'writeOff' })}
-                      >
-                        {m.writeoff_add()}
-                      </Button>
+                    {/* Refunds and write-offs are rare: one menu holds them. */}
+                    {(canRefund || canWriteOff) && (
+                      <DropdownMenu>
+                        <Tip label={m.money_more()}>
+                          <DropdownMenuTrigger
+                            aria-label={m.money_more()}
+                            className={buttonVariants({
+                              variant: 'outline',
+                              size: 'icon-xl',
+                              className: 'size-12 aria-expanded:bg-muted',
+                            })}
+                          >
+                            <DotsThreeIcon weight="bold" />
+                          </DropdownMenuTrigger>
+                        </Tip>
+                        <DropdownMenuContent align="end" className="w-56">
+                          {canRefund && (
+                            <DropdownMenuItem
+                              className="min-h-11"
+                              onClick={() => sheet.open({ kind: 'refund' })}
+                            >
+                              {m.refund_add()}
+                            </DropdownMenuItem>
+                          )}
+                          {canWriteOff && (
+                            <DropdownMenuItem
+                              className="min-h-11"
+                              variant="destructive"
+                              onClick={() => sheet.open({ kind: 'writeOff' })}
+                            >
+                              {m.writeoff_add()}
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </>
                 }
@@ -518,26 +512,26 @@ function JobPage() {
                   </div>
                 )}
                 {job.writeOff && (
-                  <div className="flex items-center justify-between gap-3 border-t border-border/70 py-1.5 pr-2 pl-4 text-sm text-muted-foreground">
-                    <span className="min-w-0 break-words">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border/70 py-1.5 pr-2 pl-4 text-sm text-muted-foreground">
+                    <span className="min-w-0 flex-1 basis-40 break-words">
                       {m.job_written_off()}:{' '}
                       {formatMoney(job.writeOff.amountCents)} ·{' '}
                       {job.writeOff.note}
                     </span>
-                    <Button
-                      variant="ghost"
-                      className="h-9 shrink-0"
-                      onClick={() =>
-                        void runChange(() =>
-                          removeWriteOff({
-                            businessId: business._id,
-                            jobId: job._id,
-                          }),
-                        )
-                      }
-                    >
-                      {m.writeoff_undo()}
-                    </Button>
+                    {/* The note goes with it, so it asks first. */}
+                    <div className="max-w-full py-1">
+                      <ConfirmAction
+                        label={m.writeoff_undo()}
+                        question={m.writeoff_undo_question({
+                          amount: formatMoney(job.writeOff.amountCents),
+                        })}
+                        confirmLabel={m.writeoff_undo()}
+                        variant="ghost"
+                        busy={undoingWriteOff}
+                        className="h-9"
+                        onConfirm={() => void undoWriteOff()}
+                      />
+                    </div>
                   </div>
                 )}
                 <PanelList>
@@ -580,124 +574,6 @@ function JobPage() {
             ),
           },
           {
-            key: 'lines',
-            node: (
-              <Panel
-                title={m.job_lines()}
-                icon={ListBulletsIcon}
-                action={editButton(
-                  () => sheet.open({ kind: 'lines' }),
-                  job.lines.length ? m.edit() : m.job_add_line(),
-                  job.lines.length ? PencilSimpleIcon : PlusIcon,
-                )}
-              >
-                {job.lines.length > 0 ? (
-                  <PanelList>
-                    {job.lines.map((line) => (
-                      <li
-                        key={line.id}
-                        className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm"
-                      >
-                        <span className="min-w-0 break-words">
-                          {line.description}
-                          <span className="text-muted-foreground">
-                            {' '}
-                            · {formatQuantity(line.quantity)} ×{' '}
-                            {formatMoney(line.unitPriceCents)}
-                          </span>
-                        </span>
-                        <span className="shrink-0 tabular-nums">
-                          {formatMoney(
-                            lineTotalCents(line.quantity, line.unitPriceCents),
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                  </PanelList>
-                ) : (
-                  job.typedPriceCents !== undefined && (
-                    <PanelBody className="py-3 text-sm text-muted-foreground">
-                      {m.job_typed_price()}: {formatMoney(job.typedPriceCents)}
-                    </PanelBody>
-                  )
-                )}
-              </Panel>
-            ),
-          },
-          {
-            key: 'costs',
-            node: modules.costs && (
-              <Panel
-                title={m.job_costs()}
-                icon={ReceiptIcon}
-                action={editButton(
-                  () => sheet.open({ kind: 'cost' }),
-                  m.cost_add(),
-                  PlusIcon,
-                )}
-              >
-                <PanelList>
-                  {data.costs.map((cost) => (
-                    <li key={cost._id}>
-                      <button
-                        type="button"
-                        onClick={() => sheet.open({ kind: 'cost', cost })}
-                        className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
-                      >
-                        <span className="min-w-0 break-words">
-                          {cost.label} ·{' '}
-                          <span className="text-muted-foreground">
-                            {formatDay(cost.date, today)}
-                          </span>
-                        </span>
-                        <span className="tabular-nums">
-                          {formatMoney(cost.amountCents)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </PanelList>
-              </Panel>
-            ),
-          },
-          {
-            key: 'items',
-            side: true,
-            node: modules.items && client && !client.isNoClient && (
-              <Panel
-                title={words.item.plural}
-                icon={StackIcon}
-                action={editButton(() => sheet.open({ kind: 'items' }))}
-              >
-                {data.items.length > 0 && (
-                  <PanelBody className="flex flex-wrap gap-2">
-                    {data.items.map((item) => (
-                      <Link
-                        key={item._id}
-                        to="/items/$itemId"
-                        params={{ itemId: item._id }}
-                        className={cn(
-                          buttonVariants({
-                            variant: 'outline',
-                            className:
-                              'h-auto min-h-11 flex-col items-start gap-0 rounded-xl py-1.5 whitespace-normal',
-                          }),
-                        )}
-                      >
-                        {item.name}
-                        <ListExtras
-                          target="item"
-                          values={item.listExtra}
-                          className="text-xs font-normal"
-                        />
-                      </Link>
-                    ))}
-                  </PanelBody>
-                )}
-              </Panel>
-            ),
-          },
-          {
             key: 'extra',
             node: (
               <ExtraFieldsView
@@ -718,45 +594,189 @@ function JobPage() {
             ),
           },
           {
-            key: 'repeat',
-            side: true,
-            node: <RepeatSection job={job} appointments={data.appointments} />,
-          },
-          {
-            key: 'reminders',
-            side: true,
-            node: modules.reminders && client && !client.isNoClient && (
-              <RemindersPanel
-                reminders={data.reminders}
-                on="job"
-                today={today}
-                onAdd={() => sheet.open({ kind: 'reminder' })}
-              />
-            ),
-          },
-          {
-            key: 'files',
+            key: 'more',
             side: true,
             node: (
-              <Panel title={m.job_files()} icon={PaperclipIcon}>
-                <PanelBody className="px-0">
-                  <FileGallery
-                    businessId={business._id}
-                    target={{ kind: 'job', jobId: job._id }}
+              <MoreSection page="job" summary={moreSummary}>
+                {modules.appointments && (
+                  <Panel
+                    title={words.appointment.plural}
+                    icon={CalendarBlankIcon}
+                    count={data.appointments.length || undefined}
+                    action={editButton(
+                      () => sheet.open({ kind: 'appointment' }),
+                      m.job_add_appointment(),
+                      PlusIcon,
+                    )}
+                  >
+                    <PanelList>
+                      {data.appointments.map((appointment) => (
+                        <li key={appointment._id}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              sheet.open({ kind: 'appointment', appointment })
+                            }
+                            className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-3 text-left"
+                          >
+                            <span className="font-medium">
+                              {formatMoment(
+                                appointment.start,
+                                appointment.allDay,
+                                today,
+                              )}
+                            </span>
+                            {appointment.label && (
+                              <span className="min-w-0 truncate text-sm text-muted-foreground">
+                                {appointment.label}
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </PanelList>
+                  </Panel>
+                )}
+                <Panel
+                  title={m.job_lines()}
+                  icon={ListBulletsIcon}
+                  action={editButton(
+                    () => sheet.open({ kind: 'lines' }),
+                    job.lines.length ? m.edit() : m.job_add_line(),
+                    job.lines.length ? PencilSimpleIcon : PlusIcon,
+                  )}
+                >
+                  {job.lines.length > 0 ? (
+                    <PanelList>
+                      {job.lines.map((line) => (
+                        <li
+                          key={line.id}
+                          className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm"
+                        >
+                          <span className="min-w-0 break-words">
+                            {line.description}
+                            <span className="text-muted-foreground">
+                              {' '}
+                              · {formatQuantity(line.quantity)} ×{' '}
+                              {formatMoney(line.unitPriceCents)}
+                            </span>
+                          </span>
+                          <span className="shrink-0 tabular-nums">
+                            {formatMoney(
+                              lineTotalCents(
+                                line.quantity,
+                                line.unitPriceCents,
+                              ),
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </PanelList>
+                  ) : (
+                    job.typedPriceCents !== undefined && (
+                      <PanelBody className="py-3 text-sm text-muted-foreground">
+                        {m.job_typed_price()}:{' '}
+                        {formatMoney(job.typedPriceCents)}
+                      </PanelBody>
+                    )
+                  )}
+                </Panel>
+
+                {modules.costs && (
+                  <Panel
+                    title={m.job_costs()}
+                    icon={ReceiptIcon}
+                    action={editButton(
+                      () => sheet.open({ kind: 'cost' }),
+                      m.cost_add(),
+                      PlusIcon,
+                    )}
+                  >
+                    <PanelList>
+                      {data.costs.map((cost) => (
+                        <li key={cost._id}>
+                          <button
+                            type="button"
+                            onClick={() => sheet.open({ kind: 'cost', cost })}
+                            className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
+                          >
+                            <span className="min-w-0 break-words">
+                              {cost.label} ·{' '}
+                              <span className="text-muted-foreground">
+                                {formatDay(cost.date, today)}
+                              </span>
+                            </span>
+                            <span className="tabular-nums">
+                              {formatMoney(cost.amountCents)}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </PanelList>
+                  </Panel>
+                )}
+                {modules.items && client && !client.isNoClient && (
+                  <Panel
+                    title={words.item.plural}
+                    icon={StackIcon}
+                    action={editButton(() => sheet.open({ kind: 'items' }))}
+                  >
+                    {data.items.length > 0 && (
+                      <PanelBody className="flex flex-wrap gap-2">
+                        {data.items.map((item) => (
+                          <Link
+                            key={item._id}
+                            to="/items/$itemId"
+                            params={{ itemId: item._id }}
+                            className={cn(
+                              buttonVariants({
+                                variant: 'outline',
+                                className:
+                                  'h-auto min-h-11 flex-col items-start gap-0 rounded-xl py-1.5 whitespace-normal',
+                              }),
+                            )}
+                          >
+                            {item.name}
+                            <ListExtras
+                              target="item"
+                              values={item.listExtra}
+                              className="text-xs font-normal"
+                            />
+                          </Link>
+                        ))}
+                      </PanelBody>
+                    )}
+                  </Panel>
+                )}
+                {<RepeatSection job={job} appointments={data.appointments} />}
+                {modules.reminders && client && !client.isNoClient && (
+                  <RemindersPanel
+                    reminders={data.reminders}
+                    on="job"
+                    today={today}
+                    onAdd={() => sheet.open({ kind: 'reminder' })}
                   />
-                </PanelBody>
-              </Panel>
-            ),
-          },
-          {
-            key: 'history',
-            side: true,
-            node: data.timeline.length > 0 && (
-              <Panel title={m.job_history()} icon={ClockCounterClockwiseIcon}>
-                <PanelBody className="px-0">
-                  <Timeline items={data.timeline} />
-                </PanelBody>
-              </Panel>
+                )}
+                <Panel title={m.job_files()} icon={PaperclipIcon}>
+                  <PanelBody className="px-0">
+                    <FileGallery
+                      businessId={business._id}
+                      target={{ kind: 'job', jobId: job._id }}
+                    />
+                  </PanelBody>
+                </Panel>
+
+                {data.timeline.length > 0 && (
+                  <Panel
+                    title={m.job_history()}
+                    icon={ClockCounterClockwiseIcon}
+                  >
+                    <PanelBody className="px-0">
+                      <Timeline items={data.timeline} />
+                    </PanelBody>
+                  </Panel>
+                )}
+              </MoreSection>
             ),
           },
         ]}

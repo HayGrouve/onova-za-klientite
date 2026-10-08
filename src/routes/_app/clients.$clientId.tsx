@@ -3,6 +3,7 @@ import {
   ChatCircleIcon,
   ClipboardTextIcon,
   ClockCounterClockwiseIcon,
+  DotsThreeIcon,
   EnvelopeSimpleIcon,
   MapPinIcon,
   NoteIcon,
@@ -36,12 +37,19 @@ import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { RefundForm } from '#/components/money/refund-form'
 import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
+import { MoreSection } from '#/components/more-section'
 import { DetailError } from '#/components/not-found'
 import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Timeline } from '#/components/timeline'
 import { Button, buttonVariants } from '#/components/ui/button'
 import { DetailSheet, useDetailSheet } from '#/components/detail-sheet'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
@@ -52,6 +60,9 @@ import { refundSources } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
+
+// The payments list opens on the latest few; the rest are one tap away.
+const PAYMENTS_SHOWN = 5
 
 export const Route = createFileRoute('/_app/clients/$clientId')({
   staticData: { layout: 'wide' },
@@ -75,11 +86,33 @@ function ClientPage() {
     kind: 'edit' | 'payment' | 'refund' | 'reminder'
   }>()
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
+  const [allPayments, setAllPayments] = useState(false)
   const { words } = business
 
   if (!data) return <ListSkeleton />
   const { client } = data
   const phone = client.phones.at(0)?.e164
+
+  // The folded parts, by name, with how many each holds.
+  const counted = (title: string, count: number) =>
+    count > 0 ? `${title}: ${count}` : title
+  const { modules } = business
+  const real = !client.isNoClient
+  const moreSummary = [
+    ...(modules.items && real
+      ? [counted(words.item.plural, data.items.length)]
+      : []),
+    ...(modules.reminders && real
+      ? [counted(m.reminder_list(), data.reminders.length)]
+      : []),
+    ...(real ? [m.job_files()] : []),
+    ...(data.timeline.length > 0
+      ? [counted(m.client_history(), data.timeline.length)]
+      : []),
+  ]
+  const shownPayments = allPayments
+    ? data.payments
+    : data.payments.slice(0, PAYMENTS_SHOWN)
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -127,8 +160,8 @@ function ClientPage() {
         )}
       </header>
 
-      {/* A wide screen puts who the client is on the left, and their work
-          and money on the right. */}
+      {/* A wide screen puts who the client is on the left, with the folded
+          rest under it, and their work and money on the right. */}
       <Columns
         layout="side-main"
         slots={[
@@ -295,20 +328,37 @@ function ClientPage() {
                   <>
                     <Button
                       size="xl"
+                      className="flex-1"
                       onClick={() => sheet.open({ kind: 'payment' })}
                     >
                       <PlusIcon data-icon="inline-start" />
                       {m.pay_add()}
                     </Button>
+                    {/* A refund is rare: it sits in a menu, as on the job. */}
                     {refundSources(client.creditCents, data.jobs).length >
                       0 && (
-                      <Button
-                        variant="outline"
-                        size="xl"
-                        onClick={() => sheet.open({ kind: 'refund' })}
-                      >
-                        {m.refund_add()}
-                      </Button>
+                      <DropdownMenu>
+                        <Tip label={m.money_more()}>
+                          <DropdownMenuTrigger
+                            aria-label={m.money_more()}
+                            className={buttonVariants({
+                              variant: 'outline',
+                              size: 'icon-xl',
+                              className: 'size-12 aria-expanded:bg-muted',
+                            })}
+                          >
+                            <DotsThreeIcon weight="bold" />
+                          </DropdownMenuTrigger>
+                        </Tip>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            className="min-h-11"
+                            onClick={() => sheet.open({ kind: 'refund' })}
+                          >
+                            {m.refund_add()}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </>
                 }
@@ -317,7 +367,7 @@ function ClientPage() {
                   {data.payments.length === 0 ? (
                     <ListNote>{m.client_no_payments()}</ListNote>
                   ) : (
-                    data.payments.map((payment) => {
+                    shownPayments.map((payment) => {
                       // The method is the title unless a label or a refund takes it.
                       const refund = payment.amountCents < 0
                       const titled =
@@ -348,91 +398,96 @@ function ClientPage() {
                     })
                   )}
                 </PanelList>
-              </Panel>
-            ),
-          },
-          {
-            key: 'items',
-            side: true,
-            node: business.modules.items && !client.isNoClient && (
-              <Panel
-                title={words.item.plural}
-                icon={StackIcon}
-                action={
-                  <Link
-                    to="/items/new"
-                    search={{ clientId: client._id }}
-                    className={buttonVariants({
-                      variant: 'ghost',
-                      className: 'h-9 text-primary',
-                    })}
+                {data.payments.length > PAYMENTS_SHOWN && (
+                  <Button
+                    variant="ghost"
+                    className="h-11 rounded-none border-t border-border/70 text-primary"
+                    onClick={() => setAllPayments(!allPayments)}
                   >
-                    <PlusIcon data-icon="inline-start" />
-                    {m.item_add()}
-                  </Link>
-                }
-              >
-                <PanelList>
-                  {data.items.map((item) => (
-                    <li key={item._id}>
-                      <Link
-                        to="/items/$itemId"
-                        params={{ itemId: item._id }}
-                        className="flex items-center justify-between gap-3 pressable px-4 py-3"
-                      >
-                        <span className="flex min-w-0 flex-col gap-0.5">
-                          <span className="font-medium break-words">
-                            {item.name}
-                          </span>
-                          <ListExtras target="item" values={item.extra} />
-                        </span>
-                        <CaretRightIcon
-                          aria-hidden
-                          className="size-4 shrink-0 text-muted-foreground/60"
-                        />
-                      </Link>
-                    </li>
-                  ))}
-                </PanelList>
+                    {allPayments
+                      ? m.payments_show_fewer()
+                      : m.payments_show_all({ count: data.payments.length })}
+                  </Button>
+                )}
               </Panel>
             ),
           },
           {
-            key: 'reminders',
+            key: 'more',
             side: true,
-            node: business.modules.reminders && !client.isNoClient && (
-              <RemindersPanel
-                reminders={data.reminders}
-                on="client"
-                today={today}
-                onAdd={() => sheet.open({ kind: 'reminder' })}
-              />
-            ),
-          },
-          {
-            key: 'files',
-            node: !client.isNoClient && (
-              <Panel title={m.job_files()} icon={PaperclipIcon}>
-                <PanelBody className="px-0">
-                  <FileGallery
-                    businessId={business._id}
-                    target={{ kind: 'client', clientId: client._id }}
+            node: moreSummary.length > 0 && (
+              <MoreSection page="client" summary={moreSummary}>
+                {modules.items && real && (
+                  <Panel
+                    title={words.item.plural}
+                    icon={StackIcon}
+                    action={
+                      <Link
+                        to="/items/new"
+                        search={{ clientId: client._id }}
+                        className={buttonVariants({
+                          variant: 'ghost',
+                          className: 'h-9 text-primary',
+                        })}
+                      >
+                        <PlusIcon data-icon="inline-start" />
+                        {m.item_add()}
+                      </Link>
+                    }
+                  >
+                    <PanelList>
+                      {data.items.map((item) => (
+                        <li key={item._id}>
+                          <Link
+                            to="/items/$itemId"
+                            params={{ itemId: item._id }}
+                            className="flex items-center justify-between gap-3 pressable px-4 py-3"
+                          >
+                            <span className="flex min-w-0 flex-col gap-0.5">
+                              <span className="font-medium break-words">
+                                {item.name}
+                              </span>
+                              <ListExtras target="item" values={item.extra} />
+                            </span>
+                            <CaretRightIcon
+                              aria-hidden
+                              className="size-4 shrink-0 text-muted-foreground/60"
+                            />
+                          </Link>
+                        </li>
+                      ))}
+                    </PanelList>
+                  </Panel>
+                )}
+                {modules.reminders && real && (
+                  <RemindersPanel
+                    reminders={data.reminders}
+                    on="client"
+                    today={today}
+                    onAdd={() => sheet.open({ kind: 'reminder' })}
                   />
-                </PanelBody>
-              </Panel>
-            ),
-          },
-          {
-            key: 'history',
-            node: data.timeline.length > 0 && (
-              <Panel
-                title={m.client_history()}
-                icon={ClockCounterClockwiseIcon}
-              >
-                <PanelBody className="px-0">
-                  <Timeline items={data.timeline} />
-                </PanelBody>
-              </Panel>
+                )}
+                {real && (
+                  <Panel title={m.job_files()} icon={PaperclipIcon}>
+                    <PanelBody className="px-0">
+                      <FileGallery
+                        businessId={business._id}
+                        target={{ kind: 'client', clientId: client._id }}
+                      />
+                    </PanelBody>
+                  </Panel>
+                )}
+                {data.timeline.length > 0 && (
+                  <Panel
+                    title={m.client_history()}
+                    icon={ClockCounterClockwiseIcon}
+                  >
+                    <PanelBody className="px-0">
+                      <Timeline items={data.timeline} />
+                    </PanelBody>
+                  </Panel>
+                )}
+              </MoreSection>
             ),
           },
         ]}

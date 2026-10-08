@@ -21,6 +21,15 @@ import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import { Tip } from '#/components/tip'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '#/components/ui/alert-dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -83,14 +92,19 @@ export function JobsBoard({
   const [ruleFor, setRuleFor] = useState<Card | null>(null)
   // The move's toast waits while the reminder rule's offer covers the board.
   const afterRuleOffer = useRef<(() => void) | null>(null)
+  // A move into Cancelled waits here for a yes. It stays set while the
+  // question closes, so the dialog keeps its words through the animation.
+  const [asking, setAsking] = useState<{ card: Card; target: Target } | null>(
+    null,
+  )
+  const [askOpen, setAskOpen] = useState(false)
 
   const stagesOf = (group: StageGroup) =>
     board?.stages.filter((stage) => stage.group === group) ?? []
-  const moveTo = (card: Card, target: Target) => {
-    if (target !== 'cancelled' && target._id === card.stageId) return
+  const moveNow = (card: Card, target: Target) => {
     const previous = board?.stages.find((stage) => stage._id === card.stageId)
     void move(card, target).then(({ moved, offerRule }) => {
-      if (!moved || target === 'cancelled') return
+      if (!moved) return
       const say = () => announce(card, target, previous)
       if (offerRule) {
         afterRuleOffer.current = say
@@ -104,6 +118,17 @@ export function JobsBoard({
     setRuleFor(null)
     afterRuleOffer.current?.()
     afterRuleOffer.current = null
+  }
+  const moveTo = (card: Card, target: Target) => {
+    if (target !== 'cancelled' && target._id === card.stageId) return
+    const toCancelled = target === 'cancelled' || target.group === 'cancelled'
+    // Cancelled jobs stop counting as owed, so ask before a job goes there.
+    if (toCancelled && card.stageGroup !== 'cancelled') {
+      setAsking({ card, target })
+      setAskOpen(true)
+      return
+    }
+    moveNow(card, target)
   }
   const { drag, press, wasDragged } = useCardDrag((card, key) => {
     const [kind, id] = key.split(':')
@@ -163,6 +188,34 @@ export function JobsBoard({
         </div>
       )}
       <RuleReminderSheet job={ruleFor} onClose={closeRuleOffer} />
+      <AlertDialog open={askOpen} onOpenChange={setAskOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {m.stage_cancel_question({
+                title: asking?.card.title ?? '',
+                stage:
+                  asking?.target === 'cancelled'
+                    ? GROUP_LABEL.cancelled()
+                    : (asking?.target.name ?? ''),
+              })}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {/* First in the page order, so focus lands on it, as in ConfirmAction. */}
+            <AlertDialogCancel>{m.back()}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (asking) moveNow(asking.card, asking.target)
+                setAskOpen(false)
+              }}
+            >
+              {m.stage_cancel_confirm()}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { useViewer } from '#/hooks/use-viewer'
+import { GROUP_LABEL } from '#/i18n/groups'
 import { runChange } from '#/lib/change'
 import { m } from '#/paraglide/messages.js'
 import { jobOwedCents, jobOwes } from '../../shared/allocation'
@@ -112,29 +113,34 @@ export function useMoveJob() {
    */
   const announce = (
     job: Moving & { balanceCents: number },
-    target: Stage,
+    target: Stage | 'cancelled',
     previous: Stage | undefined,
     onPay?: () => void,
   ) => {
+    const group = target === 'cancelled' ? 'cancelled' : target.group
     const undo = previous
       ? {
           label: m.undo(),
-          onClick: () =>
-            void move({ ...job, stageGroup: target.group }, previous),
+          onClick: () => void move({ ...job, stageGroup: group }, previous),
         }
       : undefined
     const offerPayment =
       onPay !== undefined &&
-      target.group === 'done' &&
+      group === 'done' &&
       job.stageGroup !== 'done' &&
       job.balanceCents > 0
-    toast.success(m.job_stage_moved({ stage: target.name }), {
-      id: STAGE_TOAST,
-      duration: offerPayment ? 10_000 : 6000,
-      ...(offerPayment
-        ? { action: { label: m.pay_add(), onClick: onPay }, cancel: undo }
-        : { action: undo }),
-    })
+    toast.success(
+      m.job_stage_moved({
+        stage: target === 'cancelled' ? GROUP_LABEL.cancelled() : target.name,
+      }),
+      {
+        id: STAGE_TOAST,
+        duration: offerPayment ? 10_000 : 6000,
+        ...(offerPayment
+          ? { action: { label: m.pay_add(), onClick: onPay }, cancel: undo }
+          : { action: undo }),
+      },
+    )
   }
 
   return { move, announce }

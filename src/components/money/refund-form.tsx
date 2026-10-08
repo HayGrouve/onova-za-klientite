@@ -5,8 +5,12 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { MethodPicker } from '#/components/money/method-picker'
 import type { PaymentMethod } from '#/components/money/method-picker'
 import { MoneyInput } from '#/components/money/money-input'
+import {
+  ReviewAmount,
+  ReviewSubmit,
+  useReview,
+} from '#/components/money/review-submit'
 import { useSubmit } from '#/components/money/use-submit'
-import { Button } from '#/components/ui/button'
 import {
   Field,
   FieldDescription,
@@ -16,7 +20,8 @@ import {
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
-import { Spinner } from '#/components/ui/spinner'
+import { formatDay } from '#/i18n/dates'
+import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, parseMoney } from '../../../shared/money'
 
@@ -59,6 +64,24 @@ export function RefundForm({
   const limit = formatMoney(source.limitCents)
   const title = source.title ?? ''
   const amountMissing = tried && (amountCents === null || amountCents <= 0)
+  // Any edit ends the review, so what is confirmed is what is recorded.
+  const review = useReview(
+    JSON.stringify([sourceIndex, amount, date, method, note]),
+  )
+  const record = () => {
+    if (amountCents === null) return
+    void run(() =>
+      refund({
+        businessId,
+        clientId,
+        jobId: source.jobId,
+        amountCents,
+        date,
+        method,
+        note: note || undefined,
+      }),
+    )
+  }
 
   return (
     <form
@@ -70,17 +93,7 @@ export function RefundForm({
           document.getElementById('refund-amount')?.focus()
           return
         }
-        void run(() =>
-          refund({
-            businessId,
-            clientId,
-            jobId: source.jobId,
-            amountCents,
-            date,
-            method,
-            note: note || undefined,
-          }),
-        )
+        review.start()
       }}
     >
       <FieldGroup>
@@ -173,10 +186,34 @@ export function RefundForm({
           </Field>
         </div>
       </FieldGroup>
-      <Button type="submit" size="xl" variant="destructive" disabled={busy}>
-        {busy && <Spinner data-icon="inline-start" />}
-        {m.refund_save()}
-      </Button>
+      <ReviewSubmit
+        review={review}
+        label={m.refund_save()}
+        tone="destructive"
+        busy={busy}
+        onConfirm={record}
+        summary={
+          <>
+            <p>
+              {m.review_refund()}{' '}
+              <ReviewAmount>{formatMoney(amountCents ?? 0)}</ReviewAmount>
+            </p>
+            <p className="text-muted-foreground">
+              {METHOD_LABEL[method]()} · {formatDay(date, today)}
+            </p>
+            <p>
+              {source.jobId
+                ? m.refund_split_from_job({
+                    amount: formatMoney(amountCents ?? 0),
+                    title,
+                  })
+                : m.refund_split_from_credit({
+                    amount: formatMoney(amountCents ?? 0),
+                  })}
+            </p>
+          </>
+        }
+      />
     </form>
   )
 }

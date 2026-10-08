@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { addBusiness, nav, runSetup } from './support/app'
+import { addBusiness, nav, openMore, runSetup } from './support/app'
 import { BUSINESSES } from './support/businesses'
 import type { Business } from './support/businesses'
 import { expect, test } from './support/fixtures'
@@ -123,7 +123,7 @@ async function addJobWithOneLine(page: Page, b: Business) {
   await expect(nav(page)).toBeVisible()
 }
 
-/** The job's page: the stage chips, the repeat line, the reminder offer. */
+/** The job's page: the stages, the repeat line, the reminder offer. */
 async function expectJobPage(page: Page, b: Business) {
   await nav(page).getByRole('link', { name: b.job.plural }).click()
   await expect(
@@ -134,13 +134,19 @@ async function expectJobPage(page: Page, b: Business) {
     page.getByRole('heading', { name: b.jobTitle, level: 1 }),
   ).toBeVisible()
 
+  // The page shows the stage and one step forward; every stage waits
+  // behind "Друг етап".
+  const stages = page.getByRole('button', { name: 'Друг етап' })
+  await stages.click()
   const chips = page.getByRole('group', { name: 'Етап' }).getByRole('button')
   await expect(chips).toHaveText(b.stages)
 
+  // Repeat is folded under "Още", which stays open once opened.
+  await openMore(page)
   if (b.repeat) {
     await expect(page.getByText(`Повтаря се: ${lower(b.repeat)}`)).toBeVisible()
   } else {
-    await expect(page.getByText('Не се повтаря')).toHaveCount(0)
+    await expect(page.getByText(/^Повтаря се/)).toHaveCount(0)
   }
 
   // Reaching the "done" stage offers the reminder rule's reminder (Q5).
@@ -152,11 +158,12 @@ async function expectJobPage(page: Page, b: Business) {
     await expect(offer).toBeVisible()
     await page.getByRole('button', { name: 'Не сега' }).click()
     await expect(offer).toBeHidden()
-    await expect(doneChip).toHaveAttribute('aria-pressed', 'true')
   } else {
-    await expect(doneChip).toHaveAttribute('aria-pressed', 'true')
     await expect(offer).toHaveCount(0)
   }
+  // A move folds the list again; opened, it marks the new stage.
+  await stages.click()
+  await expect(doneChip).toHaveAttribute('aria-pressed', 'true')
 }
 
 /** The client's page: the item section by its own word, with an item added. */
@@ -173,6 +180,8 @@ async function expectClientPage(page: Page, b: Business) {
     await expect(section('Обекти')).toHaveCount(0)
     return
   }
+  // The items sit under the "More" card.
+  await openMore(page)
   await expect(section(b.item.plural)).toBeVisible()
 
   await page
