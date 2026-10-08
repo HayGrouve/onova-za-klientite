@@ -12,6 +12,8 @@ import { ErrorView } from '#/components/error-view'
 import { ServiceWorkerRegister } from '#/components/service-worker-register'
 import { Toaster } from '#/components/ui/sonner'
 import { applyTimingFlag } from '#/lib/timing'
+import { IconContext } from '@phosphor-icons/react'
+import type { IconProps } from '@phosphor-icons/react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { m } from '#/paraglide/messages.js'
 import appCss from '../styles.css?url'
@@ -20,7 +22,11 @@ import appCss from '../styles.css?url'
 // before the first paint, so a dark screen never flashes white, and it
 // follows a change while the app is open.
 // The browser bar takes the brand blue in light and the page colour in dark.
-const THEME_SCRIPT = `(function(){var q=window.matchMedia('(prefers-color-scheme: dark)');function a(){var d=q.matches,e=document.documentElement,t=document.querySelectorAll('meta[name="theme-color"]');e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';t.forEach(function(m){m.setAttribute('content',d?'#18181b':'#2453a4')})}a();q.addEventListener('change',a)})()`
+const THEME_SCRIPT = `(function(){var q=window.matchMedia('(prefers-color-scheme: dark)');function a(){var d=q.matches,e=document.documentElement,t=document.querySelectorAll('meta[name="theme-color"]');e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';t.forEach(function(m){m.setAttribute('content',d?'#040405':'#2453a4')})}a();q.addEventListener('change',a)})()`
+
+// Icons are decoration: the text or aria-label next to them says what they
+// mean, so screen readers skip them. An icon can opt back in with its own prop.
+const ICONS: IconProps = { 'aria-hidden': true }
 
 // Only a cold start without signal needs it, so it stays out of the main bundle.
 const OfflineApp = lazy(() =>
@@ -104,7 +110,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <IconContext.Provider value={ICONS}>{children}</IconContext.Provider>
         {/* Above the phone's bottom nav, where the thumb is, and never over
             the header's search and business switcher (--toast-bottom). */}
         <Toaster

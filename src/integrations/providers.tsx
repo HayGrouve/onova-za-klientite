@@ -31,14 +31,14 @@ const CLERK_APPEARANCE = {
 export function AppProviders({ children }: { children: React.ReactNode }) {
   if (!convex) {
     return (
-      <CenteredMessage>
+      <CenteredMessage role="alert">
         {m.config_missing({ name: 'VITE_CONVEX_URL' })}
       </CenteredMessage>
     )
   }
   if (!clerkPublishableKey) {
     return (
-      <CenteredMessage>
+      <CenteredMessage role="alert">
         {m.config_missing({ name: 'VITE_CLERK_PUBLISHABLE_KEY' })}
       </CenteredMessage>
     )
