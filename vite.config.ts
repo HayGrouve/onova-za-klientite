@@ -31,8 +31,79 @@ const CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
 ].join('; ')
 
+/**
+ * The libraries the app always loads and rarely upgrades. They go in one
+ * `vendor` chunk of their own, so an app-code change leaves its hash alone and
+ * the service worker (ADR 0010) doesn't download them again. Everything loaded
+ * on demand (satori, the spreadsheet and CSV readers, the zip writer, the full
+ * phone metadata) is left out on purpose and stays in its own lazy chunk.
+ */
+const VENDOR_PACKAGES = [
+  'react',
+  'react-dom',
+  'scheduler',
+  '@clerk/',
+  'convex',
+  '@tanstack/',
+  'seroval',
+  'seroval-plugins',
+  'sonner',
+  'libphonenumber-js',
+  '@base-ui/',
+  '@floating-ui/',
+  'use-sync-external-store',
+  'dequal',
+]
+
+/**
+ * Start's own client packages import the app (its router and entry), so they
+ * stay with the app code; a vendor chunk that imports the app would change
+ * hash whenever the app does.
+ */
+const APP_FACING = [
+  '@tanstack/start-client-core',
+  '@tanstack/react-start',
+  '@clerk/tanstack-react-start',
+]
+
+function isVendor(id: string) {
+  const match =
+    /node_modules[\\/](?:\.pnpm[\\/][^\\/]+[\\/]node_modules[\\/])?(@[^\\/]+[\\/][^\\/]+|[^\\/]+)[\\/]/.exec(
+      id,
+    )
+  const name = match?.[1]?.replaceAll('\\', '/')
+  if (!name) return false
+  if (APP_FACING.some((pkg) => name.startsWith(pkg))) return false
+  // The full phone metadata is only for lazy chunks.
+  if (name === 'libphonenumber-js' && /metadata\.max|[\\/]max[\\/]/.test(id))
+    return false
+  return VENDOR_PACKAGES.some((pkg) =>
+    pkg.endsWith('/') ? name.startsWith(pkg) : name === pkg,
+  )
+}
+
 export default defineConfig({
   resolve: { tsconfigPaths: true },
+  environments: {
+    client: {
+      build: {
+        rolldownOptions: {
+          output: {
+            codeSplitting: {
+              groups: [
+                {
+                  name: 'vendor',
+                  test: isVendor,
+                  includeDependenciesRecursively: false,
+                  tags: ['$initial'],
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  },
   test: {
     exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**', '.worktrees/**'],
     // Convex function tests (`convex/*.test.ts`) run on convex-test.

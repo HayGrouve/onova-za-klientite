@@ -25,9 +25,9 @@ const column = (group: string, jobs: ReturnType<typeof job>[]) => ({
 })
 const board = (() => ({
   stages: [
-    { _id: 's1', name: 'Нова', group: 'new' },
-    { _id: 's3', name: 'Готово', group: 'done' },
-    { _id: 's4', name: 'Отказана', group: 'cancelled' },
+    { _id: 's1', name: 'New', group: 'new' },
+    { _id: 's3', name: 'Done', group: 'done' },
+    { _id: 's4', name: 'Cancelled', group: 'cancelled' },
   ],
   columns: [
     column('new', [job('a', 'new', 5000), job('b', 'new')]),

@@ -45,13 +45,13 @@ function Harness() {
   return <div data-offer={hook.ruleOffer?._id ?? ''} />
 }
 
-const fresh = { _id: 's1', name: 'Нова', group: 'new' } as never
-const doing = { _id: 's2', name: 'В работа', group: 'in_progress' } as never
-const done = { _id: 's3', name: 'Готово', group: 'done' } as never
+const fresh = { _id: 's1', name: 'New', group: 'new' } as never
+const doing = { _id: 's2', name: 'In progress', group: 'in_progress' } as never
+const done = { _id: 's3', name: 'Done', group: 'done' } as never
 const job = (stageGroup: 'new' | 'in_progress' | 'done') =>
   ({
     _id: 'job-1',
-    title: 'Диван',
+    title: 'Sofa',
     stageGroup,
     isNoClient: false,
     balanceCents: 0,
@@ -107,7 +107,7 @@ describe('useMoveJob', () => {
     await act(() => hook.moveAndAnnounce(job('in_progress'), done, doing))
     expect(hook.ruleOffer).toEqual({
       _id: 'job-1',
-      title: 'Диван',
+      title: 'Sofa',
       itemId: undefined,
     })
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
