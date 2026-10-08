@@ -6,6 +6,11 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { MethodPicker } from '#/components/money/method-picker'
 import type { PaymentMethod } from '#/components/money/method-picker'
 import { MoneyInput, moneyInputText } from '#/components/money/money-input'
+import {
+  ReviewAmount,
+  ReviewSubmit,
+  useReview,
+} from '#/components/money/review-submit'
 import { useSubmit } from '#/components/money/use-submit'
 import { Button } from '#/components/ui/button'
 import {
@@ -64,6 +69,23 @@ export function PaymentEditForm({
     !tooHigh &&
     date !== ''
   const several = payment.allocations.length > 1
+  // Only a new amount asks first; the date, method and label save directly.
+  const amountChanged = amountCents !== Math.abs(payment.amountCents)
+  const review = useReview(JSON.stringify([amount, date, method, text]))
+  const save = () => {
+    if (amountCents === null) return
+    void run(() =>
+      update({
+        businessId,
+        paymentId: payment._id,
+        amountCents,
+        date,
+        method,
+        label: refund ? payment.label : text || undefined,
+        note: refund ? text || undefined : payment.note,
+      }),
+    )
+  }
 
   return (
     <form
@@ -71,17 +93,8 @@ export function PaymentEditForm({
       onSubmit={(event) => {
         event.preventDefault()
         if (!valid) return
-        void run(() =>
-          update({
-            businessId,
-            paymentId: payment._id,
-            amountCents,
-            date,
-            method,
-            label: refund ? payment.label : text || undefined,
-            note: refund ? text || undefined : payment.note,
-          }),
-        )
+        if (amountChanged) review.start()
+        else save()
       }}
     >
       <FieldGroup>
@@ -146,20 +159,43 @@ export function PaymentEditForm({
           </Field>
         </div>
       </FieldGroup>
-      <div className="flex gap-2">
-        <Button
-          type="submit"
-          size="xl"
-          className="flex-1"
-          disabled={busy || !valid}
-        >
-          {busy && <Spinner data-icon="inline-start" />}
-          {m.save()}
-        </Button>
-        <Button type="button" size="xl" variant="outline" onClick={onCancel}>
-          {m.cancel()}
-        </Button>
-      </div>
+      {review.reviewing ? (
+        <ReviewSubmit
+          review={review}
+          label={m.save()}
+          tone={refund ? 'destructive' : 'default'}
+          busy={busy}
+          onConfirm={save}
+          summary={
+            <>
+              <p>
+                {m.review_edit_to()}{' '}
+                <ReviewAmount>{formatMoney(amountCents ?? 0)}</ReviewAmount>
+              </p>
+              <p className="text-muted-foreground">
+                {m.review_edit_was({
+                  amount: formatMoney(Math.abs(payment.amountCents)),
+                })}
+              </p>
+            </>
+          }
+        />
+      ) : (
+        <div className="flex gap-2">
+          <Button
+            type="submit"
+            size="xl"
+            className="flex-1"
+            disabled={busy || !valid}
+          >
+            {busy && <Spinner data-icon="inline-start" />}
+            {m.save()}
+          </Button>
+          <Button type="button" size="xl" variant="outline" onClick={onCancel}>
+            {m.cancel()}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }
