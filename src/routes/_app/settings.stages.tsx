@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { ConfirmAction } from '#/components/confirm-action'
 import { ListCard } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { useSubmit } from '#/components/money/use-submit'
@@ -290,6 +291,7 @@ function StageForm({
     ? canRemoveStage(stages, stage._id, stage.jobCount)
     : null
   const others = stages.filter((item) => item._id !== stage?._id)
+  const moveTarget = others.find((item) => item._id === moveTo)
 
   return (
     <div className="flex flex-col gap-6">
@@ -315,7 +317,7 @@ function StageForm({
             <Input
               id="stage-name"
               required
-              autoFocus={!stage}
+              name="stage-name"
               maxLength={40}
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -336,7 +338,7 @@ function StageForm({
               <FieldDescription>{m.stages_regroup_note()}</FieldDescription>
             )}
             {regroupBlocked && (
-              <p className="text-sm text-destructive">
+              <p role="alert" className="text-sm text-destructive">
                 {m.stages_last_in_group()}
               </p>
             )}
@@ -374,7 +376,7 @@ function StageForm({
                           type="button"
                           aria-pressed={moveTo === other._id}
                           onClick={() => setMoveTo(other._id)}
-                          className="rounded-full outline-none aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-offset-2"
+                          className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-offset-2"
                         >
                           <StageBadge
                             name={other.name}
@@ -387,22 +389,30 @@ function StageForm({
                   </Field>
                 </>
               )}
-              <Button
-                variant="destructive"
-                size="xl"
-                disabled={busy || (removal === 'hasJobs' && !moveTo)}
-                onClick={() =>
-                  void run(() =>
-                    remove({
-                      businessId: business._id,
-                      stageId: stage._id,
-                      moveJobsTo: moveTo ?? undefined,
-                    }),
-                  )
-                }
-              >
-                {m.stages_delete()}
-              </Button>
+              {removal === 'hasJobs' && !moveTo ? (
+                <Button type="button" variant="destructive" size="xl" disabled>
+                  {m.stages_delete()}
+                </Button>
+              ) : (
+                <ConfirmAction
+                  label={m.stages_delete()}
+                  question={
+                    removal === 'hasJobs' && moveTarget
+                      ? m.stages_delete_ask_move({ stage: moveTarget.name })
+                      : m.stages_delete_ask()
+                  }
+                  busy={busy}
+                  onConfirm={() =>
+                    void run(() =>
+                      remove({
+                        businessId: business._id,
+                        stageId: stage._id,
+                        moveJobsTo: moveTo ?? undefined,
+                      }),
+                    )
+                  }
+                />
+              )}
             </>
           )}
         </section>

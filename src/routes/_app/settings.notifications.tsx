@@ -199,7 +199,9 @@ function NotificationSwitches({ publicKey }: { publicKey: string }) {
   return (
     <div className="flex flex-col gap-5 px-4">
       {blocked ? (
-        <p className="text-sm text-destructive">{m.push_blocked()}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {m.push_blocked()}
+        </p>
       ) : (
         <Field orientation="horizontal">
           <FieldLabel htmlFor="push-device">{m.push_master()}</FieldLabel>

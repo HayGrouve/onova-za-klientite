@@ -172,26 +172,31 @@ export function PreviewStep({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 px-4">
-        <h2 className="text-xl font-semibold">{m.import_preview_title()}</h2>
+        <h2 className="text-xl font-semibold text-balance">
+          {m.import_preview_title()}
+        </h2>
         <p className="text-sm text-muted-foreground">
           {m.import_found({ clients: plural, count: rows.length })}
         </p>
-        {!statuses && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner />
-            {m.import_checking()}
-          </p>
-        )}
-        {statuses && (duplicates ?? 0) > 0 && (
-          <p className="text-sm text-muted-foreground">
-            {m.import_duplicates({ count: duplicates ?? 0 })}
-          </p>
-        )}
-        {statuses && (noName ?? 0) > 0 && (
-          <p className="text-sm text-muted-foreground">
-            {m.import_no_name({ count: noName ?? 0 })}
-          </p>
-        )}
+        {/* Always mounted, so the checking and its result are announced. */}
+        <div role="status" className="flex flex-col gap-1">
+          {!statuses && (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner aria-hidden />
+              {m.import_checking()}
+            </p>
+          )}
+          {statuses && (duplicates ?? 0) > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {m.import_duplicates({ count: duplicates ?? 0 })}
+            </p>
+          )}
+          {statuses && (noName ?? 0) > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {m.import_no_name({ count: noName ?? 0 })}
+            </p>
+          )}
+        </div>
       </div>
       <div className="lg:px-4">
         <PreviewTable rows={shown} skipDuplicates={skipDuplicates} />

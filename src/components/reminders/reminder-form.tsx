@@ -48,6 +48,7 @@ export function ReminderForm({
           <DatePicks today={today} value={date} onPick={setDate} />
           <Input
             id="reminder-date"
+            name="reminder-date"
             type="date"
             required
             value={date}
@@ -58,6 +59,7 @@ export function ReminderForm({
           <FieldLabel htmlFor="reminder-note">{m.reminder_note()}</FieldLabel>
           <Input
             id="reminder-note"
+            name="reminder-note"
             required
             maxLength={300}
             value={note}

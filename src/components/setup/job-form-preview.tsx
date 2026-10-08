@@ -99,7 +99,11 @@ export function JobFormPreview({
   const row = { highlight, pulse, onEdit }
   const { words } = settings
   return (
-    <div className="flex flex-col gap-3" aria-label={m.preview_label()}>
+    <div
+      className="flex flex-col gap-3"
+      role="group"
+      aria-label={m.preview_label()}
+    >
       <Row step="jobWord" label={settings.name} {...row}>
         <span className="text-xl font-semibold tracking-tight">
           {m.preview_add({ job: lower(words.job.singular) })}
@@ -131,9 +135,9 @@ export function JobFormPreview({
                 <FakeInput />
                 {settings.services.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {settings.services.slice(0, 4).map((service) => (
+                    {settings.services.slice(0, 4).map((service, index) => (
                       <Badge
-                        key={service.name}
+                        key={`${index}-${service.name}`}
                         variant="outline"
                         className="h-7 px-2.5 text-sm font-normal"
                       >
@@ -181,7 +185,10 @@ export function JobFormPreview({
                 <div className="flex items-center gap-2 text-sm">
                   <RepeatIcon className="size-4" />
                   <span className="flex-1">{label}</span>
-                  <Switch checked aria-label={m.preview_repeat()} />
+                  {/* A picture of the switch: nothing here to focus or flip. */}
+                  <span inert>
+                    <Switch checked aria-label={m.preview_repeat()} />
+                  </span>
                 </div>
               </Row>
             )
@@ -195,7 +202,7 @@ export function JobFormPreview({
             .filter((stage) => stage.group !== 'cancelled')
             .map((stage, index) => (
               <Badge
-                key={stage.name}
+                key={`${index}-${stage.name}`}
                 variant={index === 0 ? 'default' : 'outline'}
                 className="h-7 px-2.5 text-sm font-normal"
               >

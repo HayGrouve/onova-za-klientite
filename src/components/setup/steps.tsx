@@ -95,6 +95,7 @@ function NameStep({ answers, update }: StepProps) {
         <FieldLabel htmlFor="business-name">{m.setup_name_label()}</FieldLabel>
         <Input
           id="business-name"
+          name="business-name"
           value={answers.businessName ?? ''}
           autoComplete="organization"
           maxLength={120}
@@ -142,7 +143,7 @@ function JobWordStep({ answers, update }: StepProps) {
             </FieldLabel>
             <Input
               id="job-singular"
-              autoFocus
+              name="job-singular"
               maxLength={40}
               value={word.singular}
               onChange={(event) =>
@@ -160,6 +161,7 @@ function JobWordStep({ answers, update }: StepProps) {
             <FieldLabel htmlFor="job-plural">{m.setup_own_plural()}</FieldLabel>
             <Input
               id="job-plural"
+              name="job-plural"
               maxLength={40}
               value={word.plural}
               onChange={(event) =>
@@ -292,7 +294,7 @@ function ItemStep({ answers, update }: StepProps) {
                 </FieldLabel>
                 <Input
                   id="item-singular"
-                  autoFocus
+                  name="item-singular"
                   maxLength={40}
                   value={item.word.singular}
                   onChange={(event) =>
@@ -315,6 +317,7 @@ function ItemStep({ answers, update }: StepProps) {
                 </FieldLabel>
                 <Input
                   id="item-plural"
+                  name="item-plural"
                   maxLength={40}
                   value={item.word.plural}
                   onChange={(event) =>
@@ -478,6 +481,7 @@ function ServicesStep({ answers, update }: StepProps) {
           <div key={index} className="contents">
             <Input
               aria-labelledby="svc-name"
+              name={`service-name-${index}`}
               maxLength={60}
               value={row.name}
               onChange={(event) => setRow(index, { name: event.target.value })}
@@ -485,6 +489,8 @@ function ServicesStep({ answers, update }: StepProps) {
             <InputGroup>
               <InputGroupInput
                 aria-labelledby="svc-price"
+                autoComplete="off"
+                name={`service-price-${index}`}
                 inputMode="decimal"
                 maxLength={12}
                 value={row.price}

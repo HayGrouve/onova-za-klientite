@@ -4,6 +4,14 @@ import { m } from '#/paraglide/messages.js'
 
 const OPEN_KEY = 'settings-preview-open'
 
+function readOpen() {
+  try {
+    return localStorage.getItem(OPEN_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
+
 /**
  * What a Settings section changes, drawn live from the values on screen, as
  * setup's Job form is. A wide screen keeps it beside the controls. A phone
@@ -20,14 +28,14 @@ export function SettingsPreview({
   scrollTo?: { selector: string; key: unknown }
   children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(
-    () =>
-      typeof localStorage === 'undefined' ||
-      localStorage.getItem(OPEN_KEY) !== 'false',
-  )
+  const [open, setOpen] = useState(() => readOpen())
   const body = useRef<HTMLDivElement>(null)
   const toggle = () => {
-    localStorage.setItem(OPEN_KEY, String(!open))
+    try {
+      localStorage.setItem(OPEN_KEY, String(!open))
+    } catch {
+      // Storage can be off (private mode): the strip just forgets next time.
+    }
     setOpen(!open)
   }
 
@@ -48,7 +56,7 @@ export function SettingsPreview({
           type="button"
           aria-expanded={open}
           onClick={toggle}
-          className="-mr-2 min-h-8 rounded-lg px-2 text-sm font-medium text-primary outline-none focus-visible:ring-3 focus-visible:ring-ring/50 xl:hidden"
+          className="-mr-2 min-h-8 rounded-lg px-2 text-sm font-medium text-primary outline-none hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/50 xl:hidden"
         >
           {open ? m.settings_preview_hide() : m.settings_preview_show()}
         </button>

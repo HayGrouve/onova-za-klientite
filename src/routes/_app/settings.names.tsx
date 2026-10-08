@@ -21,6 +21,7 @@ import { Panel, PanelBody } from '#/components/panel'
 import { Field, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
+import { usePageGuard } from '#/hooks/use-discard-guard'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 import { guessPlural, isValidWord } from '../../../shared/words'
@@ -97,6 +98,13 @@ function NamesForm({
   const { busy, run } = useSubmit()
   const [words, setDraft] = useState<Words>(initial)
   const valid = KEYS.every(({ key }) => isValidWord(words[key]))
+  const guard = usePageGuard(
+    KEYS.some(
+      ({ key }) =>
+        words[key].singular.trim() !== initial[key].singular.trim() ||
+        words[key].plural.trim() !== initial[key].plural.trim(),
+    ),
+  )
   const change = (key: keyof Words, patch: Partial<Words[keyof Words]>) =>
     setDraft({ ...words, [key]: { ...words[key], ...patch } })
 
@@ -111,6 +119,7 @@ function NamesForm({
         </SettingsPreview>
       }
     >
+      {guard.prompt}
       <form
         className="flex flex-col gap-4 px-4"
         onSubmit={(event) => {
@@ -135,6 +144,7 @@ function NamesForm({
                     </FieldLabel>
                     <Input
                       id={`${key}-singular`}
+                      name={`${key}-singular`}
                       maxLength={40}
                       value={words[key].singular}
                       onChange={(event) => {
@@ -156,6 +166,7 @@ function NamesForm({
                     </FieldLabel>
                     <Input
                       id={`${key}-plural`}
+                      name={`${key}-plural`}
                       maxLength={40}
                       value={words[key].plural}
                       onChange={(event) =>
