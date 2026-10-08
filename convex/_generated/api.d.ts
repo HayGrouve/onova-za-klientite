@@ -34,6 +34,7 @@ import type * as lib_ledger from "../lib/ledger.js";
 import type * as lib_listFields from "../lib/listFields.js";
 import type * as lib_moveJob from "../lib/moveJob.js";
 import type * as lib_pushText from "../lib/pushText.js";
+import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_recompute from "../lib/recompute.js";
 import type * as lib_repeat from "../lib/repeat.js";
 import type * as lib_scope from "../lib/scope.js";
@@ -94,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   "lib/listFields": typeof lib_listFields;
   "lib/moveJob": typeof lib_moveJob;
   "lib/pushText": typeof lib_pushText;
+  "lib/rateLimit": typeof lib_rateLimit;
   "lib/recompute": typeof lib_recompute;
   "lib/repeat": typeof lib_repeat;
   "lib/scope": typeof lib_scope;
@@ -150,4 +152,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   pushPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"pushPool">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
 };

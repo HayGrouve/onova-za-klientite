@@ -9,6 +9,7 @@ import {
 } from './lib/auth'
 import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
+import { spend } from './lib/rateLimit'
 import { optionalText, requiredText } from './lib/validate'
 import { vModules, vWords } from './validators'
 
@@ -180,6 +181,7 @@ export const createAnother = userMutation({
   args: {},
   returns: v.id('businesses'),
   handler: async (ctx) => {
+    await spend(ctx, 'createBusiness', ctx.user._id)
     const businessId = await createBusiness(ctx, ctx.user._id)
     await ctx.db.patch('users', ctx.user._id, { activeBusinessId: businessId })
     return businessId

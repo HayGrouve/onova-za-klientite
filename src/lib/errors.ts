@@ -23,6 +23,8 @@ const MESSAGES: Record<ErrorCode, () => string> = {
   'client.merged': m.error_client_merged,
   'stage.lastInGroup': m.error_stage_lastInGroup,
   'file.rejected': m.files_rejected,
+  'rate.limited': m.error_rate_limited,
+  'storage.full': m.error_storage_full,
   'field.typeChange': m.error_field_typeChange,
   'field.value': m.error_field_value,
   'client.noClient': m.error_client_noClient,

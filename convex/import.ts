@@ -5,6 +5,7 @@ import type { QueryCtx } from './_generated/server'
 import { createClient, normalizePhones } from './lib/clientWrite'
 import { businessMutation, businessQuery, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
+import { spend } from './lib/rateLimit'
 import { vExtra } from './validators'
 
 const MAX_LOOKUP = 500
@@ -41,6 +42,7 @@ export const clients = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     if (args.rows.length > IMPORT_BATCH) fail('invalid', { field: 'rows' })
+    await spend(ctx, 'importBatch', ctx.business._id)
     let created = 0
     let skipped = 0
     for (const row of args.rows) {
