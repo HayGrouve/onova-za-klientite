@@ -22,6 +22,7 @@ export function Stopwatch({
   const time = formatDuration((stoppedAt ?? now) - startedAt)
   return (
     <span
+      role="timer"
       className="fixed top-[calc(0.5rem+env(safe-area-inset-top))] right-3 z-50 flex items-center gap-1 rounded-full bg-foreground/85 px-2.5 py-1 text-xs font-medium text-background tabular-nums"
       aria-label={m.timing_stopwatch({ time })}
     >

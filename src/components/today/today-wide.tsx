@@ -208,7 +208,9 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
               value={money ? formatMoney(money.receivedCents) : '…'}
               detail={
                 money && modules.costs
-                  ? `${m.money_profit()}: ${formatMoney(money.profitCents)}`
+                  ? m.money_profit_value({
+                      amount: formatMoney(money.profitCents),
+                    })
                   : undefined
               }
             />

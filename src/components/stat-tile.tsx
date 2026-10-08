@@ -40,7 +40,7 @@ export function StatTile({
     <Link
       to={to}
       hash={hash}
-      className="group flex animate-rise items-start gap-3 surface p-3 transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 xl:p-4"
+      className="group flex min-w-0 animate-rise items-start gap-3 surface p-3 transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 xl:p-4"
     >
       <span
         aria-hidden
@@ -55,7 +55,7 @@ export function StatTile({
         <span className="truncate text-sm text-muted-foreground">{label}</span>
         <span
           className={cn(
-            'text-xl leading-tight font-semibold tracking-tight xl:text-2xl',
+            'text-xl leading-tight font-semibold tracking-tight break-words tabular-nums xl:text-2xl',
             TONE[tone].value,
           )}
         >
