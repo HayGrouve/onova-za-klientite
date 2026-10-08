@@ -386,8 +386,6 @@ function JobPage() {
             key: 'stage',
             node: (
               <StagePicker
-                // A question asked about the old stage ends when it changes.
-                key={job.stageId}
                 stages={data.stages}
                 currentId={job.stageId}
                 jobTitle={job.title}

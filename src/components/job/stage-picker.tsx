@@ -66,13 +66,19 @@ export function StagePicker({
   children?: React.ReactNode
 }) {
   const [choosing, setChoosing] = useState(false)
-  const [asking, setAsking] = useState<StageRef | null>(null)
+  // The question holds the stage the job was in when it was asked: once the
+  // job moves anyway (an undo, another device), it no longer applies.
+  const [question, setQuestion] = useState<{
+    stage: StageRef
+    from: Id<'stages'>
+  } | null>(null)
+  const asking = question?.from === currentId ? question.stage : null
   const current = stages.find((stage) => stage._id === currentId)
   const next = nextStage(stages, currentId)
 
   const pick = (stage: StageRef) => {
     if (stage.group === 'cancelled') {
-      setAsking(stage)
+      setQuestion({ stage, from: currentId })
       return
     }
     setChoosing(false)
@@ -86,7 +92,7 @@ export function StagePicker({
       aria-expanded={choosing}
       onClick={() => {
         setChoosing(!choosing)
-        setAsking(null)
+        setQuestion(null)
       }}
     >
       {choosing ? m.stage_other_hide() : m.stage_other()}
@@ -185,11 +191,11 @@ export function StagePicker({
             confirmLabel={m.stage_cancel_confirm()}
             cancelLabel={m.back()}
             onConfirm={() => {
-              setAsking(null)
+              setQuestion(null)
               setChoosing(false)
               onMove(asking._id)
             }}
-            onCancel={() => setAsking(null)}
+            onCancel={() => setQuestion(null)}
           />
         )}
         {children}
