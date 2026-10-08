@@ -197,9 +197,9 @@ describe('anonymize leaves no name behind (M1)', () => {
     // Events that are not about the person keep their values.
     const payment = after.find((event) => event.type === 'payment.added')
     expect(payment?.data.amountCents).toBe(40000)
-    expect(after.find((event) => event.type === 'client.created')?.data).toEqual(
-      { name: ANONYMOUS_CLIENT_NAME },
-    )
+    expect(
+      after.find((event) => event.type === 'client.created')?.data,
+    ).toEqual({ name: ANONYMOUS_CLIENT_NAME })
   })
 
   it('blanks the clients that were merged into it, and their phones and events', async () => {

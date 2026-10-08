@@ -160,10 +160,11 @@ async function withMergedClients(
 ) {
   const found = [client]
   const seen = new Set<Id<'clients'>>([client._id])
-  for (let at = 0; at < found.length; at += 1) {
+  // `found` grows while it is walked: each client brings the ones merged into it.
+  for (const current of found) {
     const merged = await ctx.db
       .query('clients')
-      .withIndex('by_merged_into', (q) => q.eq('mergedIntoId', found[at]._id))
+      .withIndex('by_merged_into', (q) => q.eq('mergedIntoId', current._id))
       .collect()
     for (const row of merged) {
       if (seen.has(row._id) || row.businessId !== ctx.business._id) continue

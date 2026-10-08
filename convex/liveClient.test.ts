@@ -180,4 +180,3 @@ describe('a write to a merged or anonymized client is refused', () => {
     })
   })
 })
-
