@@ -180,6 +180,8 @@ async function expectClientPage(page: Page, b: Business) {
     await expect(section('Обекти')).toHaveCount(0)
     return
   }
+  // The items sit under the "More" card.
+  await openMore(page)
   await expect(section(b.item.plural)).toBeVisible()
 
   await page
