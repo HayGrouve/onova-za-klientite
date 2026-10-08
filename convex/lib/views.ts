@@ -3,6 +3,7 @@ import type { Doc, Id } from '../_generated/dataModel'
 import type { QueryCtx } from '../_generated/server'
 import { vExtra, vStageColor, vStageGroup } from '../validators'
 import { listExtra, listFieldIds } from './listFields'
+import { isOpenGroup } from '../../shared/stages'
 
 /** A job as lists show it: enough for a row, nothing more. */
 export const vJobRow = v.object({
@@ -63,8 +64,7 @@ export async function jobRow(
   const client = await cached(ctx, lookups.clients, 'clients', job.clientId)
   const stage = await cached(ctx, lookups.stages, 'stages', job.stageId)
   // A finished or cancelled job has nothing coming up, whatever is left on it.
-  const closed = job.stageGroup === 'done' || job.stageGroup === 'cancelled'
-  const appointments = closed
+  const appointments = !isOpenGroup(job.stageGroup)
     ? []
     : await ctx.db
         .query('appointments')

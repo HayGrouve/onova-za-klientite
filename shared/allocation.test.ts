@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   checkAllocations,
   jobBalanceCents,
+  jobOwedCents,
   jobOwes,
   jobPriceCents,
   jobProfitCents,
@@ -55,6 +56,12 @@ describe('jobBalanceCents and jobOwes', () => {
     expect(jobOwes(1, 'cancelled')).toBe(false)
     expect(jobOwes(0, 'done')).toBe(false)
     expect(jobOwes(-5, 'done')).toBe(false)
+  })
+
+  it('owes its balance only when it owes', () => {
+    expect(jobOwedCents({ owes: true, balanceCents: 4200 })).toBe(4200)
+    expect(jobOwedCents({ owes: false, balanceCents: 4200 })).toBe(0)
+    expect(jobOwedCents({ owes: false, balanceCents: -300 })).toBe(0)
   })
 
   it('keeps price = paid + balance + write-off', () => {

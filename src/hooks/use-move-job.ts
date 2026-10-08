@@ -4,8 +4,10 @@ import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { useViewer } from '#/hooks/use-viewer'
 import { errorMessage } from '#/lib/errors'
+import { jobOwedCents } from '../../shared/allocation'
 import { boardColumn } from '../../shared/board'
 import { offersRuleReminder } from '../../shared/reminder-rule'
+import { enterGroup } from '../../shared/stages'
 import type { StageGroup } from '../../shared/stages'
 
 type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
@@ -28,19 +30,17 @@ export function useMoveJob() {
         .flatMap((column) => column.jobs)
         .find((job) => job._id === jobId)
       if (!board || !stage || !moving) return
+      // The same rule the server applies: Cancelled never owes, Done
+      // records when it was reached.
+      const { owes, doneAt } = enterGroup(moving, stage.group, Date.now())
       const moved = {
         ...moving,
         stageId: stage._id,
         stageName: stage.name,
         stageGroup: stage.group,
-        // Cancelled never owes; Done records when it was reached.
-        owes: stage.group === 'cancelled' ? false : moving.owes,
-        doneAt:
-          stage.group === 'done' && moving.stageGroup !== 'done'
-            ? Date.now()
-            : moving.doneAt,
+        owes,
+        doneAt,
       }
-      const owed = (job: typeof moving) => (job.owes ? job.balanceCents : 0)
       store.setQuery(
         api.jobs.board,
         { businessId },
@@ -57,8 +57,8 @@ export function useMoveJob() {
               total: column.total - (left ? 1 : 0) + (arrives ? 1 : 0),
               owedCents:
                 column.owedCents -
-                (left ? owed(moving) : 0) +
-                (arrives ? owed(moved) : 0),
+                (left ? jobOwedCents(moving) : 0) +
+                (arrives ? jobOwedCents(moved) : 0),
             }
           }),
         },

@@ -1,7 +1,11 @@
 import { v } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
-import { checkAllocations, splitPayment } from '../shared/allocation'
+import {
+  checkAllocations,
+  jobOwedCents,
+  splitPayment,
+} from '../shared/allocation'
 import {
   paymentAmountRange,
   paymentPrepaidCents,
@@ -106,10 +110,7 @@ export const addFromJob = businessMutation({
       ...args,
       amountCents,
     })
-    const toJob = Math.min(
-      amountCents,
-      Math.max(job.owes ? job.balanceCents : 0, 0),
-    )
+    const toJob = Math.min(amountCents, Math.max(jobOwedCents(job), 0))
     if (toJob > 0) {
       await allocate(ctx, paymentId, job.clientId, [
         { jobId: job._id, amountCents: toJob },
@@ -267,10 +268,7 @@ export const useCredit = businessMutation({
     requireRole(ctx.member, 'manager')
     const job = await getOwned(ctx, 'jobs', args.jobId)
     const client = await getOwned(ctx, 'clients', job.clientId)
-    const available = Math.min(
-      client.creditCents,
-      job.owes ? job.balanceCents : 0,
-    )
+    const available = Math.min(client.creditCents, jobOwedCents(job))
     const wanted =
       args.amountCents === undefined
         ? available
@@ -372,7 +370,7 @@ async function loadEditState(ctx: QueryCtx, payment: Doc<'payments'>) {
       jobId: job._id,
       allocatedCents: onJob.get(job._id) ?? 0,
       paidCents: job.paidCents,
-      roomCents: job.owes ? job.balanceCents : 0,
+      roomCents: jobOwedCents(job),
     })),
     clientCreditCents: client?.creditCents ?? 0,
   }

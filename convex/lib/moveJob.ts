@@ -1,3 +1,4 @@
+import { enterGroup } from '../../shared/stages'
 import type { Doc } from '../_generated/dataModel'
 import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
@@ -14,19 +15,14 @@ export async function moveJobToStage(
   const from = await ctx.db.get('stages', job.stageId)
   const now = Date.now()
   await ctx.db.patch('jobs', job._id, {
+    ...enterGroup(
+      job,
+      stage.group,
+      now,
+      optionalText(cancelReason, 'cancelReason', 500),
+    ),
     stageId: stage._id,
-    stageGroup: stage.group,
     stageChangedAt: now,
-    doneAt:
-      stage.group === 'done'
-        ? job.stageGroup === 'done'
-          ? job.doneAt
-          : now
-        : undefined,
-    cancelReason:
-      stage.group === 'cancelled'
-        ? (optionalText(cancelReason, 'cancelReason', 500) ?? job.cancelReason)
-        : undefined,
   })
   await recomputeJob(ctx, job._id)
   await logActivity(ctx, {

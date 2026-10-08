@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
 import { BOARD_CLOSED_LIMIT, boardColumn } from '../shared/board'
-import { STAGE_GROUPS, stagesFor } from '../shared/stages'
+import { STAGE_GROUPS, isOpenGroup, stagesFor } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import {
   businessMutation,
@@ -290,7 +290,7 @@ export const board = businessQuery({
         )
         .take(LIST_LIMIT)
       let column = boardColumn(group, jobs)
-      if (group === 'done' || group === 'cancelled') {
+      if (!isOpenGroup(group)) {
         // A long history outgrows one read, so the latest closed jobs come
         // from their own index, and what Done still owes from the owes index.
         const latest = await ctx.db

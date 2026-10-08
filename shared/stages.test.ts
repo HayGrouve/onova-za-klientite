@@ -5,8 +5,11 @@ import {
   canRegroupStage,
   canRemoveStage,
   defaultStage,
+  enterGroup,
   firstStageOf,
   groupedOrder,
+  isJobLate,
+  isOpenGroup,
   stagesFor,
 } from './stages'
 import type { StageGroup } from './stages'
@@ -148,6 +151,102 @@ describe('groupedOrder', () => {
             ),
           )
           expect(rank).toEqual([...rank].sort((a, b) => a - b))
+        },
+      ),
+    )
+  })
+})
+
+describe('isOpenGroup', () => {
+  it('is New and In progress; Done and Cancelled are closed', () => {
+    expect(STAGE_GROUPS.filter(isOpenGroup)).toEqual(['new', 'in_progress'])
+  })
+})
+
+describe('isJobLate', () => {
+  it('is a New or In progress job past its due date', () => {
+    expect(
+      isJobLate({ stageGroup: 'new', dueDate: '2026-10-05' }, '2026-10-08'),
+    ).toBe(true)
+    expect(
+      isJobLate(
+        { stageGroup: 'in_progress', dueDate: '2026-10-07' },
+        '2026-10-08',
+      ),
+    ).toBe(true)
+  })
+
+  it('is not late on the due date, or with no due date', () => {
+    expect(
+      isJobLate({ stageGroup: 'new', dueDate: '2026-10-08' }, '2026-10-08'),
+    ).toBe(false)
+    expect(isJobLate({ stageGroup: 'new' }, '2026-10-08')).toBe(false)
+  })
+
+  it('is never late once Done or Cancelled', () => {
+    expect(
+      isJobLate({ stageGroup: 'done', dueDate: '2026-10-01' }, '2026-10-08'),
+    ).toBe(false)
+    expect(
+      isJobLate(
+        { stageGroup: 'cancelled', dueDate: '2026-10-01' },
+        '2026-10-08',
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('enterGroup', () => {
+  const job = {
+    stageGroup: 'in_progress' as StageGroup,
+    balanceCents: 5000,
+    doneAt: undefined as number | undefined,
+    cancelReason: undefined as string | undefined,
+  }
+
+  it('owes its balance outside Cancelled, and never in Cancelled', () => {
+    expect(enterGroup(job, 'done', 1).owes).toBe(true)
+    expect(enterGroup(job, 'new', 1).owes).toBe(true)
+    expect(enterGroup(job, 'cancelled', 1).owes).toBe(false)
+    expect(
+      enterGroup({ ...job, stageGroup: 'cancelled' }, 'done', 1).owes,
+    ).toBe(true)
+    expect(enterGroup({ ...job, balanceCents: 0 }, 'done', 1).owes).toBe(false)
+  })
+
+  it('records when Done was reached, and keeps it on a move within Done', () => {
+    expect(enterGroup(job, 'done', 7).doneAt).toBe(7)
+    expect(
+      enterGroup({ ...job, stageGroup: 'done', doneAt: 3 }, 'done', 7).doneAt,
+    ).toBe(3)
+    expect(
+      enterGroup({ ...job, stageGroup: 'done', doneAt: 3 }, 'new', 7).doneAt,
+    ).toBeUndefined()
+  })
+
+  it('keeps a cancel reason only in Cancelled, a new one winning', () => {
+    const cancelled = { ...job, cancelReason: 'Отказа' }
+    expect(enterGroup(cancelled, 'cancelled', 1).cancelReason).toBe('Отказа')
+    expect(enterGroup(cancelled, 'cancelled', 1, 'Друго').cancelReason).toBe(
+      'Друго',
+    )
+    expect(enterGroup(cancelled, 'new', 1).cancelReason).toBeUndefined()
+  })
+
+  it('always lands in the group it was given', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...STAGE_GROUPS),
+        fc.constantFrom(...STAGE_GROUPS),
+        fc.integer({ min: -10000, max: 10000 }),
+        (from, to, balanceCents) => {
+          const entered = enterGroup(
+            { ...job, stageGroup: from, balanceCents },
+            to,
+            1,
+          )
+          expect(entered.stageGroup).toBe(to)
+          expect(entered.owes).toBe(balanceCents > 0 && to !== 'cancelled')
         },
       ),
     )

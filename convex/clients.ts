@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
+import { owedCents } from '../shared/board'
 import { logActivity } from './lib/activity'
 import {
   businessMutation,
@@ -202,9 +203,7 @@ export const get = businessQuery({
       client,
       mergedIntoName: mergedInto?.name,
       jobs: jobRows,
-      owedCents: jobRows
-        .filter((job) => job.owes)
-        .reduce((sum, job) => sum + job.balanceCents, 0),
+      owedCents: owedCents(jobRows),
       items: items.map(({ _id, name, extra }) => ({ _id, name, extra })),
       payments: payments
         .sort(

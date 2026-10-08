@@ -17,7 +17,8 @@ import {
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
-import { isOverdue } from '../../../shared/dates'
+import { jobOwedCents } from '../../../shared/allocation'
+import { isJobLate } from '../../../shared/stages'
 import { formatMoney, sumCents } from '../../../shared/money'
 import { sortRows } from '../../../shared/sort'
 import type { Sort } from '../../../shared/sort'
@@ -45,10 +46,8 @@ const SORT: Record<JobSortKey, (a: JobRowData, b: JobRowData) => number> = {
     (b.nextAppointment?.start ?? Infinity),
   price: (a, b) => a.priceCents - b.priceCents,
   paid: (a, b) => a.paidCents - b.paidCents,
-  balance: (a, b) => owed(a) - owed(b),
+  balance: (a, b) => jobOwedCents(a) - jobOwedCents(b),
 }
-
-const owed = (job: JobRowData) => (job.owes ? job.balanceCents : 0)
 
 // Narrow screens drop what the books need least, so the money stays in view:
 // the client moves under the title, and the next appointment goes (xl).
@@ -109,9 +108,7 @@ export function JobsTable({
         </TableHeader>
         <TableBody>
           {rows.map((job) => {
-            const late =
-              (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
-              isOverdue(job.dueDate, today)
+            const late = isJobLate(job, today)
             const client = job.isNoClient ? m.no_client() : job.clientName
             return (
               <TableRow
@@ -168,12 +165,12 @@ export function JobsTable({
                   className={cn(
                     CELL,
                     'text-right tabular-nums',
-                    owed(job) > 0
+                    jobOwedCents(job) > 0
                       ? 'font-medium text-primary'
                       : 'text-muted-foreground',
                   )}
                 >
-                  {owed(job) > 0 ? formatMoney(owed(job)) : '–'}
+                  {jobOwedCents(job) > 0 ? formatMoney(jobOwedCents(job)) : '–'}
                 </TableCell>
                 <TableCell className={CELL}>
                   <StageBadge name={job.stageName} group={job.stageGroup} />
@@ -229,7 +226,7 @@ export function JobsTable({
                 'text-right font-semibold text-primary tabular-nums',
               )}
             >
-              {formatMoney(sumCents(rows.map(owed)))}
+              {formatMoney(sumCents(rows.map(jobOwedCents)))}
             </TableCell>
             <TableCell colSpan={2} />
             <TableCell className={WIDE_ONLY} />

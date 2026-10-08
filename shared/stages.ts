@@ -1,7 +1,54 @@
+import { jobOwes } from './allocation'
+import { isOverdue } from './dates'
+
 /** The four fixed buckets every stage belongs to. Lists and money read these, never stage names. */
 export const STAGE_GROUPS = ['new', 'in_progress', 'done', 'cancelled'] as const
 
 export type StageGroup = (typeof STAGE_GROUPS)[number]
+
+/** New and In progress are open work; Done and Cancelled are closed. */
+export function isOpenGroup(group: StageGroup): boolean {
+  return group === 'new' || group === 'in_progress'
+}
+
+/** Overdue means late and still open: a Done or Cancelled job is never late. */
+export function isJobLate(
+  job: { stageGroup: StageGroup; dueDate?: string },
+  today: string,
+): boolean {
+  return isOpenGroup(job.stageGroup) && isOverdue(job.dueDate, today)
+}
+
+/**
+ * What changes on a job when it enters a stage of `group`: whether it owes,
+ * when it reached Done (kept on a move within Done), and its cancel reason
+ * (kept only in Cancelled, a new one winning). The one rule for a stage
+ * change, a cancel, a regrouped stage and the board's instant move.
+ */
+export function enterGroup(
+  job: {
+    stageGroup: StageGroup
+    balanceCents: number
+    doneAt?: number
+    cancelReason?: string
+  },
+  group: StageGroup,
+  now: number,
+  cancelReason?: string,
+) {
+  return {
+    stageGroup: group,
+    owes: jobOwes(job.balanceCents, group),
+    doneAt:
+      group === 'done'
+        ? job.stageGroup === 'done'
+          ? (job.doneAt ?? now)
+          : now
+        : undefined,
+    cancelReason:
+      group === 'cancelled' ? (cancelReason ?? job.cancelReason) : undefined,
+  }
+}
 
 export const STAGE_COLORS = [
   'gray',

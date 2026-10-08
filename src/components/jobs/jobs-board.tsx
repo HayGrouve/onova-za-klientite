@@ -35,11 +35,11 @@ import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { GROUP_LABEL } from '#/i18n/groups'
 import { m } from '#/paraglide/messages.js'
-import { isOverdue } from '../../../shared/dates'
+import { jobOwedCents } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
 import { filterJobs, isFiltering, owedCents } from '../../../shared/board'
 import type { JobFilter } from '../../../shared/board'
-import { STAGE_GROUPS } from '../../../shared/stages'
+import { STAGE_GROUPS, isJobLate } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
 
 type Board = FunctionReturnType<typeof api.jobs.board>
@@ -495,9 +495,7 @@ function BoardCard({
   wasDragged: () => boolean
   onMove: (target: Target) => void
 }) {
-  const late =
-    (card.stageGroup === 'new' || card.stageGroup === 'in_progress') &&
-    isOverdue(card.dueDate, today)
+  const late = isJobLate(card, today)
   return (
     <li
       onPointerDown={canMove ? onPress : undefined}
@@ -531,9 +529,7 @@ function BoardCard({
  * (as on the phone's rows), the client, when, and what is still owed.
  */
 function CardFace({ card, today }: { card: Card; today: string }) {
-  const late =
-    (card.stageGroup === 'new' || card.stageGroup === 'in_progress') &&
-    isOverdue(card.dueDate, today)
+  const late = isJobLate(card, today)
   const timing: { icon: Icon; text: string } | null =
     late && card.dueDate
       ? {
@@ -555,7 +551,7 @@ function CardFace({ card, today }: { card: Card; today: string }) {
               text: m.due_short({ date: formatDay(card.dueDate, today) }),
             }
           : null
-  const owes = card.owes && card.balanceCents > 0
+  const owes = jobOwedCents(card) > 0
 
   return (
     <span className="flex flex-col gap-1.5 p-3">

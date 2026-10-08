@@ -69,12 +69,17 @@ import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
-import { jobProfitCents, jobProfitIsFinal } from '../../../shared/allocation'
-import { addMonths, isOverdue } from '../../../shared/dates'
+import {
+  jobOwedCents,
+  jobProfitCents,
+  jobProfitIsFinal,
+} from '../../../shared/allocation'
+import { addMonths } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
 import { formatQuantity } from '../../../shared/quantity'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
+import { isJobLate } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/jobs/$jobId')({
@@ -172,9 +177,7 @@ function JobPage() {
   const profitLabel = jobProfitIsFinal(job.stageGroup)
     ? m.job_profit()
     : m.job_profit_so_far()
-  const late =
-    (job.stageGroup === 'new' || job.stageGroup === 'in_progress') &&
-    isOverdue(job.dueDate, today)
+  const late = isJobLate(job, today)
 
   // Tells the person which stage the job is in now, with a way back. Reaching
   // Done with a balance also offers the payment.
@@ -487,9 +490,7 @@ function JobPage() {
                     label={m.job_balance()}
                     cents={job.balanceCents}
                     hint={m.hint_balance()}
-                    emphasis={
-                      job.owes && job.balanceCents > 0 ? 'primary' : undefined
-                    }
+                    emphasis={jobOwedCents(job) > 0 ? 'primary' : undefined}
                   />
                 </div>
                 {modules.costs && (
@@ -868,7 +869,7 @@ function JobPage() {
                 target={{
                   kind: 'job',
                   jobId: job._id,
-                  balanceCents: job.owes ? job.balanceCents : 0,
+                  balanceCents: jobOwedCents(job),
                 }}
                 today={today}
                 depositsOn={business.depositsOnNewJob}

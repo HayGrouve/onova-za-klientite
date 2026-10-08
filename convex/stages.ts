@@ -1,7 +1,11 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
-import { jobOwes } from '../shared/allocation'
-import { canRegroupStage, canRemoveStage, groupedOrder } from '../shared/stages'
+import {
+  canRegroupStage,
+  canRemoveStage,
+  enterGroup,
+  groupedOrder,
+} from '../shared/stages'
 import { logActivity } from './lib/activity'
 import { businessMutation, getOwned, requireRole } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
@@ -79,13 +83,7 @@ export const update = businessMutation({
       patch.group = args.group
       const now = Date.now()
       for (const job of await jobsIn(ctx, stage)) {
-        await ctx.db.patch('jobs', job._id, {
-          stageGroup: args.group,
-          owes: jobOwes(job.balanceCents, args.group),
-          doneAt: args.group === 'done' ? (job.doneAt ?? now) : undefined,
-          cancelReason:
-            args.group === 'cancelled' ? job.cancelReason : undefined,
-        })
+        await ctx.db.patch('jobs', job._id, enterGroup(job, args.group, now))
       }
     }
     await ctx.db.patch('stages', stage._id, patch)

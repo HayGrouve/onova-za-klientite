@@ -24,7 +24,8 @@ import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
-import { isJobLate } from '../../../shared/today'
+import { jobOwedCents } from '../../../shared/allocation'
+import { isJobLate } from '../../../shared/stages'
 
 type TodayData = FunctionReturnType<typeof api.today.list>
 type AppointmentRow = TodayData['appointments'][number]
@@ -314,7 +315,7 @@ function AgendaRow({ item, today }: { item: AppointmentRow; today: string }) {
   const { job } = item
   if (!job) return null
   const late = isJobLate(job, today)
-  const owes = job.owes && job.balanceCents > 0
+  const owes = jobOwedCents(job) > 0
   return (
     <li>
       <Link

@@ -1,8 +1,7 @@
 import { lineTotalCents, sumCents } from './money'
+import type { StageGroup } from './stages'
 
 export type Line = { quantity: number; unitPriceCents: number }
-
-type JobGroup = 'new' | 'in_progress' | 'done' | 'cancelled'
 
 export function jobPriceCents(lines: Line[], typedPriceCents?: number): number {
   if (lines.length === 0) return typedPriceCents ?? 0
@@ -32,12 +31,21 @@ export function jobProfitCents(a: {
  * still be paid or cost more, so its profit is only "so far"; a done job's
  * profit is settled, and a cancelled one has nothing more coming either.
  */
-export function jobProfitIsFinal(group: JobGroup): boolean {
+export function jobProfitIsFinal(group: StageGroup): boolean {
   return group === 'done' || group === 'cancelled'
 }
 
-export function jobOwes(balanceCents: number, group: JobGroup): boolean {
+/** A job owes a positive balance, unless it is cancelled. */
+export function jobOwes(balanceCents: number, group: StageGroup): boolean {
   return balanceCents > 0 && group !== 'cancelled'
+}
+
+/** What a job still owes: its balance when it owes, else nothing. */
+export function jobOwedCents(job: {
+  owes: boolean
+  balanceCents: number
+}): number {
+  return job.owes ? job.balanceCents : 0
 }
 
 /** Fills the open jobs in the given order (oldest first). The rest is credit. */
