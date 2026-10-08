@@ -33,7 +33,11 @@ export function RemindersPanel({
       title={m.reminder_list()}
       icon={BellIcon}
       action={
-        <Button variant="ghost" className="h-9 text-primary" onClick={onAdd}>
+        <Button
+          variant="ghost"
+          className="h-11 text-primary lg:h-9"
+          onClick={onAdd}
+        >
           <PlusIcon data-icon="inline-start" />
           {m.reminder_add()}
         </Button>

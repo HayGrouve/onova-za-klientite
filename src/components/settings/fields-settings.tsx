@@ -111,9 +111,11 @@ export function FieldsSettings({
     <SettingsPage
       title={m.fields_settings_title()}
       help={m.fields_settings_help()}
+      previewScrolls
       preview={
         active && (
           <SettingsPreview
+            fit
             title={m.fields_preview_title({
               name: lower(business.words[target].singular),
             })}
@@ -135,12 +137,12 @@ export function FieldsSettings({
             setShowArchived(false)
           }}
         >
-          <TabsList className="h-11 w-full">
+          <TabsList className="w-full group-data-horizontal/tabs:h-11">
             {visibleTargets.map((item) => (
               <TabsTrigger
                 key={item}
                 value={item}
-                className="min-w-0 px-2 text-base"
+                className="min-w-0 px-2 text-base before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
               >
                 <span className="min-w-0 truncate">
                   {business.words[item].plural}

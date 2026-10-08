@@ -20,12 +20,15 @@ function readOpen() {
 export function SettingsPreview({
   title,
   scrollTo,
+  fit = false,
   children,
 }: {
   /** The line above the card, when the default one fits poorly. */
   title?: string
   /** A part to bring into view in the phone's short strip, and when. */
   scrollTo?: { selector: string; key: unknown }
+  /** Shows the whole card on a phone too, with no strip that scrolls inside. */
+  fit?: boolean
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(() => readOpen())
@@ -48,7 +51,7 @@ export function SettingsPreview({
 
   return (
     <aside aria-label={m.settings_preview_label()} className="flex flex-col">
-      <div className="mb-2 flex min-h-8 items-center justify-between gap-2">
+      <div className="mb-2 flex min-h-11 items-center justify-between gap-2 xl:min-h-8">
         <p className="text-sm text-muted-foreground">
           {title ?? m.settings_preview_title()}
         </p>
@@ -56,7 +59,7 @@ export function SettingsPreview({
           type="button"
           aria-expanded={open}
           onClick={toggle}
-          className="-mr-2 min-h-8 rounded-lg px-2 text-sm font-medium text-primary outline-none hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/50 xl:hidden"
+          className="-mr-2 min-h-11 rounded-lg px-2 text-sm font-medium text-primary outline-none hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/50 xl:hidden"
         >
           {open ? m.settings_preview_hide() : m.settings_preview_show()}
         </button>
@@ -66,8 +69,9 @@ export function SettingsPreview({
         data-preview-body
         className={cn(
           'rounded-2xl border bg-card p-4 shadow-sm shadow-zinc-900/5',
-          // The phone's strip stays short and scrolls inside.
-          'max-xl:max-h-[32dvh] max-xl:overflow-y-auto max-xl:overscroll-contain',
+          // The phone's strip stays short and scrolls inside, unless it fits.
+          !fit &&
+            'max-xl:max-h-[32dvh] max-xl:overflow-y-auto max-xl:overscroll-contain',
           !open && 'max-xl:hidden',
         )}
       >

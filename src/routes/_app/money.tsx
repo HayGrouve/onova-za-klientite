@@ -15,6 +15,7 @@ import {
   ReceiptIcon,
   TrendDownIcon,
   TrendUpIcon,
+  WalletIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -30,7 +31,7 @@ import { ClientPaymentSheet } from '#/components/money/client-payment-sheet'
 import { PaymentSheet } from '#/components/money/payment-sheet'
 import { CostForm } from '#/components/money/cost-form'
 import { MoneyFigure } from '#/components/money/money-figure'
-import { PageTitle } from '#/components/page'
+import { EmptyState, PageTitle } from '#/components/page'
 import { Panel, PanelList } from '#/components/panel'
 import { Tip } from '#/components/tip'
 import { Button, buttonVariants } from '#/components/ui/button'
@@ -101,6 +102,16 @@ function MoneyPage() {
   } | null>(null)
   const data = useQuery(api.money.summary, { businessId: business._id, month })
   const costsOn = business.modules.costs
+  // Nothing in the month and nothing owed or held: one calm note, not zeros.
+  const quiet =
+    data !== undefined &&
+    data.receivedCents === 0 &&
+    data.costCents === 0 &&
+    data.stillOwedCents === 0 &&
+    data.creditHeldCents === 0 &&
+    data.whoOwesMe.length === 0 &&
+    data.payments.length === 0 &&
+    data.costs.length === 0
   const shift = (months: number) =>
     setMonth(monthOf(addMonths(`${month}-01`, months)))
 
@@ -110,10 +121,16 @@ function MoneyPage() {
       {/* A wide screen: the month beside the balances, then who owes me
           beside the month's payments and costs. The phone keeps one column in
           the same order. */}
-      <div className="flex flex-col gap-4 pb-6 lg:grid lg:grid-cols-2 lg:items-start">
-        <div className="contents lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-stretch">
-          {/* The month and what happened in it. */}
-          <section className="mx-4 flex flex-col overflow-hidden surface">
+      <div className="flex flex-col gap-4 pb-6 lg:grid lg:grid-cols-2 lg:items-start lg:px-4">
+        <div className="contents lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-4">
+          {/* The month and what happened in it. The cards keep the phone's
+              side margin only below lg, where the grid's gap takes over. */}
+          <section
+            className={cn(
+              'mx-4 flex flex-col overflow-hidden surface lg:mx-0',
+              quiet && 'lg:col-span-2',
+            )}
+          >
             <div className="flex items-center justify-between gap-2 p-1">
               <Tip label={m.money_prev_month()}>
                 <Button
@@ -146,11 +163,11 @@ function MoneyPage() {
                 <Skeleton className="h-4 w-1/3 rounded-full" />
                 <Skeleton className="h-7 w-1/2 rounded-full" />
               </div>
-            ) : (
+            ) : quiet ? null : (
               <>
                 <div
                   className={cn(
-                    'grid divide-x divide-border/70 border-t border-border/70',
+                    'grid divide-x divide-border/70 border-t border-border/70 lg:flex-1 lg:*:justify-center',
                     costsOn ? 'grid-cols-2' : 'grid-cols-1',
                   )}
                 >
@@ -189,10 +206,11 @@ function MoneyPage() {
               </>
             )}
           </section>
-          {data && (
+          {data && !quiet && (
             <>
-              {/* Balances as of today, whatever the month. */}
-              <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface lg:grid-cols-1 lg:grid-rows-2 lg:divide-x-0 lg:divide-y">
+              {/* Balances as of today, whatever the month. Each figure sits in
+                  the middle of its half when the card is taller than both. */}
+              <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface lg:mx-0 lg:grid-cols-1 lg:grid-rows-2 lg:divide-x-0 lg:divide-y lg:*:justify-center">
                 <MoneyFigure
                   label={m.money_still_owed()}
                   cents={data.stillOwedCents}
@@ -213,12 +231,33 @@ function MoneyPage() {
 
         {!data ? (
           <ListSkeleton />
+        ) : quiet ? (
+          <div className="lg:col-span-2">
+            <EmptyState
+              icon={WalletIcon}
+              title={m.money_empty_title()}
+              body={m.money_empty_body()}
+              action={
+                costsOn && (
+                  <Button
+                    variant="outline"
+                    size="xl"
+                    onClick={() => setCostPanel({})}
+                  >
+                    <PlusIcon data-icon="inline-start" />
+                    {m.cost_add()}
+                  </Button>
+                )
+              }
+            />
+          </div>
         ) : (
           <>
             <div className="contents lg:flex lg:flex-col lg:gap-4">
               <Panel
                 title={m.money_who_owes()}
                 icon={HandCoinsIcon}
+                className="lg:mx-0"
                 count={data.whoOwesMe.length || undefined}
               >
                 <PanelList>
@@ -232,12 +271,12 @@ function MoneyPage() {
                       return (
                         <li
                           key={row.clientId}
-                          className="flex flex-col pb-3 row-lazy"
+                          className="flex flex-col pb-3 row-lazy xl:flex-row xl:items-center xl:pb-0"
                         >
                           <Link
                             to="/clients/$clientId"
                             params={{ clientId: row.clientId }}
-                            className="flex items-center gap-3 pressable px-4 pt-3 pb-2"
+                            className="flex items-center gap-3 pressable px-4 pt-3 pb-2 xl:min-w-0 xl:flex-1 xl:py-3"
                           >
                             <InitialsAvatar
                               name={name}
@@ -274,8 +313,8 @@ function MoneyPage() {
                               {formatMoney(row.owedCents)}
                             </span>
                           </Link>
-                          {/* Under the name, so the row stays readable on a phone. */}
-                          <div className="flex items-center gap-2 pr-4 pl-16">
+                          {/* Under the name on a phone, so the row stays readable; at the right from xl, where the column is wide enough. */}
+                          <div className="flex items-center gap-2 pr-4 pl-16 xl:pl-0">
                             {row.phone && (
                               <Tip label={m.client_call()}>
                                 <a
@@ -284,7 +323,8 @@ function MoneyPage() {
                                   className={buttonVariants({
                                     variant: 'outline',
                                     size: 'icon-lg',
-                                    className: 'size-10 text-primary',
+                                    className:
+                                      'size-11 text-primary xl:size-10',
                                   })}
                                 >
                                   <PhoneIcon weight="fill" />
@@ -293,7 +333,7 @@ function MoneyPage() {
                             )}
                             <Button
                               variant="outline"
-                              className="h-10 px-3"
+                              className="h-11 px-3 xl:h-10"
                               aria-label={m.money_pay({ name })}
                               onClick={() =>
                                 setPayClient({ _id: row.clientId, name })
@@ -311,7 +351,11 @@ function MoneyPage() {
               </Panel>
             </div>
             <div className="contents lg:flex lg:flex-col lg:gap-4">
-              <Panel title={m.money_payments()} icon={ArrowDownLeftIcon}>
+              <Panel
+                title={m.money_payments()}
+                icon={ArrowDownLeftIcon}
+                className="lg:mx-0"
+              >
                 <PanelList>
                   {data.payments.length === 0 ? (
                     <ListNote>{m.money_none()}</ListNote>
@@ -353,10 +397,11 @@ function MoneyPage() {
                 <Panel
                   title={m.money_costs_list()}
                   icon={ReceiptIcon}
+                  className="lg:mx-0"
                   action={
                     <Button
                       variant="ghost"
-                      className="h-9 text-primary"
+                      className="h-11 text-primary lg:h-9"
                       onClick={() => setCostPanel({})}
                     >
                       <PlusIcon data-icon="inline-start" />
@@ -393,7 +438,7 @@ function MoneyPage() {
                   </PanelList>
                 </Panel>
               )}
-              <p className="px-4 text-xs text-muted-foreground">
+              <p className="px-4 text-xs text-muted-foreground lg:px-0">
                 {m.money_workers_hidden()}
               </p>
             </div>

@@ -91,7 +91,7 @@ export function StagePicker({
   const toggle = (
     <Button
       variant="ghost"
-      className="h-9 text-primary"
+      className="h-11 text-primary lg:h-9"
       aria-expanded={choosing}
       onClick={() => {
         setChoosing(!choosing)

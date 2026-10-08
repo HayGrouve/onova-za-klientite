@@ -55,24 +55,29 @@ export function ClientForm({
   businessId,
   client,
   fields,
+  initialName,
+  initialPhone,
   onSaved,
   onDirtyChange,
 }: {
   businessId: Id<'businesses'>
   client?: ClientDoc
   fields: Array<Doc<'fields'>>
+  /** A new client's name and phone when started from words typed elsewhere. */
+  initialName?: string
+  initialPhone?: string
   onSaved: (clientId: Id<'clients'>) => void
   /** Tells the page or sheet whether there are unsaved changes. */
   onDirtyChange?: (dirty: boolean) => void
 }) {
   const create = useMutation(api.clients.create)
   const update = useMutation(api.clients.update)
-  const [name, setName] = useState(client?.name ?? '')
+  const [name, setName] = useState(client?.name ?? initialName ?? '')
   const [kind, setKind] = useState<ClientDoc['kind']>(client?.kind ?? 'person')
   const [phones, setPhones] = useState<string[]>(
     client?.phones.length
       ? client.phones.map((phone) => formatPhone(phone.e164))
-      : [''],
+      : [initialPhone ?? ''],
   )
   const [email, setEmail] = useState(client?.email ?? '')
   const [address, setAddress] = useState(client?.address ?? '')

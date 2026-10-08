@@ -240,7 +240,11 @@ export function JobSummaryButton({
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button variant="outline" className="h-9" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        className="h-11 lg:h-9"
+        onClick={() => setOpen(true)}
+      >
         {m.summary_button()}
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>

@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '#/components/ui/table'
 import { useViewer } from '#/hooks/use-viewer'
-import { formatDay } from '#/i18n/dates'
+import { formatDayShort } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { jobOwedCents } from '../../../shared/allocation'
 import { isJobLate } from '../../../shared/stages'
@@ -51,6 +51,9 @@ const SORT: Record<JobSortKey, (a: JobRowData, b: JobRowData) => number> = {
 
 // Narrow screens drop what the books need least, so the money stays in view:
 // the client moves under the title, and the next appointment goes (xl).
+/** An amount, or a dash for none, in price, paid and balance alike. */
+const money = (cents: number) => (cents === 0 ? '–' : formatMoney(cents))
+
 const WIDE_ONLY = 'hidden xl:table-cell'
 const CELL = 'px-3 xl:px-4'
 
@@ -150,8 +153,14 @@ export function JobsTable({
                 >
                   {client}
                 </TableCell>
-                <TableCell className={cn(CELL, 'text-right tabular-nums')}>
-                  {formatMoney(job.priceCents)}
+                <TableCell
+                  className={cn(
+                    CELL,
+                    'text-right tabular-nums',
+                    job.priceCents === 0 && 'text-muted-foreground',
+                  )}
+                >
+                  {money(job.priceCents)}
                 </TableCell>
                 <TableCell
                   className={cn(
@@ -159,7 +168,7 @@ export function JobsTable({
                     'text-right text-muted-foreground tabular-nums',
                   )}
                 >
-                  {formatMoney(job.paidCents)}
+                  {money(job.paidCents)}
                 </TableCell>
                 <TableCell
                   className={cn(
@@ -170,7 +179,7 @@ export function JobsTable({
                       : 'text-muted-foreground',
                   )}
                 >
-                  {jobOwedCents(job) > 0 ? formatMoney(jobOwedCents(job)) : '–'}
+                  {money(jobOwedCents(job))}
                 </TableCell>
                 <TableCell className={CELL}>
                   <StageBadge name={job.stageName} group={job.stageGroup} />
@@ -184,7 +193,7 @@ export function JobsTable({
                       : 'text-muted-foreground',
                   )}
                 >
-                  {job.dueDate ? formatDay(job.dueDate, today) : ''}
+                  {job.dueDate ? formatDayShort(job.dueDate, today) : ''}
                 </TableCell>
                 <TableCell
                   className={cn(
@@ -197,6 +206,7 @@ export function JobsTable({
                         job.nextAppointment.start,
                         job.nextAppointment.allDay,
                         today,
+                        true,
                       )
                     : ''}
                 </TableCell>

@@ -144,7 +144,7 @@ function StagesSettings() {
                   {owner && (
                     <Button
                       variant="ghost"
-                      className="h-10 shrink-0 text-primary"
+                      className="h-11 shrink-0 text-primary lg:h-10"
                       onClick={() => setPanel({ group })}
                     >
                       <PlusIcon data-icon="inline-start" />
