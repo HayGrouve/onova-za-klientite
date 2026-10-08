@@ -107,6 +107,8 @@ export function ClientsTable({
               onClick={(event) => {
                 // The name is the real link; the rest of the row follows it.
                 if ((event.target as HTMLElement).closest('a')) return
+                // Cmd/Ctrl/Shift-clicks mean "somewhere else"; leave them alone.
+                if (event.metaKey || event.ctrlKey || event.shiftKey) return
                 void navigate({
                   to: '/clients/$clientId',
                   params: { clientId: client._id },

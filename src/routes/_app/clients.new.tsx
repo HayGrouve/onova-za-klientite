@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
+import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { ClientForm } from '#/components/client-form'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { PageTitle } from '#/components/page'
+import { usePageGuard } from '#/hooks/use-discard-guard'
 import { useViewer } from '#/hooks/use-viewer'
 
 export const Route = createFileRoute('/_app/clients/new')({
@@ -13,6 +15,8 @@ export const Route = createFileRoute('/_app/clients/new')({
 function NewClientPage() {
   const { business } = useViewer()
   const navigate = useNavigate()
+  const [dirty, setDirty] = useState(false)
+  const guard = usePageGuard(dirty)
   const fields = useQuery(api.fields.list, {
     businessId: business._id,
     target: 'client',
@@ -27,16 +31,19 @@ function NewClientPage() {
           <ClientForm
             businessId={business._id}
             fields={fields}
-            onSaved={(clientId) =>
+            onDirtyChange={setDirty}
+            onSaved={(clientId) => {
+              guard.release()
               void navigate({
                 to: '/clients/$clientId',
                 params: { clientId },
                 replace: true,
               })
-            }
+            }}
           />
         )}
       </div>
+      {guard.prompt}
     </>
   )
 }

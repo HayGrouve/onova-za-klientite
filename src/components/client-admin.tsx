@@ -150,9 +150,11 @@ function MergePicker({
       </p>
       <InputGroup>
         <InputGroupInput
-          autoFocus
+          name="search"
+          type="search"
+          spellCheck={false}
           aria-label={m.clients_search()}
-          placeholder={m.clients_search()}
+          placeholder={m.clients_search_placeholder()}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

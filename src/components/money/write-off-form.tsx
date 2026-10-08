@@ -41,8 +41,8 @@ export function WriteOffForm({
           <FieldLabel htmlFor="writeoff-note">{m.writeoff_note()}</FieldLabel>
           <Input
             id="writeoff-note"
+            name="note"
             required
-            autoFocus
             maxLength={500}
             value={note}
             onChange={(event) => setNote(event.target.value)}

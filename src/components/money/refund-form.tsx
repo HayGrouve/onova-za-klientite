@@ -15,6 +15,7 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { Spinner } from '#/components/ui/spinner'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, parseMoney } from '../../../shared/money'
@@ -50,19 +51,25 @@ export function RefundForm({
   const [date, setDate] = useState(today)
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [note, setNote] = useState('')
+  const [tried, setTried] = useState(false)
   const source = sources[sourceIndex]
   const amountCents = parseMoney(amount)
   const over = amountCents !== null && amountCents > source.limitCents
   const valid = amountCents !== null && amountCents > 0 && !over
   const limit = formatMoney(source.limitCents)
   const title = source.title ?? ''
+  const amountMissing = tried && (amountCents === null || amountCents <= 0)
 
   return (
     <form
       className="flex flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault()
-        if (!valid) return
+        if (!valid) {
+          setTried(true)
+          document.getElementById('refund-amount')?.focus()
+          return
+        }
         void run(() =>
           refund({
             businessId,
@@ -80,21 +87,23 @@ export function RefundForm({
         {sources.length > 1 && (
           <Field>
             <FieldLabel>{m.refund_source()}</FieldLabel>
-            <div
-              role="radiogroup"
+            <ToggleGroup
               aria-label={m.refund_source()}
-              className="flex flex-col gap-2"
+              value={[String(sourceIndex)]}
+              onValueChange={(next: string[]) => {
+                // Tapping the chosen one again keeps it chosen.
+                if (next[0]) setSourceIndex(Number(next[0]))
+              }}
+              variant="outline"
+              size="xl"
+              orientation="vertical"
+              className="w-full"
             >
               {sources.map((item, index) => (
-                <Button
+                <ToggleGroupItem
                   key={item.jobId ?? 'credit'}
-                  type="button"
-                  variant="outline"
-                  size="xl"
-                  role="radio"
-                  aria-checked={index === sourceIndex}
-                  className="justify-start text-left whitespace-normal aria-checked:border-primary aria-checked:bg-primary/8"
-                  onClick={() => setSourceIndex(index)}
+                  value={String(index)}
+                  className="h-auto min-h-12 justify-start py-2 text-left break-words whitespace-normal"
                 >
                   {item.jobId
                     ? m.refund_source_job({
@@ -104,9 +113,9 @@ export function RefundForm({
                     : m.refund_source_credit({
                         amount: formatMoney(item.limitCents),
                       })}
-                </Button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
           </Field>
         )}
         <Field>
@@ -117,7 +126,11 @@ export function RefundForm({
             value={amount}
             onChange={setAmount}
             autoFocus
+            invalid={over || amountMissing}
           />
+          {amountMissing && !over && (
+            <FieldError>{m.error_payment_zero()}</FieldError>
+          )}
           {over ? (
             <FieldError>
               {source.jobId
@@ -141,6 +154,7 @@ export function RefundForm({
             <FieldLabel htmlFor="refund-date">{m.pay_date()}</FieldLabel>
             <Input
               id="refund-date"
+              name="date"
               type="date"
               required
               value={date}
@@ -151,6 +165,7 @@ export function RefundForm({
             <FieldLabel htmlFor="refund-note">{m.pay_note()}</FieldLabel>
             <Input
               id="refund-note"
+              name="note"
               maxLength={1000}
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -158,12 +173,7 @@ export function RefundForm({
           </Field>
         </div>
       </FieldGroup>
-      <Button
-        type="submit"
-        size="xl"
-        variant="destructive"
-        disabled={busy || !valid}
-      >
+      <Button type="submit" size="xl" variant="destructive" disabled={busy}>
         {busy && <Spinner data-icon="inline-start" />}
         {m.refund_save()}
       </Button>

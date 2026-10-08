@@ -93,6 +93,7 @@ export function PaymentEditForm({
             value={amount}
             onChange={setAmount}
             autoFocus
+            invalid={tooLow || tooHigh}
           />
           {tooLow ? (
             <FieldError>
@@ -124,6 +125,7 @@ export function PaymentEditForm({
             <FieldLabel htmlFor="pay-edit-date">{m.pay_date()}</FieldLabel>
             <Input
               id="pay-edit-date"
+              name="date"
               type="date"
               required
               value={date}
@@ -136,6 +138,7 @@ export function PaymentEditForm({
             </FieldLabel>
             <Input
               id="pay-edit-text"
+              name={refund ? 'note' : 'label'}
               maxLength={refund ? 1000 : 100}
               value={text}
               onChange={(event) => setText(event.target.value)}

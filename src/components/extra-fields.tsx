@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import type { Doc } from '../../convex/_generated/dataModel'
-import { Field, FieldLabel } from '#/components/ui/field'
+import { Field, FieldError, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import {
   InputGroup,
@@ -69,10 +70,92 @@ export function ExtraFieldsView({
           <dt className="w-28 shrink-0 text-sm text-muted-foreground">
             {field.name}
           </dt>
-          <dd className="min-w-0 flex-1 text-sm whitespace-pre-wrap">{text}</dd>
+          <dd className="min-w-0 flex-1 text-sm break-words whitespace-pre-wrap">
+            {text}
+          </dd>
         </div>
       ))}
     </dl>
+  )
+}
+
+/** The number a person typed, `undefined` for nothing, `null` for text that is not a number. */
+function parseNumber(text: string): number | undefined | null {
+  const clean = text.replace(/\s/g, '').replace(',', '.')
+  if (clean === '') return undefined
+  const number = Number(clean)
+  return Number.isFinite(number) ? number : null
+}
+
+/**
+ * A number or money input that keeps what was typed. Text that is not a
+ * number shows an error and blocks the form's submit (the browser's own
+ * validation), instead of saving the field empty.
+ */
+function NumberInput({
+  id,
+  name,
+  label,
+  value,
+  kind,
+  onValue,
+}: {
+  id: string
+  name: string
+  label: string
+  value: unknown
+  kind: 'number' | 'money'
+  onValue: (value: number | undefined) => void
+}) {
+  const [text, setText] = useState(() =>
+    typeof value !== 'number'
+      ? ''
+      : kind === 'money'
+        ? formatMoney(value).replace(/\s?€/, '')
+        : String(value),
+  )
+  const parse = (input: string) =>
+    kind === 'money'
+      ? input.trim() === ''
+        ? undefined
+        : (parseMoney(input) ?? null)
+      : parseNumber(input)
+  const invalid = parse(text) === null
+  const message =
+    kind === 'money' ? m.field_money_invalid() : m.field_number_invalid()
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    input.current?.setCustomValidity(invalid ? message : '')
+  }, [invalid, message])
+  const common = {
+    id,
+    name,
+    inputMode: 'decimal' as const,
+    spellCheck: false,
+    value: text,
+    'aria-invalid': invalid,
+    'aria-describedby': invalid ? `${id}-error` : undefined,
+    onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+      setText(event.target.value)
+      const parsed = parse(event.target.value)
+      if (parsed !== null) onValue(parsed)
+    },
+  }
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      {kind === 'money' ? (
+        <InputGroup>
+          <InputGroupInput ref={input} {...common} />
+          <InputGroupAddon align="inline-end">
+            <InputGroupText>€</InputGroupText>
+          </InputGroupAddon>
+        </InputGroup>
+      ) : (
+        <Input ref={input} {...common} />
+      )}
+      {invalid && <FieldError id={`${id}-error`}>{message}</FieldError>}
+    </Field>
   )
 }
 
@@ -112,6 +195,7 @@ export function ExtraFieldsEditor({
                   <FieldLabel htmlFor={id}>{field.name}</FieldLabel>
                   <Input
                     id={id}
+                    name={id}
                     maxLength={500}
                     value={typeof value === 'string' ? value : ''}
                     onChange={(event) => set(field._id, event.target.value)}
@@ -124,6 +208,7 @@ export function ExtraFieldsEditor({
                   <FieldLabel htmlFor={id}>{field.name}</FieldLabel>
                   <Textarea
                     id={id}
+                    name={id}
                     rows={3}
                     className="rounded-xl"
                     value={typeof value === 'string' ? value : ''}
@@ -132,55 +217,17 @@ export function ExtraFieldsEditor({
                 </Field>
               )
             case 'number':
-              return (
-                <Field key={field._id}>
-                  <FieldLabel htmlFor={id}>{field.name}</FieldLabel>
-                  <Input
-                    id={id}
-                    inputMode="decimal"
-                    defaultValue={
-                      typeof value === 'number' ? String(value) : ''
-                    }
-                    onChange={(event) => {
-                      const text = event.target.value
-                        .replace(/\s/g, '')
-                        .replace(',', '.')
-                      const number = Number(text)
-                      set(
-                        field._id,
-                        text === '' || !Number.isFinite(number)
-                          ? undefined
-                          : number,
-                      )
-                    }}
-                  />
-                </Field>
-              )
             case 'money':
               return (
-                <Field key={field._id}>
-                  <FieldLabel htmlFor={id}>{field.name}</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      id={id}
-                      inputMode="decimal"
-                      defaultValue={
-                        typeof value === 'number'
-                          ? formatMoney(value).replace(/\s?€/, '')
-                          : ''
-                      }
-                      onChange={(event) =>
-                        set(
-                          field._id,
-                          parseMoney(event.target.value) ?? undefined,
-                        )
-                      }
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <InputGroupText>€</InputGroupText>
-                    </InputGroupAddon>
-                  </InputGroup>
-                </Field>
+                <NumberInput
+                  key={field._id}
+                  id={id}
+                  name={id}
+                  label={field.name}
+                  value={value}
+                  kind={field.type}
+                  onValue={(next) => set(field._id, next)}
+                />
               )
             case 'date':
               return (
@@ -188,6 +235,7 @@ export function ExtraFieldsEditor({
                   <FieldLabel htmlFor={id}>{field.name}</FieldLabel>
                   <Input
                     id={id}
+                    name={id}
                     type="date"
                     value={typeof value === 'string' ? value : ''}
                     onChange={(event) => set(field._id, event.target.value)}
