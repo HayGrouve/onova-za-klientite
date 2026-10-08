@@ -163,6 +163,8 @@ export default defineSchema({
         unit: vRepeatUnit,
         nextJobId: v.optional(v.id('jobs')),
         stoppedAt: v.optional(v.number()),
+        /** The day of the month a monthly series keeps (shared/repeat.ts). */
+        anchorDay: v.optional(v.number()),
       }),
     ),
     nextRepeatOn: v.optional(v.string()),

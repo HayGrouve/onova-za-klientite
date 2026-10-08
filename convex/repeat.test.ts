@@ -4,6 +4,7 @@ import { api, internal } from './_generated/api'
 import { dateInSofia, sofiaTimeToUtc } from '../shared/dates'
 import { REPEAT_CHOICES, nextJobDate } from '../shared/repeat'
 import {
+  addMember,
   expectCachesFresh,
   getDoc,
   setupBusiness,
@@ -130,6 +131,131 @@ describe('repeat (Q6)', () => {
     await t.mutation(internal.repeat.run, { today: '2026-02-01' })
     const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId!
     expect((await getDoc(t, 'jobs', nextId)).dueDate).toBe('2026-02-28')
+  })
+
+  it('a monthly series from the 31st goes back to the 31st after a short month', async () => {
+    const t = setupConvex()
+    const { owner, businessId, noClientId } = await setupBusiness(t)
+    const firstId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: noClientId,
+      title: 'Абонамент',
+      dueDate: '2026-01-31',
+    })
+    await owner.mutation(api.jobs.setRepeat, {
+      businessId,
+      jobId: firstId,
+      every: 1,
+      unit: 'month',
+    })
+    const expected = [
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+      '2026-05-31',
+      '2026-06-30',
+      '2026-07-31',
+      '2026-08-31',
+      '2026-09-30',
+      '2026-10-31',
+      '2026-11-30',
+      '2026-12-31',
+      '2027-01-31',
+      '2027-02-28',
+    ]
+    let current = firstId
+    let due = '2026-01-31'
+    const seen: string[] = []
+    for (const next of expected) {
+      expect(await t.mutation(internal.repeat.run, { today: due })).toBe(1)
+      const job = await getDoc(t, 'jobs', current)
+      current = job.repeat!.nextJobId!
+      const created = await getDoc(t, 'jobs', current)
+      seen.push(created.dueDate!)
+      // What the Job page promises for the next one is what the run creates.
+      expect(created.nextRepeatOn).toBe(next)
+      due = next
+    }
+    expect(seen).toEqual(expected)
+  })
+
+  it('a job someone moved to another day carries on from that day', async () => {
+    const t = setupConvex()
+    const { owner, businessId, noClientId } = await setupBusiness(t)
+    const firstId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: noClientId,
+      title: 'Абонамент',
+      dueDate: '2026-01-31',
+    })
+    await owner.mutation(api.jobs.setRepeat, {
+      businessId,
+      jobId: firstId,
+      every: 1,
+      unit: 'month',
+    })
+    await t.mutation(internal.repeat.run, { today: '2026-01-31' })
+    const secondId = (await getDoc(t, 'jobs', firstId)).repeat!.nextJobId!
+    // The February job is moved to the 10th: the series now follows the 10th.
+    await owner.mutation(api.jobs.update, {
+      businessId,
+      jobId: secondId,
+      dueDate: '2026-02-10',
+    })
+    await t.mutation(internal.repeat.run, { today: '2026-02-10' })
+    const thirdId = (await getDoc(t, 'jobs', secondId)).repeat!.nextJobId!
+    expect((await getDoc(t, 'jobs', thirdId)).dueDate).toBe('2026-03-10')
+  })
+
+  it('stops retrying when the job’s creator and the owner are gone', async () => {
+    const { t, jobId } = await weeklyJob()
+    // The only member goes: nobody is left to create the next job as.
+    await t.run(async (ctx) => {
+      const job = (await ctx.db.get('jobs', jobId))!
+      await ctx.db.delete('memberships', job.createdBy)
+    })
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-07' })).toBe(
+      0,
+    )
+    expect((await getDoc(t, 'jobs', jobId)).nextRepeatOn).toBeUndefined()
+    // The run no longer finds it.
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-08' })).toBe(
+      0,
+    )
+  })
+
+  it('carries on as the owner when the creator is gone', async () => {
+    const { t, owner, businessId, clientId, ...b } = await weeklyJob()
+    const { member: manager, membershipId } = await addMember(
+      t,
+      { owner, businessId, ...b },
+      'manager',
+    )
+    const { jobId } = await manager.mutation(api.newJob.save, {
+      businessId,
+      client: { kind: 'existing', clientId },
+      title: 'От управител',
+      when: { date: '2026-10-07' },
+    })
+    await manager.mutation(api.jobs.setRepeat, {
+      businessId,
+      jobId,
+      every: 1,
+      unit: 'week',
+    })
+    await t.run(async (ctx) => ctx.db.delete('memberships', membershipId))
+    await t.mutation(internal.repeat.run, { today: '2026-10-07' })
+    const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId
+    expect(nextId).toBeDefined()
+    const next = await getDoc(t, 'jobs', nextId!)
+    const owners = await t.run((ctx) =>
+      ctx.db
+        .query('memberships')
+        .collect()
+        .then((rows) => rows.filter((row) => row.role === 'owner')),
+    )
+    expect(next.createdBy).toBe(owners[0]._id)
+    expect(next.nextRepeatOn).toBe('2026-10-14')
   })
 
   it.each(REPEAT_CHOICES)(

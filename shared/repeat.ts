@@ -2,10 +2,18 @@
 // The daily repeat run and the Job page both read the dates from here, so the
 // date the screen promises is the date the run creates.
 
-import { addDays, addMonths, dateInSofia } from './dates'
+import { addDays, addMonths, dateInSofia, daysInMonth } from './dates'
 
 export type RepeatUnit = 'week' | 'month'
-export type RepeatInterval = { every: number; unit: RepeatUnit }
+export type RepeatInterval = {
+  every: number
+  unit: RepeatUnit
+  /**
+   * The day of the month a monthly series keeps (the 31st, say), when a short
+   * month pulled an earlier job to the 28th. Absent on the first job.
+   */
+  anchorDay?: number
+}
 
 /**
  * The intervals offered on a Job and in setup, shortest first. The server
@@ -25,11 +33,37 @@ export const REPEAT_CHOICES = [
 
 export type RepeatKey = (typeof REPEAT_CHOICES)[number]['key']
 
-/** One interval after `date`. Months clamp to the end of a short month. */
+function dayYearMonth(date: string) {
+  const [year, month, day] = date.split('-').map(Number)
+  return { year, month, day }
+}
+
+/**
+ * The day of the month a series is on at `date`: the anchor while the job is
+ * still on it (or on the end of a month too short for it), else the job's own
+ * day, as when someone moved the job. Weeks have none.
+ */
+export function repeatAnchorDay(date: string, repeat: RepeatInterval) {
+  if (repeat.unit === 'week') return undefined
+  const { year, month, day } = dayYearMonth(date)
+  const anchor = repeat.anchorDay
+  return anchor !== undefined &&
+    day === Math.min(anchor, daysInMonth(year, month))
+    ? anchor
+    : day
+}
+
+/**
+ * One interval after `date`. Months clamp to the end of a short month, and a
+ * series that was clamped goes back to its day once the month is long enough
+ * (31 Jan, 28 Feb, 31 Mar), instead of drifting to the 28th for good.
+ */
 export function nextRepeatDate(date: string, repeat: RepeatInterval) {
-  return repeat.unit === 'week'
-    ? addDays(date, 7 * repeat.every)
-    : addMonths(date, repeat.every)
+  if (repeat.unit === 'week') return addDays(date, 7 * repeat.every)
+  const next = addMonths(date, repeat.every)
+  const day = repeatAnchorDay(date, repeat) ?? 1
+  const { year, month } = dayYearMonth(next)
+  return `${next.slice(0, 8)}${String(Math.min(day, daysInMonth(year, month))).padStart(2, '0')}`
 }
 
 /**
