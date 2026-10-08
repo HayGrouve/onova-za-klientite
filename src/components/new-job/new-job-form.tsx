@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ClientPicker } from '#/components/new-job/client-picker'
+import { useFixer } from '#/components/new-job/use-fixer'
 import type { ItemRef, PaymentMethod } from '#/components/new-job/types'
 import { Stopwatch } from '#/components/stopwatch'
 import { Badge } from '#/components/ui/badge'
@@ -57,8 +58,6 @@ import { exampleLine, parseLine } from '../../../shared/parse-line'
 import type { ServiceRef } from '../../../shared/parse-line'
 import { formatPhone } from '../../../shared/phone-format'
 import type { ClientCandidate } from '../../../shared/search'
-
-type Fixable = 'client' | 'title' | 'price' | 'deposit' | 'date'
 
 const METHODS = [
   'cash',
@@ -173,9 +172,9 @@ export function NewJobForm({
   const [text, setText] = useState('')
   const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [fixing, setFixing] = useState<Fixable | null>(null)
-  // The title's box was opened by a failed save, not by a tap on "Fix".
-  const [titleOpenedByError, setTitleOpenedByError] = useState(false)
+  // Which field is being fixed; the title's box may have been opened by a failed save.
+  const fixer = useFixer()
+  const { fixing, titleOpenedByError } = fixer
   // A save is under way or done: a second Enter or tap must not make a second job.
   const submitting = useRef(false)
   // Fixes made by hand. A fix holds until the line reads that field differently.
@@ -223,10 +222,7 @@ export function NewJobForm({
   const onText = (value: string) => setText(value)
   // Once the line itself reads a title, the box a failed save opened has
   // nothing left to say: the read-out shows it. A hand fix keeps its box.
-  if (fixing === 'title' && titleOpenedByError && parsed.title.trim()) {
-    setFixing(null)
-    setTitleOpenedByError(false)
-  }
+  if (titleOpenedByError && parsed.title.trim()) fixer.closeIfOpenedByError()
   // Back where "+" was opened: the item or the client (the new job is in its
   // list), otherwise Today.
   const leave = () =>
@@ -289,8 +285,7 @@ export function NewJobForm({
     if (!args) {
       // A missing title opens its input; a missing client shows its picker.
       if (draft.missing.title) {
-        setFixing('title')
-        setTitleOpenedByError(true)
+        fixer.openAfterError()
       }
       setFailure({ id: Date.now(), client: draft.missing.client })
       return
@@ -370,7 +365,7 @@ export function NewJobForm({
     <Button
       variant="secondary"
       className="h-11 rounded-xl"
-      onClick={() => setFixing(null)}
+      onClick={() => fixer.close()}
     >
       {m.new_done_fixing()}
     </Button>
@@ -442,7 +437,7 @@ export function NewJobForm({
             label={words.client.singular}
             icon={UserIcon}
             fixing={fixing === 'client'}
-            onFix={() => setFixing('client')}
+            onFix={() => fixer.open('client')}
             value={
               clientName && (
                 <span className="flex flex-col">
@@ -473,7 +468,7 @@ export function NewJobForm({
                 }
                 onPick={(choice) => {
                   setClient(choice)
-                  setFixing(null)
+                  fixer.close()
                 }}
               />
             ) : (
@@ -517,7 +512,7 @@ export function NewJobForm({
             icon={ClipboardTextIcon}
             value={chosenTitle}
             fixing={fixing === 'title'}
-            onFix={() => setFixing('title')}
+            onFix={() => fixer.open('title')}
             missing={tried && !chosenTitle.trim() && m.new_missing_title()}
             errorId="new-error-title"
           >
@@ -572,7 +567,7 @@ export function NewJobForm({
             label={m.new_price()}
             icon={TagIcon}
             fixing={fixing === 'price'}
-            onFix={() => setFixing('price')}
+            onFix={() => fixer.open('price')}
             value={
               chosenPrice !== null && (
                 <span className="flex flex-wrap items-center gap-2">
@@ -604,7 +599,7 @@ export function NewJobForm({
               label={isPayment ? m.new_paid() : m.new_deposit()}
               icon={CoinsIcon}
               fixing={fixing === 'deposit'}
-              onFix={() => setFixing('deposit')}
+              onFix={() => fixer.open('deposit')}
               value={
                 chosenDeposit !== null &&
                 chosenDeposit > 0 &&
@@ -660,7 +655,7 @@ export function NewJobForm({
             icon={single ? CalendarBlankIcon : FlagIcon}
             value={dateText}
             fixing={fixing === 'date'}
-            onFix={() => setFixing('date')}
+            onFix={() => fixer.open('date')}
           >
             {fixing === 'date' && (
               <div className="flex flex-col gap-3">
