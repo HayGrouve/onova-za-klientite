@@ -19,6 +19,7 @@ import { ListSection } from '#/components/list-section'
 import { EmptyState, PageTitle } from '#/components/page'
 import { TodayWide } from '#/components/today/today-wide'
 import { VisitRow } from '#/components/today/visit-row'
+import { useNow } from '#/hooks/use-now'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
@@ -40,7 +41,12 @@ const LONG_DATE = new Intl.DateTimeFormat('bg-BG', {
 function TodayPage() {
   const { business } = useViewer()
   const today = useToday()
-  const data = useQuery(api.today.list, { businessId: business._id, today })
+  const now = useNow()
+  const data = useQuery(api.today.list, {
+    businessId: business._id,
+    today,
+    now,
+  })
   const wide = useWide()
   const { words } = business
 

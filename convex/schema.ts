@@ -98,6 +98,7 @@ export default defineSchema({
     mergedIntoId: v.optional(v.id('clients')),
   })
     .index('by_business_name', ['businessId', 'name'])
+    .index('by_business_credit', ['businessId', 'creditCents'])
     .searchIndex('search', {
       searchField: 'searchText',
       filterFields: ['businessId'],

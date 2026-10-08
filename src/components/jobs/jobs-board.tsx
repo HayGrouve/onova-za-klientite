@@ -40,6 +40,7 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { Skeleton } from '#/components/ui/skeleton'
 import { useMoveJob } from '#/hooks/use-move-job'
+import { useNow } from '#/hooks/use-now'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { GROUP_LABEL } from '#/i18n/groups'
@@ -87,7 +88,8 @@ export function JobsBoard({
   const { business } = useViewer()
   // Level 2: a Worker cannot change stages, so their cards don't move.
   const canMove = hasRole(business.role, 'manager')
-  const board = useQuery(api.jobs.board, { businessId: business._id })
+  const now = useNow()
+  const board = useQuery(api.jobs.board, { businessId: business._id, now })
   const { move, announce } = useMoveJob()
   const [ruleFor, setRuleFor] = useState<Card | null>(null)
   // The move's toast waits while the reminder rule's offer covers the board.
@@ -403,6 +405,8 @@ function Column({
     stages.some((stage) => stage._id !== dragging.stageId)
   const over = drag?.over === `column:${group}`
   const hidden = column.total - column.jobs.length
+  // Done and Cancelled are counted up to a cap: "100+".
+  const total = column.totalCapped ? `${column.total}+` : column.total
   // The header counts what is shown: with a filter on, the cards that pass it.
   const owed = filtering ? owedCents(cards) : column.owedCents
 
@@ -426,7 +430,7 @@ function Column({
             {GROUP_LABEL[group]()}
           </h2>
           <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
-            {filtering ? `${cards.length}/${column.total}` : column.total}
+            {filtering ? `${cards.length}/${total}` : total}
           </span>
           {group === 'new' && (
             <Tip label={m.new_job_label({ job: words.job.singular })}>
@@ -513,7 +517,7 @@ function Column({
         <p className="flex items-center justify-between gap-2 px-2 py-1 text-xs text-muted-foreground">
           {m.board_closed_shown({
             count: column.jobs.length,
-            total: column.total,
+            total,
           })}
           <Link
             to="/jobs"

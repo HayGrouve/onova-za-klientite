@@ -23,6 +23,7 @@ import {
   InputGroupInput,
 } from '#/components/ui/input-group'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
+import { useNow } from '#/hooks/use-now'
 import { useToday } from '#/hooks/use-today'
 import { useUrlText } from '#/hooks/use-url-text'
 import { useViewer } from '#/hooks/use-viewer'
@@ -199,13 +200,14 @@ function JobsList({
     search.group === 'all' && !table ? 'new' : (search.group ?? 'new')
   const setSearch = useListSearch()
   const today = useToday()
+  const now = useNow()
   // A filter counts what it finds in every tab, so it reads all of them.
   const filtering = table && isFiltering(filter)
   const data = useQuery(
     api.jobs.list,
     group === 'all' || filtering
-      ? { businessId: business._id }
-      : { businessId: business._id, group },
+      ? { businessId: business._id, now }
+      : { businessId: business._id, group, now },
   )
   // The counts don't depend on the open tab, so they stay while another loads.
   const counts = useLatest(data?.counts)

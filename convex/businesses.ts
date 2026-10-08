@@ -25,23 +25,6 @@ export const settings = businessQuery({
       .query('stages')
       .withIndex('by_business_order', (q) => q.eq('businessId', business._id))
       .collect()
-    const stagesWithCounts = []
-    for (const stage of stages) {
-      const jobs = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_stage', (q) =>
-          q.eq('businessId', business._id).eq('stageId', stage._id),
-        )
-        .collect()
-      stagesWithCounts.push({
-        _id: stage._id,
-        name: stage.name,
-        color: stage.color,
-        group: stage.group,
-        order: stage.order,
-        jobCount: jobs.length,
-      })
-    }
     const services = await ctx.db
       .query('services')
       .withIndex('by_business_order', (q) => q.eq('businessId', business._id))
@@ -57,7 +40,13 @@ export const settings = businessQuery({
       jobFlow: business.jobFlow,
       depositsOnNewJob: business.depositsOnNewJob,
       reminderRule: business.reminderRule ?? null,
-      stages: stagesWithCounts,
+      stages: stages.map(({ _id, name, color, group, order }) => ({
+        _id,
+        name,
+        color,
+        group,
+        order,
+      })),
       services: services.map(({ _id, name, priceCents, archivedAt }) => ({
         _id,
         name,
@@ -67,6 +56,39 @@ export const settings = businessQuery({
       storageBytes: business.storageBytes,
       role: ctx.member.role,
     }
+  },
+})
+
+/** Most jobs counted in one stage; a stage past it reads as this many. */
+const STAGE_COUNT_CAP = 1000
+
+/**
+ * How many jobs each stage holds, for the Stages screen only: Settings itself
+ * stays small, and a job change doesn't re-run every other Settings screen.
+ * Not for a Worker, who sees only their own jobs (D89).
+ */
+export const stageJobCounts = businessQuery({
+  args: {},
+  returns: v.array(v.object({ stageId: v.id('stages'), jobCount: v.number() })),
+  handler: async (ctx) => {
+    requireRole(ctx.member, 'manager')
+    const stages = await ctx.db
+      .query('stages')
+      .withIndex('by_business_order', (q) =>
+        q.eq('businessId', ctx.business._id),
+      )
+      .collect()
+    const counts = []
+    for (const stage of stages) {
+      const jobs = await ctx.db
+        .query('jobs')
+        .withIndex('by_business_stage', (q) =>
+          q.eq('businessId', ctx.business._id).eq('stageId', stage._id),
+        )
+        .take(STAGE_COUNT_CAP)
+      counts.push({ stageId: stage._id, jobCount: jobs.length })
+    }
+    return counts
   },
 })
 

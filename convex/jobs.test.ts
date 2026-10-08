@@ -408,6 +408,7 @@ describe('jobs board', () => {
       'Без срок',
     ])
     expect(open.total).toBe(3)
+    expect(open.totalCapped).toBe(false)
     expect(open.owedCents).toBe(30000)
     expect(done.jobs.map((job) => job.title)).toEqual(['Готов'])
     expect(board.stages.map((item) => item._id)).toEqual(
@@ -446,6 +447,9 @@ describe('jobs board', () => {
     const column = board.columns.find((item) => item.group === 'done')!
     expect(column.jobs).toHaveLength(20)
     expect(column.jobs[0].title).toBe('Най-нов')
+    // Closed work is counted up to a cap and says so.
+    expect(column.total).toBe(100)
+    expect(column.totalCapped).toBe(true)
     expect(column.owedCents).toBe(512 * 1000)
     // The owing filter can still find every Done job that owes.
     expect(column.olderOwing).toHaveLength(512 - 20)

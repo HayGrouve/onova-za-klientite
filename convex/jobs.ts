@@ -1,6 +1,10 @@
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
-import { BOARD_CLOSED_LIMIT, boardColumn } from '../shared/board'
+import {
+  BOARD_CLOSED_LIMIT,
+  BOARD_COUNT_CAP,
+  boardColumn,
+} from '../shared/board'
 import { STAGE_GROUPS, isOpenGroup, stagesFor } from '../shared/stages'
 import { logActivity } from './lib/activity'
 import {
@@ -9,6 +13,7 @@ import {
   getOwned,
   requireRole,
 } from './lib/auth'
+import { queryNow } from './lib/clock'
 import { fail } from './lib/errors'
 import { mergeExtra } from './lib/extra'
 import { listExtra, listFieldIds } from './lib/listFields'
@@ -227,7 +232,7 @@ const LIST_LIMIT = 500
  * tab), newest first, plus the count of each group for the tabs.
  */
 export const list = businessQuery({
-  args: { group: v.optional(vStageGroup) },
+  args: { group: v.optional(vStageGroup), now: v.optional(v.number()) },
   returns: v.object({
     jobs: v.array(vJobRow),
     counts: v.object({
@@ -237,8 +242,9 @@ export const list = businessQuery({
       cancelled: v.number(),
     }),
   }),
-  handler: async (ctx, { group }) => {
+  handler: async (ctx, { group, now: clientNow }) => {
     const businessId = ctx.business._id
+    const now = queryNow(clientNow)
     const counts = { new: 0, in_progress: 0, done: 0, cancelled: 0 }
     const selected: Array<Doc<'jobs'>> = []
     for (const key of STAGE_GROUPS) {
@@ -258,7 +264,7 @@ export const list = businessQuery({
     for (const job of selected.sort(
       (a, b) => b._creationTime - a._creationTime,
     )) {
-      rows.push(await jobRow(ctx, job, lookups))
+      rows.push(await jobRow(ctx, job, lookups, now))
     }
     return { jobs: rows, counts }
   },
@@ -269,7 +275,7 @@ export const list = businessQuery({
  * (shared/board), and the stages a job can be dropped on.
  */
 export const board = businessQuery({
-  args: {},
+  args: { now: v.optional(v.number()) },
   returns: v.object({
     columns: v.array(
       v.object({
@@ -281,6 +287,8 @@ export const board = businessQuery({
          */
         olderOwing: v.array(vJobRow),
         total: v.number(),
+        /** Done and Cancelled are counted up to BOARD_COUNT_CAP: `total` is then "at least". */
+        totalCapped: v.boolean(),
         owedCents: v.number(),
       }),
     ),
@@ -288,34 +296,41 @@ export const board = businessQuery({
       v.object({ _id: v.id('stages'), name: v.string(), group: vStageGroup }),
     ),
   }),
-  handler: async (ctx) => {
+  handler: async (ctx, { now: clientNow }) => {
     const businessId = ctx.business._id
     const lookups = newLookups()
-    const now = Date.now()
+    const now = queryNow(clientNow)
     const worker = isWorker(ctx.member)
     const columns = []
     for (const group of STAGE_GROUPS) {
-      const jobs = (
-        await ctx.db
-          .query('jobs')
-          .withIndex('by_business_group_due', (q) =>
-            q.eq('businessId', businessId).eq('stageGroup', group),
-          )
-          .take(LIST_LIMIT)
-      ).filter((job) => seesJob(ctx.member, job))
-      let column = boardColumn(group, jobs)
-      let olderOwing: typeof jobs = []
+      let column: { jobs: Array<Doc<'jobs'>>; total: number; owedCents: number }
+      let olderOwing: Array<Doc<'jobs'>> = []
+      let totalCapped = false
       // A Worker's own jobs are few, so their closed ones come from `jobs`.
-      if (!isOpenGroup(group) && !worker) {
-        // A long history outgrows one read, so the latest closed jobs come
-        // from their own index, and what Done still owes from the owes index.
-        const latest = await ctx.db
+      if (isOpenGroup(group) || worker) {
+        const jobs = (
+          await ctx.db
+            .query('jobs')
+            .withIndex('by_business_group_due', (q) =>
+              q.eq('businessId', businessId).eq('stageGroup', group),
+            )
+            .take(LIST_LIMIT)
+        ).filter((job) => seesJob(ctx.member, job))
+        column = boardColumn(group, jobs)
+      } else {
+        // A long history outgrows one read, so closed work is one read of its
+        // own index, newest first: the cards are the first few, and the count
+        // stops at BOARD_COUNT_CAP. What Done still owes comes from the owes
+        // index.
+        const counted = await ctx.db
           .query('jobs')
           .withIndex('by_business_group_done', (q) =>
             q.eq('businessId', businessId).eq('stageGroup', group),
           )
           .order('desc')
-          .take(BOARD_CLOSED_LIMIT)
+          .take(BOARD_COUNT_CAP + 1)
+        totalCapped = counted.length > BOARD_COUNT_CAP
+        const latest = counted.slice(0, BOARD_CLOSED_LIMIT)
         const owing =
           group === 'done'
             ? await ctx.db
@@ -330,7 +345,7 @@ export const board = businessQuery({
             : []
         column = {
           jobs: boardColumn(group, latest).jobs,
-          total: column.total,
+          total: Math.min(counted.length, BOARD_COUNT_CAP),
           owedCents: boardColumn(group, owing).owedCents,
         }
         const shown = new Set(column.jobs.map((job) => job._id))
@@ -340,13 +355,14 @@ export const board = businessQuery({
           owing.length,
         ).jobs
       }
-      const rows = async (from: typeof jobs) => {
+      const rows = async (from: Array<Doc<'jobs'>>) => {
         const out = []
         for (const job of from) out.push(await jobRow(ctx, job, lookups, now))
         return out
       }
       columns.push({
         ...column,
+        totalCapped,
         // A Worker sees no totals (D89).
         owedCents: worker ? 0 : column.owedCents,
         group,

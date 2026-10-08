@@ -9,7 +9,7 @@ import { serviceWorker } from './build/service-worker.ts'
 const isVitest = Boolean(process.env.VITEST)
 
 /**
- * Report-only for now (D90b): browsers log what it would block and send
+ * Report-only for now (D91): browsers log what it would block and send
  * nothing anywhere. It becomes enforcing after a clean period. The Clerk host
  * is the development instance's; the production instance needs its own
  * (`clerk.<domain>`) at launch.

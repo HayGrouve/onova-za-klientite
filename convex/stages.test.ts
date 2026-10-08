@@ -22,6 +22,23 @@ async function withJob() {
 }
 
 describe('stages', () => {
+  it('counts the jobs in each stage on their own, not in Settings', async () => {
+    const { owner, businessId, stage } = await withJob()
+    const counts = await owner.query(api.businesses.stageJobCounts, {
+      businessId,
+    })
+    expect(counts.find((item) => item.stageId === stage('new'))?.jobCount).toBe(
+      1,
+    )
+    expect(
+      counts.find((item) => item.stageId === stage('done'))?.jobCount,
+    ).toBe(0)
+    const { stages } = await owner.query(api.businesses.settings, {
+      businessId,
+    })
+    expect(Object.keys(stages[0])).not.toContain('jobCount')
+  })
+
   it('a regrouped stage moves to the end of its new group', async () => {
     const { owner, businessId } = await withJob()
     const waiting = await owner.mutation(api.stages.add, {

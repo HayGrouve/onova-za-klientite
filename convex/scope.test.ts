@@ -26,6 +26,7 @@ const modules = import.meta.glob<Record<string, unknown>>(
  */
 const WORKER_READS: Record<string, string> = {
   'businesses:settings': 'settings, read-only (D38)',
+  'businesses:stageJobCounts': 'forbidden',
   'clients:get': 'only through their jobs, without money',
   'clients:list': 'only the clients of their jobs, without money',
   'clientsAdmin:findByPhones': 'forbidden',
@@ -38,6 +39,7 @@ const WORKER_READS: Record<string, string> = {
   'jobs:board': 'their jobs, no totals',
   'jobs:get': 'their jobs, without costs or credit',
   'jobs:list': 'their jobs',
+  'money:headline': 'forbidden',
   'money:summary': 'forbidden',
   'newJob:context': 'forbidden',
   'offline:snapshot': 'their jobs, appointments and clients',
@@ -355,6 +357,9 @@ describe('a Worker sees only their own work (D89)', () => {
     ).rejects.toThrow(/auth.forbidden/)
     await expect(
       worker.query(api.money.summary, { businessId, month: '2026-10' }),
+    ).rejects.toThrow(/auth.forbidden/)
+    await expect(
+      worker.query(api.money.headline, { businessId, month: '2026-10' }),
     ).rejects.toThrow(/auth.forbidden/)
   })
 
