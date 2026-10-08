@@ -258,6 +258,105 @@ describe('repeat (Q6)', () => {
     expect(next.nextRepeatOn).toBe('2026-10-14')
   })
 
+  it('carries on as the owner when the creator is deactivated', async () => {
+    const { t, owner, businessId, clientId, ...b } = await weeklyJob()
+    const { member: manager, membershipId } = await addMember(
+      t,
+      { owner, businessId, ...b },
+      'manager',
+    )
+    const { jobId } = await manager.mutation(api.newJob.save, {
+      businessId,
+      client: { kind: 'existing', clientId },
+      title: 'От управител',
+      when: { date: '2026-10-07' },
+    })
+    await manager.mutation(api.jobs.setRepeat, {
+      businessId,
+      jobId,
+      every: 1,
+      unit: 'week',
+    })
+    await t.run((ctx) =>
+      ctx.db.patch('memberships', membershipId, { deactivatedAt: Date.now() }),
+    )
+    await t.mutation(internal.repeat.run, { today: '2026-10-07' })
+    const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId
+    expect(nextId).toBeDefined()
+    const next = await getDoc(t, 'jobs', nextId!)
+    const creator = await getDoc(t, 'memberships', next.createdBy)
+    expect(creator.role).toBe('owner')
+    expect(creator.deactivatedAt).toBeUndefined()
+  })
+
+  it('stops the series of an anonymized client: no job, no more retries', async () => {
+    const { t, owner, businessId, clientId, jobId } = await weeklyJob()
+    // Anonymize clears the date the run looks for.
+    await owner.mutation(api.clientsAdmin.anonymize, { businessId, clientId })
+    expect((await getDoc(t, 'jobs', jobId)).nextRepeatOn).toBeUndefined()
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-07' })).toBe(
+      0,
+    )
+    expect(await t.run((ctx) => ctx.db.query('jobs').collect())).toHaveLength(1)
+  })
+
+  it('does not create a job on a client anonymized after the date was set', async () => {
+    const { t, jobId, clientId } = await weeklyJob()
+    // A stale date (set again after anonymize, or a race): the run still refuses.
+    await t.run((ctx) =>
+      ctx.db.patch('clients', clientId, { anonymizedAt: Date.now() }),
+    )
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-07' })).toBe(
+      0,
+    )
+    const job = await getDoc(t, 'jobs', jobId)
+    expect(job.nextRepeatOn).toBeUndefined()
+    expect(job.repeat!.nextJobId).toBeUndefined()
+    expect(await t.run((ctx) => ctx.db.query('jobs').collect())).toHaveLength(1)
+  })
+
+  it('continues on the survivor when the job’s client was merged into another', async () => {
+    const { t, owner, businessId, clientId, jobId } = await weeklyJob()
+    const survivor = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Офис ООД',
+    })
+    await t.run((ctx) =>
+      ctx.db.patch('clients', clientId, { mergedIntoId: survivor }),
+    )
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-07' })).toBe(
+      1,
+    )
+    const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId!
+    const next = await getDoc(t, 'jobs', nextId)
+    expect(next.clientId).toBe(survivor)
+    const appointments = await t.run((ctx) =>
+      ctx.db
+        .query('appointments')
+        .withIndex('by_job', (q) => q.eq('jobId', nextId))
+        .collect(),
+    )
+    expect(appointments.map((row) => row.clientId)).toEqual([survivor])
+    await expectCachesFresh(t)
+  })
+
+  it('stops the series when the survivor of a merge was anonymized', async () => {
+    const { t, owner, businessId, clientId, jobId } = await weeklyJob()
+    const survivor = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Офис ООД',
+    })
+    await t.run(async (ctx) => {
+      await ctx.db.patch('clients', clientId, { mergedIntoId: survivor })
+      await ctx.db.patch('clients', survivor, { anonymizedAt: Date.now() })
+    })
+    expect(await t.mutation(internal.repeat.run, { today: '2026-10-07' })).toBe(
+      0,
+    )
+    expect((await getDoc(t, 'jobs', jobId)).nextRepeatOn).toBeUndefined()
+    expect(await t.run((ctx) => ctx.db.query('jobs').collect())).toHaveLength(1)
+  })
+
   it.each(REPEAT_CHOICES)(
     'a due date repeats $key: the next job gets the date the screen shows',
     async ({ every, unit }) => {
