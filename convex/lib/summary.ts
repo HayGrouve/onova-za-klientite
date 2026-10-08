@@ -1,13 +1,8 @@
-import {
-  addDays,
-  nextSofiaTime,
-  sofiaTimeToUtc,
-  todayInSofia,
-} from '../../shared/dates'
+import { nextSofiaTime, todayInSofia } from '../../shared/dates'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { summaryBody, summaryTitle } from './pushText'
-import { isWorker, seesAppointment, seesJob } from './scope'
+import { collectToday } from './todayData'
 import type { SummaryCounts } from './pushText'
 
 const SUMMARY_HOUR = 7
@@ -22,10 +17,10 @@ export function nextSummaryTime(now: number): number {
 }
 
 /**
- * What Today would list, as counts (convex/today.ts has the same rules):
- * appointments that aren't cancelled, New and In progress jobs past their due
- * date (Q17), and open reminders due today or earlier. A Worker's counts
- * cover only their own work, and no reminders (D89).
+ * What Today would list, as counts: the very lists the Today screen shows
+ * (`collectToday`), so the two cannot differ. A Done job's visit and an
+ * overdue job already shown under a visit today are not counted twice. A
+ * Worker's counts cover only their own work, and no reminders (D89).
  */
 export async function summaryCounts(
   ctx: QueryCtx,
@@ -34,61 +29,16 @@ export async function summaryCounts(
   today: string,
   include: { overdue: boolean; reminders: boolean },
 ): Promise<SummaryCounts> {
-  const businessId = business._id
-  const dayStart = sofiaTimeToUtc(today, 0, 0)
-  const tomorrowStart = sofiaTimeToUtc(addDays(today, 1), 0, 0)
-
-  let appointments = 0
-  const items = await ctx.db
-    .query('appointments')
-    .withIndex('by_business_start', (q) =>
-      q
-        .eq('businessId', businessId)
-        .gte('start', dayStart)
-        .lt('start', tomorrowStart),
-    )
-    .collect()
-  for (const item of items) {
-    if (item.cancelledAt !== undefined) continue
-    const job = item.jobId ? await ctx.db.get('jobs', item.jobId) : null
-    if (job?.stageGroup === 'cancelled') continue
-    if (!seesAppointment(member, item, job)) continue
-    appointments += 1
+  const arranged = await collectToday(ctx, business, member, today, {
+    rest: false,
+    overdue: include.overdue,
+    reminders: include.reminders,
+  })
+  return {
+    appointments: arranged.appointments.length,
+    overdue: arranged.overdue.length,
+    reminders: arranged.reminders.length,
   }
-
-  let overdue = 0
-  if (include.overdue) {
-    for (const group of ['new', 'in_progress'] as const) {
-      const late = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_group_due', (q) =>
-          q
-            .eq('businessId', businessId)
-            .eq('stageGroup', group)
-            .gt('dueDate', '')
-            .lt('dueDate', today),
-        )
-        .collect()
-      overdue += late.filter((job) => seesJob(member, job)).length
-    }
-  }
-
-  let reminders = 0
-  if (include.reminders && business.modules.reminders && !isWorker(member)) {
-    reminders = (
-      await ctx.db
-        .query('reminders')
-        .withIndex('by_business_status_date', (q) =>
-          q
-            .eq('businessId', businessId)
-            .eq('status', 'open')
-            .lte('date', today),
-        )
-        .collect()
-    ).length
-  }
-
-  return { appointments, overdue, reminders }
 }
 
 export type PushMessage = {

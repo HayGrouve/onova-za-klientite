@@ -184,15 +184,22 @@ async function seedDay(t: TestConvex, b: TestBusiness) {
     businessId: b.businessId,
     name: 'Иван',
   })
-  const jobId = await b.owner.mutation(api.jobs.create, {
+  await b.owner.mutation(api.jobs.create, {
     businessId: b.businessId,
     clientId,
     title: 'Гардероб',
     dueDate: '2026-10-20',
   })
+  // The visit is on another job: an overdue job with a visit today is shown
+  // under the visit, not counted twice.
+  const visitJobId = await b.owner.mutation(api.jobs.create, {
+    businessId: b.businessId,
+    clientId,
+    title: 'Маса',
+  })
   await b.owner.mutation(api.appointments.add, {
     businessId: b.businessId,
-    jobId,
+    jobId: visitJobId,
     date: '2026-10-26',
   })
   await t.run((ctx) =>
