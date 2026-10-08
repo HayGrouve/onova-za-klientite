@@ -156,4 +156,86 @@ describe('files', () => {
       vi.useRealTimers()
     }
   })
+  it('hands out 20 upload URLs at once, then says rate.limited', async () => {
+    const { owner, businessId } = await withJob()
+    for (let n = 0; n < 20; n++) {
+      await owner.mutation(api.files.generateUploadUrl, { businessId })
+    }
+    await expect(
+      owner.mutation(api.files.generateUploadUrl, { businessId }),
+    ).rejects.toThrow(/rate.limited/)
+  })
+
+  it('keeps a business under 1 GB and leaves the count alone when full', async () => {
+    const { t, owner, businessId, target } = await withJob()
+    await t.run((ctx) =>
+      ctx.db.patch('businesses', businessId, {
+        storageBytes: 1024 * MB - 100,
+      }),
+    )
+    const fits = await storeBlob(t, 100, 'image/png')
+    const tooMuch = await storeBlob(t, 101, 'image/png')
+    await expect(
+      owner.mutation(api.files.save, {
+        businessId,
+        storageId: tooMuch,
+        target,
+      }),
+    ).rejects.toThrow(/storage.full/)
+    expect(await storageBytes(t, businessId)).toBe(1024 * MB - 100)
+    expect(await t.run((ctx) => ctx.db.query('files').collect())).toEqual([])
+    const saved = await owner.mutation(api.files.save, {
+      businessId,
+      storageId: fits,
+      target,
+    })
+    expect('fileId' in saved).toBe(true)
+    expect(await storageBytes(t, businessId)).toBe(1024 * MB)
+  })
+
+  it('refuses a blob another file already points to, and keeps it', async () => {
+    const { t, owner, businessId, target } = await withJob()
+    const storageId = await storeBlob(t, 100, 'image/png')
+    const first = await owner.mutation(api.files.save, {
+      businessId,
+      storageId,
+      target,
+    })
+    if (!('fileId' in first)) throw new Error('rejected')
+    await expect(
+      owner.mutation(api.files.save, { businessId, storageId, target }),
+    ).rejects.toThrow(/invalid/)
+    // The second save must not have deleted the first file's blob.
+    expect(
+      await t.run((ctx) => ctx.db.system.get('_storage', storageId)),
+    ).not.toBeNull()
+    expect(await storageBytes(t, businessId)).toBe(100)
+  })
+
+  it('refuses the business logo’s blob as a new file, even a wrong type', async () => {
+    const { t, owner, businessId, target } = await withJob()
+    const storageId = await storeBlob(t, 100, 'image/png')
+    const logo = await owner.mutation(api.files.save, {
+      businessId,
+      storageId,
+      target: { kind: 'logo' },
+    })
+    if (!('fileId' in logo)) throw new Error('rejected')
+    await expect(
+      owner.mutation(api.files.save, { businessId, storageId, target }),
+    ).rejects.toThrow(/invalid/)
+    await expect(
+      owner.mutation(api.files.save, {
+        businessId,
+        storageId,
+        target: { kind: 'logo' },
+      }),
+    ).rejects.toThrow(/invalid/)
+    expect(
+      await t.run((ctx) => ctx.db.system.get('_storage', storageId)),
+    ).not.toBeNull()
+    expect((await getDoc(t, 'businesses', businessId)).logoFileId).toBe(
+      logo.fileId,
+    )
+  })
 })

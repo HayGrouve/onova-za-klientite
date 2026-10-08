@@ -222,3 +222,24 @@ describe('import.duplicatesByPhone', () => {
     ).rejects.toThrow(/invalid/)
   })
 })
+
+describe('import rate limit', () => {
+  it('allows 100 batches at once, then says rate.limited', async () => {
+    const t = setupConvex()
+    const { owner, businessId } = await setupBusiness(t)
+    for (let n = 0; n < 100; n++) {
+      await owner.mutation(api.import.clients, {
+        businessId,
+        skipDuplicates: false,
+        rows: [],
+      })
+    }
+    await expect(
+      owner.mutation(api.import.clients, {
+        businessId,
+        skipDuplicates: false,
+        rows: [],
+      }),
+    ).rejects.toThrow(/rate.limited/)
+  })
+})

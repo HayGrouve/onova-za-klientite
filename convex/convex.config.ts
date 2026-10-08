@@ -1,3 +1,4 @@
+import rateLimiter from '@convex-dev/rate-limiter/convex.config.js'
 import workpool from '@convex-dev/workpool/convex.config.js'
 import { defineApp } from 'convex/server'
 import { v } from 'convex/values'
@@ -22,5 +23,8 @@ const app = defineApp({
 
 // Push fan-out with retries (D12).
 app.use(workpool, { name: 'pushPool' })
+
+// Limits on uploads, push subscriptions, extra businesses and imports (D12).
+app.use(rateLimiter)
 
 export default app

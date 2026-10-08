@@ -10,6 +10,7 @@ import {
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
+import { spend } from './lib/rateLimit'
 import { seesItem, seesJob } from './lib/scope'
 import { optionalText } from './lib/validate'
 
@@ -24,6 +25,8 @@ const IMAGE_TYPES = [
 const PDF_TYPE = 'application/pdf'
 const MAX_IMAGE_BYTES = 10 * MB
 const MAX_PDF_BYTES = 20 * MB
+/** What one business may keep in total. Past it, `save` fails with `storage.full`. */
+const STORAGE_CAP_BYTES = 1024 * MB
 
 /** Uploads no record points to are removed after this long (D14). */
 const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000
@@ -62,6 +65,7 @@ export const generateUploadUrl = businessMutation({
   returns: v.string(),
   handler: async (ctx) => {
     requireRole(ctx.member, 'manager')
+    await spend(ctx, 'uploadUrl', ctx.member._id)
     return await ctx.storage.generateUploadUrl()
   },
 })
@@ -86,6 +90,13 @@ export const save = businessMutation({
     const links = await resolveTarget(ctx, args.target)
     const meta = await ctx.db.system.get('_storage', args.storageId)
     if (!meta) fail('notFound', { table: '_storage' })
+    // A blob a file already points to (this business's logo included) is
+    // someone's. Refused before anything can delete it.
+    const taken = await ctx.db
+      .query('files')
+      .withIndex('by_storage', (q) => q.eq('storageId', args.storageId))
+      .first()
+    if (taken) fail('invalid', { field: 'storageId' })
     const mimeType = (meta.contentType ?? '').toLowerCase()
     const isImage = IMAGE_TYPES.includes(mimeType)
     if (
@@ -98,6 +109,11 @@ export const save = businessMutation({
     if (meta.size > (isImage ? MAX_IMAGE_BYTES : MAX_PDF_BYTES)) {
       await ctx.storage.delete(args.storageId)
       return { rejected: 'size' as const }
+    }
+    if (ctx.business.storageBytes + meta.size > STORAGE_CAP_BYTES) {
+      // The blob stays until cleanupOrphans removes it: a delete here would
+      // be rolled back by the throw.
+      fail('storage.full')
     }
     const name = optionalText(args.name, 'name', 200)
     const fileId = await ctx.db.insert('files', {
