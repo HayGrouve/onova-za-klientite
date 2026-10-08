@@ -14,12 +14,22 @@ import { useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
 import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import { Tip } from '#/components/tip'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '#/components/ui/alert-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +57,8 @@ type Card = Board['columns'][number]['jobs'][number]
 type Stage = Board['stages'][number]
 /** Where a dragged job lands: a stage, or Cancelled when it has no stage left. */
 type Target = Stage | 'cancelled'
+
+const MOVE_TOAST = 'board-move'
 
 // The dot by a column's name carries its group's meaning: open work blue,
 // done green, cancelled red, as on the stage badges (D53).
@@ -76,12 +88,44 @@ export function JobsBoard({
   const board = useQuery(api.jobs.board, { businessId: business._id })
   const move = useMoveJob()
   const [ruleFor, setRuleFor] = useState<Card | null>(null)
+  // A move into Cancelled waits here for a yes.
+  const [asking, setAsking] = useState<{ card: Card; target: Target } | null>(
+    null,
+  )
 
   const stagesOf = (group: StageGroup) =>
     board?.stages.filter((stage) => stage.group === group) ?? []
+  // Tells the person where the job went, with a way back to where it was.
+  const announce = (card: Card, target: Target) => {
+    const previous = board?.stages.find((stage) => stage._id === card.stageId)
+    const group = target === 'cancelled' ? 'cancelled' : target.group
+    const undo = previous
+      ? {
+          label: m.undo(),
+          onClick: () => void move({ ...card, stageGroup: group }, previous),
+        }
+      : undefined
+    toast.success(
+      m.job_stage_moved({
+        stage: target === 'cancelled' ? GROUP_LABEL.cancelled() : target.name,
+      }),
+      { id: MOVE_TOAST, duration: 6000, action: undo },
+    )
+  }
+  const moveNow = (card: Card, target: Target) => {
+    void move(card, target, () => announce(card, target)).then(
+      (offer) => offer && setRuleFor(card),
+    )
+  }
   const moveTo = (card: Card, target: Target) => {
     if (target !== 'cancelled' && target._id === card.stageId) return
-    void move(card, target).then((offer) => offer && setRuleFor(card))
+    const toCancelled = target === 'cancelled' || target.group === 'cancelled'
+    // Cancelled jobs stop counting as owed, so ask before a job goes there.
+    if (toCancelled && card.stageGroup !== 'cancelled') {
+      setAsking({ card, target })
+      return
+    }
+    moveNow(card, target)
   }
   const { drag, press, wasDragged } = useCardDrag((card, key) => {
     const [kind, id] = key.split(':')
@@ -134,6 +178,31 @@ export function JobsBoard({
         </div>
       )}
       <RuleReminderSheet job={ruleFor} onClose={() => setRuleFor(null)} />
+      <AlertDialog
+        open={asking !== null}
+        onOpenChange={(open) => !open && setAsking(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {m.board_cancel_question({ title: asking?.card.title ?? '' })}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {/* First in the page order, so focus lands on it, as in ConfirmAction. */}
+            <AlertDialogCancel>{m.cancel()}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (asking) moveNow(asking.card, asking.target)
+                setAsking(null)
+              }}
+            >
+              {m.board_cancel_confirm()}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
