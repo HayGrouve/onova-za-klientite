@@ -1,9 +1,61 @@
 import { v } from 'convex/values'
-import type { Id } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
 import { isValidMonth, monthRange } from '../shared/dates'
 import { sumCents } from '../shared/money'
 import { businessQuery, requireRole } from './lib/auth'
 import { fail } from './lib/errors'
+
+/**
+ * The four figures Today shows, without the lists the Money screen builds:
+ * what is still owed (and on how many jobs, how many of them done), what came
+ * in this month, and the profit.
+ */
+export const headline = businessQuery({
+  args: { month: v.string() },
+  returns: v.object({
+    stillOwedCents: v.number(),
+    owingJobs: v.number(),
+    doneOwingJobs: v.number(),
+    receivedCents: v.number(),
+    profitCents: v.number(),
+  }),
+  handler: async (ctx, { month }) => {
+    // Level 2: a Worker sees no totals.
+    requireRole(ctx.member, 'manager')
+    if (!isValidMonth(month)) fail('invalid', { field: 'month' })
+    const businessId = ctx.business._id
+    const { from, to } = monthRange(month)
+    const payments = await ctx.db
+      .query('payments')
+      .withIndex('by_business_date', (q) =>
+        q.eq('businessId', businessId).gte('date', from).lte('date', to),
+      )
+      .collect()
+    const costs = await ctx.db
+      .query('costs')
+      .withIndex('by_business_date', (q) =>
+        q.eq('businessId', businessId).gte('date', from).lte('date', to),
+      )
+      .collect()
+    const owing = await ctx.db
+      .query('jobs')
+      .withIndex('by_business_owes', (q) =>
+        q.eq('businessId', businessId).eq('owes', true),
+      )
+      .collect()
+    const receivedCents = sumCents(
+      payments.map((payment) => payment.amountCents),
+    )
+    return {
+      stillOwedCents: sumCents(owing.map((job) => job.balanceCents)),
+      owingJobs: owing.length,
+      doneOwingJobs: owing.filter((job) => job.stageGroup === 'done').length,
+      receivedCents,
+      profitCents:
+        receivedCents - sumCents(costs.map((cost) => cost.amountCents)),
+    }
+  },
+})
 
 /**
  * The Money screen for one month (Calculated values in the plan): received,
@@ -89,7 +141,7 @@ export const summary = businessQuery({
       )
       .collect()
     const byClient = new Map<
-      string,
+      Id<'clients'>,
       {
         owedCents: number
         doneOwedCents: number
@@ -113,20 +165,29 @@ export const summary = businessQuery({
       byClient.set(job.clientId, entry)
     }
 
-    const clients = await ctx.db
+    // Only the clients that appear: who owes, and who paid this month.
+    const clientIds = new Set<Id<'clients'>>([
+      ...byClient.keys(),
+      ...payments.map((payment) => payment.clientId),
+    ])
+    const clientById = new Map<string, Doc<'clients'>>()
+    for (const clientId of clientIds) {
+      const client = await ctx.db.get('clients', clientId)
+      if (client) clientById.set(clientId, client)
+    }
+    const withCredit = await ctx.db
       .query('clients')
-      .withIndex('by_business_name', (q) => q.eq('businessId', businessId))
+      .withIndex('by_business_credit', (q) =>
+        q.eq('businessId', businessId).gt('creditCents', 0),
+      )
       .collect()
-    const clientById = new Map(
-      clients.map((client) => [client._id as string, client]),
-    )
 
     // Q7: everyone with a balance; done work first, then the most owed.
     const whoOwesMe = [...byClient.entries()]
       .map(([clientId, entry]) => {
         const client = clientById.get(clientId)
         return {
-          clientId: client!._id,
+          clientId,
           name: client?.name ?? '',
           isNoClient: client?.isNoClient ?? false,
           phone: client?.phones.at(0)?.e164,
@@ -200,11 +261,7 @@ export const summary = businessQuery({
       costCents,
       profitCents: receivedCents - costCents,
       stillOwedCents: sumCents(owing.map((job) => job.balanceCents)),
-      creditHeldCents: sumCents(
-        clients
-          .filter((client) => client.creditCents > 0)
-          .map((client) => client.creditCents),
-      ),
+      creditHeldCents: sumCents(withCredit.map((client) => client.creditCents)),
       whoOwesMe,
       payments: paymentRows,
       costs: costs

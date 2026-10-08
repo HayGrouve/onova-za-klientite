@@ -50,6 +50,36 @@ describe('money.summary', () => {
     await expectCachesFresh(t)
   })
 
+  it('the Today headline matches the Money screen, without its lists', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-25T10:00:00Z'))
+    vi.stubEnv('ALLOW_SEED', 'true')
+    const t = setupConvex()
+    const owner = t.withIdentity(OWNER)
+    await owner.mutation(api.users.ensureCurrent, {})
+    await t.mutation(internal.seed.dev, {})
+    const viewer = await owner.query(api.users.viewer, {})
+    const furniture = viewer!.businesses.find(
+      (b) => b.name === 'Мебели Стоянов',
+    )!
+    const args = { businessId: furniture._id, month: '2026-10' }
+
+    const summary = await owner.query(api.money.summary, args)
+    const headline = await owner.query(api.money.headline, args)
+    expect(headline).toEqual({
+      stillOwedCents: summary.stillOwedCents,
+      owingJobs: summary.whoOwesMe.reduce((sum, row) => sum + row.jobs, 0),
+      doneOwingJobs: summary.whoOwesMe.reduce(
+        (sum, row) => sum + row.doneJobs,
+        0,
+      ),
+      receivedCents: summary.receivedCents,
+      profitCents: summary.profitCents,
+    })
+    expect(headline.owingJobs).toBe(3)
+    expect(headline.doneOwingJobs).toBe(1)
+  })
+
   it('a refund lowers what was received in its month', async () => {
     const t = setupConvex()
     const { owner, businessId } = await setupBusiness(t)
