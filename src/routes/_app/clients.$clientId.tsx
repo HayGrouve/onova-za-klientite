@@ -293,7 +293,7 @@ function ClientPage() {
                     aria-label={m.new_job_label({ job: words.job.singular })}
                     className={buttonVariants({
                       variant: 'ghost',
-                      className: 'h-9 text-primary',
+                      className: 'h-11 text-primary lg:h-9',
                     })}
                   >
                     <PlusIcon data-icon="inline-start" />
@@ -427,7 +427,7 @@ function ClientPage() {
                         search={{ clientId: client._id }}
                         className={buttonVariants({
                           variant: 'ghost',
-                          className: 'h-9 text-primary',
+                          className: 'h-11 text-primary lg:h-9',
                         })}
                       >
                         <PlusIcon data-icon="inline-start" />

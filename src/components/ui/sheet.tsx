@@ -72,7 +72,8 @@ function SheetContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-3 right-3"
+                // Local change: the 28 px button gets a 44+ px hit area.
+                className="absolute top-3 right-3 after:absolute after:-inset-2.5 after:content-['']"
                 size="icon-sm"
               />
             }

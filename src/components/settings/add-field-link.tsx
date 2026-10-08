@@ -17,7 +17,7 @@ export function AddFieldLink({ target }: { target: Target }) {
       <Button
         type="button"
         variant="link"
-        className="h-9 w-fit px-0"
+        className="h-11 w-fit px-0 lg:h-9"
         onClick={() => setOpen(true)}
       >
         {m.fields_settings_add_link()}
