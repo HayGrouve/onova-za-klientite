@@ -4,6 +4,7 @@ import { useMutation } from 'convex/react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
+import { ConfirmAction } from '#/components/confirm-action'
 import { useSubmit } from '#/components/money/use-submit'
 import { REPEAT_LABEL } from '#/components/setup/steps'
 import { Button, buttonVariants } from '#/components/ui/button'
@@ -61,19 +62,21 @@ export function RepeatSection({
               date={nextJobDate(dated, job.repeat)}
             />
           </div>
-          <Button
-            variant="outline"
-            className="h-11 rounded-xl"
-            disabled={busy}
-            onClick={() =>
-              void run(
-                () => stopRepeat({ businessId: business._id, jobId: job._id }),
-                m.repeat_stopped(),
-              )
-            }
-          >
-            {m.repeat_stop()}
-          </Button>
+          <div className="w-full">
+            <ConfirmAction
+              variant="outline"
+              label={m.repeat_stop()}
+              question={m.repeat_stop_question()}
+              busy={busy}
+              onConfirm={() =>
+                void run(
+                  () =>
+                    stopRepeat({ businessId: business._id, jobId: job._id }),
+                  m.repeat_stopped(),
+                )
+              }
+            />
+          </div>
         </PanelBody>
       ) : !pickJobDate(dated) ? (
         <PanelBody className="text-sm text-muted-foreground">
