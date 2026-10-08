@@ -51,6 +51,7 @@ export function useMoveJob() {
             return {
               ...column,
               jobs: boardColumn(column.group, jobs, jobs.length).jobs,
+              olderOwing: column.olderOwing.filter((job) => job._id !== jobId),
               total: column.total - (left ? 1 : 0) + (arrives ? 1 : 0),
               owedCents:
                 column.owedCents -

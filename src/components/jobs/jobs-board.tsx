@@ -127,7 +127,14 @@ export function JobsBoard({
           <Column
             key={column.group}
             column={column}
-            cards={filterJobs(column.jobs, filter, today)}
+            cards={filterJobs(
+              // The owing filter finds every Done job that owes, not only the latest.
+              filter.owing
+                ? [...column.jobs, ...column.olderOwing]
+                : column.jobs,
+              filter,
+              today,
+            )}
             filter={filter}
             filtering={filtering}
             stages={stagesOf(column.group)}

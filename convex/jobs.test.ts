@@ -447,6 +447,10 @@ describe('jobs board', () => {
     expect(column.jobs).toHaveLength(20)
     expect(column.jobs[0].title).toBe('Най-нов')
     expect(column.owedCents).toBe(512 * 1000)
+    // The owing filter can still find every Done job that owes.
+    expect(column.olderOwing).toHaveLength(512 - 20)
+    const shown = new Set(column.jobs.map((job) => job._id))
+    expect(column.olderOwing.some((job) => shown.has(job._id))).toBe(false)
   })
 
   it('shows another business nothing', async () => {

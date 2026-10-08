@@ -273,6 +273,11 @@ export const board = businessQuery({
       v.object({
         group: vStageGroup,
         jobs: v.array(vJobRow),
+        /**
+         * Done jobs that still owe but are older than the cards shown, so the
+         * "owing" filter finds every one of them.
+         */
+        olderOwing: v.array(vJobRow),
         total: v.number(),
         owedCents: v.number(),
       }),
@@ -294,6 +299,7 @@ export const board = businessQuery({
         )
         .take(LIST_LIMIT)
       let column = boardColumn(group, jobs)
+      let olderOwing: typeof jobs = []
       if (!isOpenGroup(group)) {
         // A long history outgrows one read, so the latest closed jobs come
         // from their own index, and what Done still owes from the owes index.
@@ -321,12 +327,24 @@ export const board = businessQuery({
           total: column.total,
           owedCents: boardColumn(group, owing).owedCents,
         }
+        const shown = new Set(column.jobs.map((job) => job._id))
+        olderOwing = boardColumn(
+          group,
+          owing.filter((job) => !shown.has(job._id)),
+          owing.length,
+        ).jobs
       }
-      const rows = []
-      for (const job of column.jobs) {
-        rows.push(await jobRow(ctx, job, lookups, now))
+      const rows = async (list: typeof jobs) => {
+        const out = []
+        for (const job of list) out.push(await jobRow(ctx, job, lookups, now))
+        return out
       }
-      columns.push({ ...column, group, jobs: rows })
+      columns.push({
+        ...column,
+        group,
+        jobs: await rows(column.jobs),
+        olderOwing: await rows(olderOwing),
+      })
     }
     const stages = await ctx.db
       .query('stages')
