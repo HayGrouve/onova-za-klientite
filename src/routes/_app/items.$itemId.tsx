@@ -352,6 +352,7 @@ function MovePicker({
       </ToggleGroup>
       {asking && chosen ? (
         <ConfirmQuestion
+          tone="default"
           question={
             jobsWord
               ? m.item_move_question_jobs({

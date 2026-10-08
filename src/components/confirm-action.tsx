@@ -61,6 +61,7 @@ export function ConfirmQuestion({
   confirmLabel,
   cancelLabel = m.cancel(),
   busy = false,
+  tone = 'destructive',
   onConfirm,
   onCancel,
 }: {
@@ -69,6 +70,8 @@ export function ConfirmQuestion({
   /** "Cancel" unless that word could be read as the action itself. */
   cancelLabel?: React.ReactNode
   busy?: boolean
+  /** Red for what removes or stops something; plain for a move. */
+  tone?: 'destructive' | 'default'
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -85,7 +88,7 @@ export function ConfirmQuestion({
         <Button
           type="button"
           size="xl"
-          variant="destructive"
+          variant={tone}
           className="flex-1"
           disabled={busy}
           onClick={onConfirm}
