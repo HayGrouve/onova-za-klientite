@@ -113,10 +113,10 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
           // The dot sits on the line: 16px padding, half the 2px line, half the 10px dot.
           className="relative flex flex-col gap-0.5 before:absolute before:top-1.5 before:-left-[22px] before:size-2.5 before:rounded-full before:bg-primary/70 before:ring-3 before:ring-card first:before:bg-primary"
         >
-          <span className="text-sm">
+          <span className="text-sm break-words">
             {describe(item, business.words, today)}
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs break-words text-muted-foreground">
             {WHEN.format(item._creationTime)}
             {item.actorName && ` · ${item.actorName}`}
           </span>

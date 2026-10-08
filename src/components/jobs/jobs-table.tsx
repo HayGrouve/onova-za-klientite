@@ -130,6 +130,7 @@ export function JobsTable({
                   <Link
                     to="/jobs/$jobId"
                     params={{ jobId: job._id }}
+                    title={job.title}
                     className="block truncate font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
                     {job.title}
@@ -148,6 +149,7 @@ export function JobsTable({
                     WIDE_ONLY,
                     'max-w-56 truncate px-4 text-muted-foreground',
                   )}
+                  title={client || undefined}
                 >
                   {client}
                 </TableCell>

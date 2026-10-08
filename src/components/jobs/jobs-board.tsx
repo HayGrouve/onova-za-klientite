@@ -501,8 +501,9 @@ function BoardCard({
   return (
     <li
       onPointerDown={canMove ? onPress : undefined}
+      inert={dragged}
       className={cn(
-        'group/card relative overflow-hidden surface transition-[opacity,box-shadow] duration-150 hover:shadow-md',
+        'group/card relative overflow-hidden surface transition-[opacity,box-shadow] duration-150 row-lazy hover:shadow-md',
         canMove && 'cursor-grab touch-manipulation select-none',
         dragged && 'opacity-40',
         late && 'shadow-[inset_3px_0_0_var(--destructive)]',
@@ -561,7 +562,7 @@ function CardFace({ card, today }: { card: Card; today: string }) {
       {/* On a narrow column the stage sits on its own line above the title, so
           the title gets the card's whole width; from xl it shares the line. */}
       <span className="flex flex-col-reverse gap-1.5 xl:flex-row xl:items-start xl:justify-between xl:gap-2">
-        <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium">
+        <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium break-words">
           {card.title}
         </span>
         {/* Pulled over the card's padding onto its top and right edges. */}
@@ -575,7 +576,9 @@ function CardFace({ card, today }: { card: Card; today: string }) {
       <span className="flex flex-col gap-1 pr-7 text-xs text-muted-foreground">
         {!card.isNoClient && (
           <Meta icon={UserIcon}>
-            <span className="line-clamp-2 min-w-0">{card.clientName}</span>
+            <span className="line-clamp-2 min-w-0 break-words">
+              {card.clientName}
+            </span>
           </Meta>
         )}
         {timing && (
@@ -615,7 +618,7 @@ function MoveMenu({
         <DropdownMenuTrigger
           aria-label={label}
           data-no-drag
-          className="absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,background-color] outline-none group-hover/card:opacity-100 hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:opacity-100"
+          className="absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,background-color] outline-none group-hover/card:opacity-100 hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:opacity-100 pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-[''] [@media(hover:none)]:opacity-100"
         >
           <ArrowsLeftRightIcon className="size-4" />
         </DropdownMenuTrigger>

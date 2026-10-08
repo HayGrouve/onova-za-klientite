@@ -134,9 +134,7 @@ async function expectJobPage(page: Page, b: Business) {
     page.getByRole('heading', { name: b.jobTitle, level: 1 }),
   ).toBeVisible()
 
-  const chips = page
-    .getByRole('radiogroup', { name: 'Етап' })
-    .getByRole('radio')
+  const chips = page.getByRole('group', { name: 'Етап' }).getByRole('button')
   await expect(chips).toHaveText(b.stages)
 
   if (b.repeat) {
@@ -154,9 +152,9 @@ async function expectJobPage(page: Page, b: Business) {
     await expect(offer).toBeVisible()
     await page.getByRole('button', { name: 'Не сега' }).click()
     await expect(offer).toBeHidden()
-    await expect(doneChip).toHaveAttribute('aria-checked', 'true')
+    await expect(doneChip).toHaveAttribute('aria-pressed', 'true')
   } else {
-    await expect(doneChip).toHaveAttribute('aria-checked', 'true')
+    await expect(doneChip).toHaveAttribute('aria-pressed', 'true')
     await expect(offer).toHaveCount(0)
   }
 }

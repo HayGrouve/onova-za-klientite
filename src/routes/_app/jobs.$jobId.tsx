@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import { ConfirmAction } from '#/components/confirm-action'
 import { ListExtras } from '#/components/list-extras'
 import { AddressLink } from '#/components/address-link'
 import { ExtraFieldsView } from '#/components/extra-fields'
@@ -59,6 +60,7 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { useSheetGuard } from '#/hooks/use-discard-guard'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useMoveJob } from '#/hooks/use-move-job'
@@ -70,6 +72,7 @@ import { m } from '#/paraglide/messages.js'
 import { jobProfitCents, jobProfitIsFinal } from '../../../shared/allocation'
 import { addMonths, isOverdue } from '../../../shared/dates'
 import { formatMoney, lineTotalCents } from '../../../shared/money'
+import { formatQuantity } from '../../../shared/quantity'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
 import type { StageGroup } from '../../../shared/stages'
@@ -99,10 +102,12 @@ const STAGE_TOAST = 'stage-moved'
 
 // The current stage is the one filled chip; colour follows its group (D53).
 const CURRENT_STAGE: Record<StageGroup, string> = {
-  new: 'bg-primary text-primary-foreground',
-  in_progress: 'bg-primary text-primary-foreground',
-  done: 'bg-green-600 text-white',
-  cancelled: 'bg-destructive text-white',
+  new: 'aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground',
+  in_progress:
+    'aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground',
+  done: 'aria-pressed:bg-green-600 aria-pressed:text-white aria-pressed:hover:bg-green-600 aria-pressed:hover:text-white',
+  cancelled:
+    'aria-pressed:bg-destructive aria-pressed:text-white aria-pressed:hover:bg-destructive aria-pressed:hover:text-white',
 }
 
 /** One fact about the job, with an icon in front. */
@@ -152,6 +157,9 @@ function JobPage() {
   // The stage toast waits here while the reminder offer is open (see moveTo).
   const afterSheet = useRef<(() => void) | null>(null)
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
+  const [usingCredit, setUsingCredit] = useState(false)
+  // The edit, lines, appointment and cost forms ask before dropping what was typed.
+  const guard = useSheetGuard()
   const { words, modules } = business
 
   // A toast's undo and payment buttons belong to this job's page.
@@ -224,6 +232,7 @@ function JobPage() {
     })
   }
   const close = () => {
+    guard.setDirty(false)
     setPanel(null)
     afterSheet.current?.()
     afterSheet.current = null
@@ -245,7 +254,7 @@ function JobPage() {
   return (
     <div className="flex flex-col gap-4 pb-6">
       <header className="flex items-start justify-between gap-3 px-4 pt-2">
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight">
+        <h1 className="min-w-0 text-2xl leading-tight font-semibold tracking-tight text-balance break-words">
           {job.title}
         </h1>
         <div className="flex shrink-0 items-center gap-1">
@@ -333,22 +342,24 @@ function JobPage() {
                 hint={<Hint term={m.job_stage()}>{m.hint_stage()}</Hint>}
               >
                 <PanelBody>
-                  <div
-                    className="flex flex-wrap gap-2"
-                    role="radiogroup"
+                  <ToggleGroup
                     aria-label={m.job_stage()}
+                    value={[job.stageId]}
+                    onValueChange={(next: string[]) => {
+                      // The current stage can't be switched off: only a move counts.
+                      if (next[0] && next[0] !== job.stageId)
+                        moveTo(next[0] as Id<'stages'>)
+                    }}
+                    className="w-full flex-wrap"
                   >
                     {data.stages.map((stage) => {
                       const current = stage._id === job.stageId
                       return (
-                        <button
+                        <ToggleGroupItem
                           key={stage._id}
-                          type="button"
-                          role="radio"
-                          aria-checked={current}
-                          onClick={() => !current && moveTo(stage._id)}
+                          value={stage._id}
                           className={cn(
-                            'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-[background-color,color,transform] duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95',
+                            'h-9 max-w-full rounded-full px-3.5 whitespace-normal ring-offset-0 duration-200 active:scale-95',
                             current
                               ? cn('shadow-sm', CURRENT_STAGE[stage.group])
                               : cn(
@@ -367,12 +378,12 @@ function JobPage() {
                             />
                           )}
                           {stage.name}
-                        </button>
+                        </ToggleGroupItem>
                       )
                     })}
-                  </div>
+                  </ToggleGroup>
                   {job.cancelReason && job.stageGroup === 'cancelled' && (
-                    <p className="pt-3 text-sm text-muted-foreground">
+                    <p className="pt-3 text-sm break-words text-muted-foreground">
                       {m.job_cancel_reason()}: {job.cancelReason}
                     </p>
                   )}
@@ -411,7 +422,7 @@ function JobPage() {
                           )}
                         </span>
                         {appointment.label && (
-                          <span className="truncate text-sm text-muted-foreground">
+                          <span className="min-w-0 truncate text-sm text-muted-foreground">
                             {appointment.label}
                           </span>
                         )}
@@ -508,37 +519,48 @@ function JobPage() {
                   </>
                 )}
                 {client && client.creditCents > 0 && job.owes && (
-                  <div className="flex items-center justify-between gap-3 border-t border-border/70 bg-primary/5 py-2 pr-2 pl-4">
-                    <span className="text-sm font-medium">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 bg-primary/5 py-2 pr-2 pl-4">
+                    <span className="min-w-0 flex-1 basis-40 text-sm font-medium">
                       {m.credit_banner({
                         amount: formatMoney(client.creditCents),
                       })}
                     </span>
-                    <Button
-                      variant="outline"
-                      className="h-10 border-primary bg-background text-primary hover:bg-primary/10 dark:bg-background dark:hover:bg-primary/15"
-                      onClick={() =>
-                        void applyCredit({
-                          businessId: business._id,
-                          jobId: job._id,
-                        })
-                          .then((cents) =>
-                            toast.success(
-                              m.credit_used({ amount: formatMoney(cents) }),
-                            ),
-                          )
-                          .catch((error: unknown) =>
-                            toast.error(errorMessage(error)),
-                          )
-                      }
-                    >
-                      {m.credit_use()}
-                    </Button>
+                    {/* Nothing reverses it in one step, so it asks first. */}
+                    <div className="max-w-full">
+                      <ConfirmAction
+                        label={m.credit_use()}
+                        question={m.credit_use_question({
+                          amount: formatMoney(
+                            Math.min(client.creditCents, job.balanceCents),
+                          ),
+                        })}
+                        confirmLabel={m.credit_use()}
+                        variant="outline"
+                        busy={usingCredit}
+                        className="h-10 border-primary bg-background text-primary hover:bg-primary/10 dark:bg-background dark:hover:bg-primary/15"
+                        onConfirm={() => {
+                          setUsingCredit(true)
+                          void applyCredit({
+                            businessId: business._id,
+                            jobId: job._id,
+                          })
+                            .then((cents) =>
+                              toast.success(
+                                m.credit_used({ amount: formatMoney(cents) }),
+                              ),
+                            )
+                            .catch((error: unknown) =>
+                              toast.error(errorMessage(error)),
+                            )
+                            .finally(() => setUsingCredit(false))
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
                 {job.writeOff && (
                   <div className="flex items-center justify-between gap-3 border-t border-border/70 py-1.5 pr-2 pl-4 text-sm text-muted-foreground">
-                    <span>
+                    <span className="min-w-0 break-words">
                       {m.job_written_off()}:{' '}
                       {formatMoney(job.writeOff.amountCents)} ·{' '}
                       {job.writeOff.note}
@@ -572,7 +594,7 @@ function JobPage() {
                           className="flex w-full flex-col gap-0.5 pressable px-4 py-2.5 text-left text-sm"
                         >
                           <span className="flex w-full items-baseline justify-between gap-3">
-                            <span>
+                            <span className="min-w-0 break-words">
                               {payment.label ?? METHOD_LABEL[payment.method]()}{' '}
                               ·{' '}
                               <span className="text-muted-foreground">
@@ -617,11 +639,11 @@ function JobPage() {
                         key={line.id}
                         className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm"
                       >
-                        <span className="min-w-0">
+                        <span className="min-w-0 break-words">
                           {line.description}
                           <span className="text-muted-foreground">
                             {' '}
-                            · {String(line.quantity).replace('.', ',')} ×{' '}
+                            · {formatQuantity(line.quantity)} ×{' '}
                             {formatMoney(line.unitPriceCents)}
                           </span>
                         </span>
@@ -663,7 +685,7 @@ function JobPage() {
                         onClick={() => setPanel({ kind: 'cost', cost })}
                         className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left text-sm"
                       >
-                        <span>
+                        <span className="min-w-0 break-words">
                           {cost.label} ·{' '}
                           <span className="text-muted-foreground">
                             {formatDay(cost.date, today)}
@@ -730,7 +752,7 @@ function JobPage() {
             key: 'notes',
             node: job.notes && (
               <Panel title={m.job_notes()} icon={NoteIcon}>
-                <PanelBody className="text-sm whitespace-pre-wrap">
+                <PanelBody className="text-sm break-words whitespace-pre-wrap">
                   {job.notes}
                 </PanelBody>
               </Panel>
@@ -780,7 +802,10 @@ function JobPage() {
         ]}
       />
 
-      <Sheet open={panel !== null} onOpenChange={(open) => !open && close()}>
+      <Sheet
+        open={panel !== null}
+        onOpenChange={(open) => !open && guard.close(close)}
+      >
         <SheetContent
           side="bottom"
           className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
@@ -815,6 +840,7 @@ function JobPage() {
                 job={job}
                 fields={fields}
                 onDone={close}
+                onDirtyChange={guard.setDirty}
               />
             )}
             {panel?.kind === 'lines' && (
@@ -823,6 +849,7 @@ function JobPage() {
                 job={job}
                 services={services ?? []}
                 onDone={close}
+                onDirtyChange={guard.setDirty}
               />
             )}
             {panel?.kind === 'appointment' && (
@@ -832,6 +859,7 @@ function JobPage() {
                 appointment={panel.appointment}
                 today={today}
                 onDone={close}
+                onDirtyChange={guard.setDirty}
               />
             )}
             {panel?.kind === 'payment' && (
@@ -883,6 +911,7 @@ function JobPage() {
                 cost={panel.cost}
                 today={today}
                 onDone={close}
+                onDirtyChange={guard.setDirty}
               />
             )}
             {panel?.kind === 'reminder' && (
@@ -922,6 +951,7 @@ function JobPage() {
           </div>
         </SheetContent>
       </Sheet>
+      {guard.prompt}
       <PaymentSheet
         businessId={business._id}
         paymentId={openPayment}

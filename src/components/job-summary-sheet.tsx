@@ -23,7 +23,13 @@ import { m } from '#/paraglide/messages.js'
 
 const FILE_NAME = 'summary.png'
 
-type Made = { blob: Blob; file: File; url: string }
+type Made = {
+  blob: Blob
+  file: File
+  url: string
+  /** The picture's own size, so its place is kept before it has loaded. */
+  size?: { width: number; height: number }
+}
 
 /** Makes the PNG as soon as the input is known, so a tap can share at once. */
 function useSummaryImage(input: SummaryInput | undefined, logoUrl?: string) {
@@ -35,16 +41,28 @@ function useSummaryImage(input: SummaryInput | undefined, logoUrl?: string) {
   useEffect(() => {
     if (!input || key === undefined) return
     let cancelled = false
+    // A function, so the check after an await isn't narrowed away.
+    const stale = () => cancelled
     let url: string | undefined
     setFailed(false)
     renderSummaryPng(input, logoUrl).then(
-      (blob) => {
-        if (cancelled) return
+      async (blob) => {
+        if (stale()) return
+        const size = await createImageBitmap(blob).then(
+          (bitmap) => {
+            const found = { width: bitmap.width, height: bitmap.height }
+            bitmap.close()
+            return found
+          },
+          () => undefined,
+        )
+        if (stale()) return
         url = URL.createObjectURL(blob)
         setMade({
           blob,
           file: new File([blob], FILE_NAME, { type: 'image/png' }),
           url,
+          size,
         })
       },
       () => !cancelled && setFailed(true),
@@ -128,7 +146,10 @@ function SummaryBody({
   }
   if (!made || !input) {
     return (
-      <p className="px-4 py-12 text-center text-sm text-muted-foreground">
+      <p
+        role="status"
+        className="px-4 py-12 text-center text-sm text-muted-foreground"
+      >
         {m.summary_preparing()}
       </p>
     )
@@ -152,11 +173,13 @@ function SummaryBody({
 
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
         <img
           src={made.url}
+          width={made.size?.width}
+          height={made.size?.height}
           alt={m.summary_preview_alt()}
-          className="mx-auto w-full max-w-sm rounded-xl border bg-white"
+          className="mx-auto h-auto w-full max-w-sm rounded-xl border bg-white"
         />
       </div>
       <div className="flex flex-col gap-2 px-4 pb-4">
