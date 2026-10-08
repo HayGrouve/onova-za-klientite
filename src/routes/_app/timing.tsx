@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { PageTitle } from '#/components/page'
+import { ConfirmAction } from '#/components/confirm-action'
 import { Button } from '#/components/ui/button'
 import {
   applyTimingFlag,
@@ -11,6 +12,12 @@ import {
 import { m } from '#/paraglide/messages.js'
 
 export const Route = createFileRoute('/_app/timing')({ component: TimingPage })
+
+const WHEN = new Intl.DateTimeFormat('bg-BG', {
+  dateStyle: 'short',
+  timeStyle: 'medium',
+  timeZone: 'Europe/Sofia',
+})
 
 const FLOW_LABEL = { setup: m.timing_flow_setup, newJob: m.timing_flow_new_job }
 
@@ -32,7 +39,7 @@ function TimingPage() {
               >
                 <span>{FLOW_LABEL[record.flow]()}</span>
                 <span className="text-sm text-muted-foreground tabular-nums">
-                  {new Date(record.at).toLocaleString('bg-BG')}
+                  {WHEN.format(record.at)}
                 </span>
                 <span className="font-medium tabular-nums">
                   {formatDuration(record.ms)}
@@ -42,16 +49,15 @@ function TimingPage() {
           </ul>
         )}
         <div className="flex gap-2">
-          <Button
+          <ConfirmAction
             variant="outline"
-            size="xl"
-            onClick={() => {
+            label={m.timing_clear()}
+            question={m.timing_clear_question()}
+            onConfirm={() => {
               clearTimings()
               setRecords([])
             }}
-          >
-            {m.timing_clear()}
-          </Button>
+          />
           <Button
             variant="ghost"
             size="xl"

@@ -1,6 +1,6 @@
 import { PlusIcon, XIcon } from '@phosphor-icons/react'
 import { useMutation } from 'convex/react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useSubmit } from '#/components/money/use-submit'
@@ -78,7 +78,9 @@ function AddFieldForm({
   const { busy, run } = useSubmit(onDone)
   const [name, setName] = useState('')
   const [type, setType] = useState<FieldType>('text')
-  const [options, setOptions] = useState<string[]>([''])
+  // Each option row keeps its own key, so removing a middle one moves no focus.
+  const nextKey = useRef(1)
+  const [options, setOptions] = useState([{ key: 0, value: '' }])
   const [showInList, setShowInList] = useState(false)
 
   return (
@@ -98,7 +100,7 @@ function AddFieldForm({
             type,
             options:
               type === 'choice'
-                ? options.map((option) => option.trim()).filter(Boolean)
+                ? options.map((option) => option.value.trim()).filter(Boolean)
                 : undefined,
             showInList,
           }),
@@ -113,9 +115,8 @@ function AddFieldForm({
           <Input
             id="new-field-name"
             required
-            autoFocus
+            name="new-field-name"
             maxLength={60}
-            autoComplete="off"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -130,16 +131,18 @@ function AddFieldForm({
             <FieldLabel>{m.fields_settings_options()}</FieldLabel>
             <div className="flex flex-col gap-2">
               {options.map((option, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={option.key} className="flex gap-2">
                   <Input
                     aria-label={m.fields_settings_option_name()}
+                    name={`new-field-option-${index}`}
                     maxLength={60}
-                    autoComplete="off"
-                    value={option}
+                    value={option.value}
                     onChange={(event) =>
                       setOptions(
-                        options.map((item, i) =>
-                          i === index ? event.target.value : item,
+                        options.map((item) =>
+                          item.key === option.key
+                            ? { ...item, value: event.target.value }
+                            : item,
                         ),
                       )
                     }
@@ -151,7 +154,9 @@ function AddFieldForm({
                       size="icon-xl"
                       aria-label={m.remove()}
                       onClick={() =>
-                        setOptions(options.filter((_, i) => i !== index))
+                        setOptions(
+                          options.filter((item) => item.key !== option.key),
+                        )
                       }
                     >
                       <XIcon />
@@ -164,7 +169,12 @@ function AddFieldForm({
                   type="button"
                   variant="ghost"
                   className="h-11 w-fit"
-                  onClick={() => setOptions([...options, ''])}
+                  onClick={() =>
+                    setOptions([
+                      ...options,
+                      { key: nextKey.current++, value: '' },
+                    ])
+                  }
                 >
                   <PlusIcon data-icon="inline-start" />
                   {m.fields_settings_option_add()}

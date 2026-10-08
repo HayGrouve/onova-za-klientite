@@ -19,6 +19,7 @@ import { Panel, PanelBody, PanelList } from '#/components/panel'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { Tip } from '#/components/tip'
+import { ListNote } from '#/components/list-section'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { DetailError } from '#/components/not-found'
 import { Timeline } from '#/components/timeline'
@@ -32,6 +33,7 @@ import {
 } from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { useSheetGuard } from '#/hooks/use-discard-guard'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
@@ -56,6 +58,7 @@ function ItemPage() {
     itemId,
   })
   usePageTitle(data?.item.name)
+  const guard = useSheetGuard()
   const [panel, setPanel] = useState<'edit' | 'move' | 'reminder' | null>(null)
   const reminders = useQuery(
     api.reminders.forItem,
@@ -82,7 +85,7 @@ function ItemPage() {
     <div className="flex flex-col gap-4 pb-6 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
       <header className="flex flex-col gap-2 px-4 pt-2 lg:col-span-2">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight">
+          <h1 className="min-w-0 text-2xl leading-tight font-semibold tracking-tight text-balance break-words">
             {item.name}
           </h1>
           <Tip label={m.edit()}>
@@ -159,15 +162,19 @@ function ItemPage() {
           count={data.jobs.length || undefined}
         >
           <PanelList>
-            {data.jobs.map((job) => (
-              <JobRow
-                key={job._id}
-                job={job}
-                today={today}
-                showClient={false}
-                showDone
-              />
-            ))}
+            {data.jobs.length === 0 ? (
+              <ListNote>{m.client_no_jobs()}</ListNote>
+            ) : (
+              data.jobs.map((job) => (
+                <JobRow
+                  key={job._id}
+                  job={job}
+                  today={today}
+                  showClient={false}
+                  showDone
+                />
+              ))
+            )}
           </PanelList>
         </Panel>
 
@@ -199,7 +206,7 @@ function ItemPage() {
 
       <Sheet
         open={panel !== null}
-        onOpenChange={(open) => !open && setPanel(null)}
+        onOpenChange={(open) => !open && guard.close(() => setPanel(null))}
       >
         <SheetContent
           side="bottom"
@@ -222,6 +229,7 @@ function ItemPage() {
                 item={item}
                 fields={data.fields}
                 onSaved={() => setPanel(null)}
+                onDirtyChange={guard.setDirty}
               />
             )}
             {panel === 'move' && (
@@ -243,6 +251,7 @@ function ItemPage() {
           </div>
         </SheetContent>
       </Sheet>
+      {guard.prompt}
     </div>
   )
 }
@@ -280,9 +289,11 @@ function MovePicker({
     <div className="flex flex-col gap-4">
       <InputGroup>
         <InputGroupInput
-          autoFocus
+          name="search"
+          type="search"
+          spellCheck={false}
           aria-label={m.clients_search()}
-          placeholder={m.clients_search()}
+          placeholder={m.clients_search_placeholder()}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

@@ -144,6 +144,41 @@
   body {
     -webkit-tap-highlight-color: transparent;
   }
+  /* No double-tap zoom delay on anything tappable. */
+  a,
+  button,
+  input,
+  label,
+  select,
+  summary,
+  textarea,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+  /* A focused or scrolled-to field stops clear of the phone's sticky header
+     and bottom nav. From lg there are neither. */
+  html {
+    scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
+    scroll-padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  }
+  @media (min-width: 64rem) {
+    html {
+      scroll-padding-top: 1rem;
+      scroll-padding-bottom: 1rem;
+    }
+  }
+  /* No rubber-band bounce with a mouse; touch keeps pull-to-refresh. */
+  @media (pointer: fine) {
+    html {
+      overscroll-behavior: none;
+    }
+  }
+}
+
+/* A row in a long list: the browser skips laying out rows off screen. */
+@utility row-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4rem;
 }
 
 /* Toasts sit just above the phone's bottom nav; from lg there is none. */

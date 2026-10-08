@@ -41,6 +41,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { useSheetGuard } from '#/hooks/use-discard-guard'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
@@ -99,6 +100,7 @@ function MoneyPage() {
     >
   } | null>(null)
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
+  const guard = useSheetGuard()
   const [payClient, setPayClient] = useState<{
     _id: Id<'clients'>
     name: string
@@ -234,7 +236,10 @@ function MoneyPage() {
                       // Owed money splits by stage group: finished work, and the rest.
                       const goingCents = row.owedCents - row.doneOwedCents
                       return (
-                        <li key={row.clientId} className="flex flex-col pb-3">
+                        <li
+                          key={row.clientId}
+                          className="flex flex-col pb-3 row-lazy"
+                        >
                           <Link
                             to="/clients/$clientId"
                             params={{ clientId: row.clientId }}
@@ -318,7 +323,7 @@ function MoneyPage() {
                     <ListNote>{m.money_none()}</ListNote>
                   ) : (
                     data.payments.map((payment) => (
-                      <li key={payment._id}>
+                      <li key={payment._id} className="row-lazy">
                         {/* Opens the payment itself: its split, edit, delete. */}
                         <button
                           type="button"
@@ -370,7 +375,7 @@ function MoneyPage() {
                       <ListNote>{m.money_none()}</ListNote>
                     ) : (
                       data.costs.map((cost) => (
-                        <li key={cost._id}>
+                        <li key={cost._id} className="row-lazy">
                           {cost.jobId ? (
                             <Link
                               to="/jobs/$jobId"
@@ -415,7 +420,7 @@ function MoneyPage() {
       />
       <Sheet
         open={costPanel !== null}
-        onOpenChange={(open) => !open && setCostPanel(null)}
+        onOpenChange={(open) => !open && guard.close(() => setCostPanel(null))}
       >
         <SheetContent
           side="bottom"
@@ -431,11 +436,13 @@ function MoneyPage() {
                 cost={costPanel.cost}
                 today={today}
                 onDone={() => setCostPanel(null)}
+                onDirtyChange={guard.setDirty}
               />
             )}
           </div>
         </SheetContent>
       </Sheet>
+      {guard.prompt}
     </>
   )
 }

@@ -127,7 +127,15 @@ function ServicesSettings() {
           </ModuleOff>
         </div>
       )}
-      <ListCard>{active.map((service, index) => row(service, index))}</ListCard>
+      {active.length > 0 ? (
+        <ListCard>
+          {active.map((service, index) => row(service, index))}
+        </ListCard>
+      ) : (
+        <p className="px-4 text-sm text-muted-foreground">
+          {m.services_empty()}
+        </p>
+      )}
       {owner && (
         <div className="px-4">
           <Button
@@ -294,7 +302,7 @@ function ServiceForm({
           <Input
             id="service-name"
             required
-            autoFocus={!service}
+            name="service-name"
             maxLength={60}
             value={name}
             onChange={(event) => setName(event.target.value)}

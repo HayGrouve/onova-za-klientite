@@ -131,7 +131,9 @@ export function PreviewTable({
                   {heading(column)}
                 </TableHead>
               ))}
-              <TableHead className="h-11 px-4" />
+              <TableHead className="h-11 px-4">
+                <span className="sr-only">{m.import_col_note()}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -140,6 +142,7 @@ export function PreviewTable({
                 {columns.map((column, position) => (
                   <TableCell
                     key={column.kind === 'extra' ? column.header : column.kind}
+                    title={cellText(row, column)}
                     className={cn(
                       'max-w-56 truncate px-4 py-2.5',
                       position === 0 ? 'font-medium' : 'text-muted-foreground',

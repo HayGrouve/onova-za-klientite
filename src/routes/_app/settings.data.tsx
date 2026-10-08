@@ -85,7 +85,8 @@ function ExportRow() {
       link.href = url
       link.download = `onova-${todayInSofia(Date.now())}.zip`
       link.click()
-      URL.revokeObjectURL(url)
+      // Revoking at once can cancel the download in Safari and Firefox.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (error) {
       toast.error(errorMessage(error))
     } finally {
@@ -138,7 +139,9 @@ function DeleteAccount() {
         <FieldLabel htmlFor="delete-confirm">{m.data_delete_type()}</FieldLabel>
         <Input
           id="delete-confirm"
-          autoComplete="off"
+          name="delete-confirm"
+          autoCapitalize="off"
+          spellCheck={false}
           value={typed}
           onChange={(event) => setTyped(event.target.value)}
         />

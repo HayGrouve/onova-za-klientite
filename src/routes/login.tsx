@@ -24,7 +24,7 @@ function LoginPage() {
   }, [isLoaded, isSignedIn, navigate, redirect])
 
   if (!isLoaded || isSignedIn) {
-    return <CenteredMessage>{m.loading()}</CenteredMessage>
+    return <CenteredMessage role="status">{m.loading()}</CenteredMessage>
   }
 
   return (
@@ -33,6 +33,8 @@ function LoginPage() {
         <img
           src="/icon.svg"
           alt=""
+          width={64}
+          height={64}
           className="mb-2 size-16 rounded-2xl shadow-lg shadow-primary/25"
         />
         <p className="text-sm font-medium text-primary">{m.app_name()}</p>

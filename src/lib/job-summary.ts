@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, lineTotalCents } from '../../shared/money'
+import { formatQuantity } from '../../shared/quantity'
 
 /** The Job summary (Q16: a PNG only, Q18: no job number). Never an invoice. */
 
@@ -40,11 +41,6 @@ export type SummaryRow = {
   total: string
 }
 
-/** Bulgarian numbers use a decimal comma. */
-function quantityText(quantity: number): string {
-  return String(quantity).replace('.', ',')
-}
-
 /** One row per job line. A job without lines has none: the price says it all. */
 export function summaryRows(lines: SummaryInput['lines']): SummaryRow[] {
   return lines.map((line) => {
@@ -52,7 +48,7 @@ export function summaryRows(lines: SummaryInput['lines']): SummaryRow[] {
     return {
       id: line.id,
       description: line.description,
-      detail: `${quantityText(line.quantity)} × ${formatMoney(line.unitPriceCents)}`,
+      detail: `${formatQuantity(line.quantity)} × ${formatMoney(line.unitPriceCents)}`,
       totalCents,
       total: formatMoney(totalCents),
     }

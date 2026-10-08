@@ -66,6 +66,11 @@ export function SetupWizard({
   const [startedAt] = useState(() => Date.now())
   const [reviewedAt, setReviewedAt] = useState<number>()
   const previewRef = useRef<HTMLDivElement>(null)
+  const reviewHeading = useRef<HTMLHeadingElement>(null)
+  // The last step's button unmounts into the review: focus follows to its heading.
+  useEffect(() => {
+    if (step === DONE) reviewHeading.current?.focus()
+  }, [step])
 
   const key = SETUP_STEPS[step] as SetupStep | undefined
   const settings = useMemo(
@@ -223,7 +228,7 @@ export function SetupWizard({
                   <span
                     key={stepKey}
                     className={cn(
-                      'h-1.5 rounded-full transition-all',
+                      'h-1.5 rounded-full transition-colors',
                       index === step
                         ? 'w-5 bg-primary'
                         : index < step
@@ -247,9 +252,13 @@ export function SetupWizard({
           </>
         ) : (
           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-5">
-            <h1 className="text-xl font-semibold tracking-tight">
+            <h2
+              ref={reviewHeading}
+              tabIndex={-1}
+              className="text-xl font-semibold tracking-tight outline-none"
+            >
               {m.setup_review_title()}
-            </h1>
+            </h2>
             <p className="text-sm text-muted-foreground">
               {m.setup_review_body()}
             </p>

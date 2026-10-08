@@ -48,6 +48,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { useSheetGuard } from '#/hooks/use-discard-guard'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
@@ -85,6 +86,7 @@ function ClientPage() {
   >(null)
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const close = () => setPanel(null)
+  const guard = useSheetGuard()
   const reminders = useQuery(
     api.reminders.forClient,
     business.modules.reminders
@@ -112,7 +114,7 @@ function ClientPage() {
     <div className="flex flex-col gap-4 pb-6">
       <header className="flex flex-col gap-3 px-4 pt-2">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-balance break-words">
             {client.isNoClient ? m.no_client() : client.name}
           </h1>
           <div className="flex shrink-0 items-center">
@@ -267,7 +269,7 @@ function ClientPage() {
             side: true,
             node: client.note && (
               <Panel title={m.client_note()} icon={NoteIcon}>
-                <PanelBody className="text-sm whitespace-pre-wrap">
+                <PanelBody className="text-sm break-words whitespace-pre-wrap">
                   {client.note}
                 </PanelBody>
               </Panel>
@@ -355,7 +357,7 @@ function ClientPage() {
                             onClick={() => setOpenPayment(payment._id)}
                             className="flex w-full items-baseline justify-between gap-3 pressable px-4 py-2.5 text-left"
                           >
-                            <span className="flex flex-col">
+                            <span className="flex min-w-0 flex-col break-words">
                               <span>
                                 {titled ?? METHOD_LABEL[payment.method]()}
                               </span>
@@ -407,7 +409,9 @@ function ClientPage() {
                         className="flex items-center justify-between gap-3 pressable px-4 py-3"
                       >
                         <span className="flex min-w-0 flex-col gap-0.5">
-                          <span className="font-medium">{item.name}</span>
+                          <span className="font-medium break-words">
+                            {item.name}
+                          </span>
                           <ListExtras target="item" values={item.extra} />
                         </span>
                         <CaretRightIcon
@@ -484,7 +488,10 @@ function ClientPage() {
         ]}
       />
 
-      <Sheet open={panel !== null} onOpenChange={(open) => !open && close()}>
+      <Sheet
+        open={panel !== null}
+        onOpenChange={(open) => !open && guard.close(close)}
+      >
         <SheetContent
           side="bottom"
           className="max-h-[92dvh] overflow-y-auto rounded-t-3xl"
@@ -507,6 +514,7 @@ function ClientPage() {
                 client={client}
                 fields={data.fields}
                 onSaved={close}
+                onDirtyChange={guard.setDirty}
               />
             )}
             {panel?.kind === 'payment' && (
@@ -543,6 +551,7 @@ function ClientPage() {
           </div>
         </SheetContent>
       </Sheet>
+      {guard.prompt}
       <PaymentSheet
         businessId={business._id}
         paymentId={openPayment}

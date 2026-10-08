@@ -11,17 +11,31 @@ import { AppShell } from '#/components/app-shell'
 import { SnapshotKeeper } from '#/components/offline/snapshot-keeper'
 import { CenteredMessage } from '#/components/centered-message'
 import { PushKeeper } from '#/components/push-keeper'
+import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { ViewerProvider } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 
 export const Route = createFileRoute('/_app')({ component: SignedInLayout })
 
+function ProfileError() {
+  return (
+    <CenteredMessage role="alert">
+      <p>{m.error_profile()}</p>
+      <Button size="xl" onClick={() => window.location.reload()}>
+        {m.error_retry()}
+      </Button>
+    </CenteredMessage>
+  )
+}
+
 function Loading() {
   return (
     <CenteredMessage>
-      <Spinner className="size-6 text-muted-foreground" />
-      <span className="sr-only">{m.loading()}</span>
+      <Spinner
+        aria-label={m.loading()}
+        className="size-6 text-muted-foreground"
+      />
     </CenteredMessage>
   )
 }
@@ -62,8 +76,7 @@ function EnsureUser() {
     }
   }, [ensureCurrent])
 
-  if (state === 'failed')
-    return <CenteredMessage>{m.error_profile()}</CenteredMessage>
+  if (state === 'failed') return <ProfileError />
   if (state === 'pending') return <Loading />
   return <WithViewer />
 }
@@ -81,8 +94,7 @@ function WithViewer() {
   }, [needsSetup, navigate])
 
   if (viewer === undefined || needsSetup) return <Loading />
-  if (!viewer?.business)
-    return <CenteredMessage>{m.error_profile()}</CenteredMessage>
+  if (!viewer?.business) return <ProfileError />
   return (
     <ViewerProvider value={viewer}>
       <PushKeeper />

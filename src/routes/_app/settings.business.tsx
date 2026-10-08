@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { FunctionReturnType } from 'convex/server'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { ConfirmAction } from '#/components/confirm-action'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { useSubmit } from '#/components/money/use-submit'
 import { SettingsPage } from '#/components/settings/settings-page'
@@ -19,6 +20,7 @@ import {
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
+import { usePageGuard } from '#/hooks/use-discard-guard'
 import { useViewer } from '#/hooks/use-viewer'
 import { compressImage } from '#/lib/compress-image'
 import { errorMessage } from '#/lib/errors'
@@ -61,6 +63,12 @@ function BusinessForm({ settings }: { settings: Settings }) {
   const [address, setAddress] = useState(settings.address ?? '')
   const owner = settings.role === 'owner'
   const current = logo?.at(0)
+  const guard = usePageGuard(
+    name !== settings.name ||
+      phone !== (settings.phone ?? '') ||
+      email !== (settings.email ?? '') ||
+      address !== (settings.address ?? ''),
+  )
 
   return (
     <SettingsPage
@@ -77,6 +85,7 @@ function BusinessForm({ settings }: { settings: Settings }) {
         </SettingsPreview>
       }
     >
+      {guard.prompt}
       <div className="flex flex-col gap-6 px-4">
         <Logo owner={owner} current={current} />
         <form
@@ -102,6 +111,8 @@ function BusinessForm({ settings }: { settings: Settings }) {
                 </FieldLabel>
                 <Input
                   id="business-name"
+                  name="business-name"
+                  autoComplete="organization"
                   required
                   maxLength={120}
                   value={name}
@@ -114,6 +125,8 @@ function BusinessForm({ settings }: { settings: Settings }) {
                 </FieldLabel>
                 <Input
                   id="business-phone"
+                  name="business-phone"
+                  autoComplete="tel"
                   type="tel"
                   maxLength={40}
                   value={phone}
@@ -126,7 +139,10 @@ function BusinessForm({ settings }: { settings: Settings }) {
                 </FieldLabel>
                 <Input
                   id="business-email"
+                  name="business-email"
                   type="email"
+                  autoComplete="email"
+                  spellCheck={false}
                   maxLength={200}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -138,6 +154,8 @@ function BusinessForm({ settings }: { settings: Settings }) {
                 </FieldLabel>
                 <Input
                   id="business-address"
+                  name="business-address"
+                  autoComplete="street-address"
                   maxLength={500}
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
@@ -286,18 +304,18 @@ function Logo({
             {current ? m.business_logo_change() : m.business_logo_add()}
           </Button>
           {current && owner && (
-            <Button
+            <ConfirmAction
+              label={m.business_logo_remove()}
+              question={m.business_logo_remove_ask()}
               variant="ghost"
               className="h-11"
-              onClick={() =>
+              onConfirm={() =>
                 void remove({
                   businessId: business._id,
                   fileId: current._id,
                 }).catch((error: unknown) => toast.error(errorMessage(error)))
               }
-            >
-              {m.business_logo_remove()}
-            </Button>
+            />
           )}
         </div>
       </div>

@@ -127,8 +127,10 @@ function ClientsPage() {
               </InputGroupAddon>
               <InputGroupInput
                 type="search"
+                name="search"
+                spellCheck={false}
                 aria-label={m.clients_search()}
-                placeholder={m.clients_search()}
+                placeholder={m.clients_search_placeholder()}
                 {...searchText}
               />
             </InputGroup>
@@ -153,7 +155,7 @@ function ClientsPage() {
           ) : (
             <ListCard>
               {shown.map((client) => (
-                <li key={client._id}>
+                <li key={client._id} className="row-lazy">
                   <Link
                     to="/clients/$clientId"
                     params={{ clientId: client._id }}

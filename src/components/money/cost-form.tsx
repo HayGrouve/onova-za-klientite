@@ -1,12 +1,18 @@
 import { useMutation } from 'convex/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { MoneyInput, moneyInputText } from '#/components/money/money-input'
 import { useSubmit } from '#/components/money/use-submit'
 import { Button } from '#/components/ui/button'
-import { Field, FieldGroup, FieldLabel } from '#/components/ui/field'
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
+import { ConfirmAction } from '#/components/confirm-action'
 import { Spinner } from '#/components/ui/spinner'
 import { m } from '#/paraglide/messages.js'
 import { parseMoney } from '../../../shared/money'
@@ -29,6 +35,7 @@ export function CostForm({
   cost,
   today,
   onDone,
+  onDirtyChange,
 }: {
   businessId: Id<'businesses'>
   jobId?: Id<'jobs'>
@@ -38,6 +45,8 @@ export function CostForm({
   >
   today: string
   onDone: () => void
+  /** Tells the sheet whether there are unsaved changes. */
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const add = useMutation(api.costs.add)
   const update = useMutation(api.costs.update)
@@ -47,8 +56,20 @@ export function CostForm({
   const [amount, setAmount] = useState(moneyInputText(cost?.amountCents))
   const [date, setDate] = useState(cost?.date ?? today)
   const [note, setNote] = useState(cost?.note ?? '')
+  const [tried, setTried] = useState(false)
+  const dirty =
+    label !== (cost?.label ?? '') ||
+    amount !== moneyInputText(cost?.amountCents) ||
+    date !== (cost?.date ?? today) ||
+    note !== (cost?.note ?? '')
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+  // A form that goes away has nothing left unsaved.
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
   const amountCents = parseMoney(amount)
-  const valid = label.trim() && amountCents !== null && amountCents >= 0
+  const labelMissing = !label.trim()
+  const amountBad = amountCents === null || amountCents < 0
   const suggestions =
     (jobId ?? cost?.jobId) ? JOB_SUGGESTIONS : GENERAL_SUGGESTIONS
 
@@ -57,7 +78,13 @@ export function CostForm({
       className="flex flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault()
-        if (!valid) return
+        if (labelMissing || amountBad) {
+          setTried(true)
+          document
+            .getElementById(labelMissing ? 'cost-label' : 'cost-amount')
+            ?.focus()
+          return
+        }
         const values = { label, amountCents, date, note: note || undefined }
         void run(() =>
           cost
@@ -71,11 +98,20 @@ export function CostForm({
           <FieldLabel htmlFor="cost-label">{m.cost_label()}</FieldLabel>
           <Input
             id="cost-label"
-            required
+            name="label"
             maxLength={100}
+            aria-invalid={tried && labelMissing}
+            aria-describedby={
+              tried && labelMissing ? 'cost-label-error' : undefined
+            }
             value={label}
             onChange={(event) => setLabel(event.target.value)}
           />
+          {tried && labelMissing && (
+            <FieldError id="cost-label-error">
+              {m.cost_label_required()}
+            </FieldError>
+          )}
           {!label && (
             <div className="flex flex-wrap gap-2">
               {suggestions.map((suggestion) => (
@@ -104,12 +140,20 @@ export function CostForm({
               label={m.cost_amount()}
               value={amount}
               onChange={setAmount}
+              invalid={tried && amountBad}
+              describedBy={tried && amountBad ? 'cost-amount-error' : undefined}
             />
+            {tried && amountBad && (
+              <FieldError id="cost-amount-error">
+                {m.field_money_invalid()}
+              </FieldError>
+            )}
           </Field>
           <Field>
             <FieldLabel htmlFor="cost-date">{m.cost_date()}</FieldLabel>
             <Input
               id="cost-date"
+              name="date"
               type="date"
               required
               value={date}
@@ -121,6 +165,7 @@ export function CostForm({
           <FieldLabel htmlFor="cost-note">{m.cost_note()}</FieldLabel>
           <Input
             id="cost-note"
+            name="note"
             maxLength={1000}
             value={note}
             onChange={(event) => setNote(event.target.value)}
@@ -128,29 +173,23 @@ export function CostForm({
         </Field>
       </FieldGroup>
       <div className="flex gap-2">
-        <Button
-          type="submit"
-          size="xl"
-          className="flex-1"
-          disabled={busy || !valid}
-        >
+        <Button type="submit" size="xl" className="flex-1" disabled={busy}>
           {busy && <Spinner data-icon="inline-start" />}
           {m.cost_save()}
         </Button>
-        {cost && (
-          <Button
-            type="button"
-            size="xl"
-            variant="destructive"
-            disabled={busy}
-            onClick={() =>
-              void run(() => remove({ businessId, costId: cost._id }))
-            }
-          >
-            {m.cost_remove()}
-          </Button>
-        )}
       </div>
+      {cost && (
+        <ConfirmAction
+          label={m.cost_remove()}
+          question={m.cost_remove_confirm()}
+          variant="outline"
+          className="w-full"
+          busy={busy}
+          onConfirm={() =>
+            void run(() => remove({ businessId, costId: cost._id }))
+          }
+        />
+      )}
     </form>
   )
 }

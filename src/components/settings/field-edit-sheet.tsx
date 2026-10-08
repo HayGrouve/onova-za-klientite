@@ -219,7 +219,7 @@ function OptionsList({
       >
         <Input
           aria-label={m.fields_settings_option_name()}
-          placeholder={m.fields_settings_option_name()}
+          placeholder={m.fields_settings_option_placeholder()}
           maxLength={60}
           autoComplete="off"
           value={draft}

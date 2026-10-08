@@ -13,7 +13,7 @@ import { usePageTitle } from '#/hooks/use-page-title'
 export function PageTitle({ children }: { children: string }) {
   usePageTitle(children)
   return (
-    <h1 className="px-4 pt-2 pb-3 text-3xl font-semibold tracking-tight">
+    <h1 className="px-4 pt-2 pb-3 text-3xl font-semibold tracking-tight text-balance break-words">
       {children}
     </h1>
   )

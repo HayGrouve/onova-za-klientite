@@ -18,10 +18,13 @@ import type { ClientChoice } from '#/components/new-job/types'
 
 /** Fixing the client: search the list, take a phone contact, add a new one, or none. */
 export function ClientPicker({
+  autoFocus = false,
   clients,
   initialQuery,
   onPick,
 }: {
+  /** Only when the person tapped to open the picker: it must not raise the keyboard by itself. */
+  autoFocus?: boolean
   clients: ClientCandidate[]
   initialQuery: string
   onPick: (choice: ClientChoice) => void
@@ -38,8 +41,10 @@ export function ClientPicker({
           <MagnifyingGlassIcon />
         </InputGroupAddon>
         <InputGroupInput
-          autoFocus
-          aria-label={m.new_search_placeholder()}
+          name="client-search"
+          autoFocus={autoFocus}
+          spellCheck={false}
+          aria-label={m.new_search_label()}
           placeholder={m.new_search_placeholder()}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -50,7 +55,7 @@ export function ClientPicker({
           <Button
             key={client.id}
             variant="outline"
-            className="h-11 rounded-xl"
+            className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal"
             onClick={() =>
               onPick({ kind: 'existing', id: client.id, name: client.name })
             }
@@ -61,7 +66,7 @@ export function ClientPicker({
         {typed && !hits.some((client) => client.name === typed) && (
           <Button
             variant="outline"
-            className="h-11 rounded-xl"
+            className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal"
             onClick={() => onPick({ kind: 'new', name: typed })}
           >
             <PlusIcon data-icon="inline-start" />
@@ -71,7 +76,7 @@ export function ClientPicker({
         {contactsSupported && (
           <Button
             variant="outline"
-            className="h-11 rounded-xl"
+            className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal"
             onClick={() => {
               void pickContact().then((contact) => {
                 if (contact) onPick({ kind: 'contact', ...contact })
@@ -84,7 +89,7 @@ export function ClientPicker({
         )}
         <Button
           variant="ghost"
-          className="h-11 rounded-xl"
+          className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal"
           onClick={() => onPick({ kind: 'none' })}
         >
           {m.no_client()}

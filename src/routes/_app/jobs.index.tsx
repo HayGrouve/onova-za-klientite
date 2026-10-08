@@ -139,8 +139,10 @@ function WideJobsPage() {
           </InputGroupAddon>
           <InputGroupInput
             type="search"
+            name="jobs-filter"
+            spellCheck={false}
             aria-label={m.jobs_filter()}
-            placeholder={m.jobs_filter()}
+            placeholder={m.jobs_filter_placeholder()}
             {...filterText}
           />
         </InputGroup>
@@ -280,6 +282,14 @@ function JobsList({
         </Tabs>
         {toolbar}
       </div>
+      {/* Mounted empty, then filled: tells a screen reader what a filter found. */}
+      <p role="status" className="sr-only">
+        {filtering && jobs
+          ? jobs.length === 0
+            ? m.jobs_filter_none()
+            : m.count({ label: words.job.plural, count: jobs.length })
+          : ''}
+      </p>
       {!jobs ? (
         <ListSkeleton />
       ) : jobs.length === 0 ? (

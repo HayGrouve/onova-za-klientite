@@ -98,7 +98,9 @@ export function MappingStep({
   return (
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-x-8">
       <div className="flex flex-col gap-1 px-4 lg:col-span-2">
-        <h2 className="text-xl font-semibold">{m.import_map_title()}</h2>
+        <h2 className="text-xl font-semibold text-balance">
+          {m.import_map_title()}
+        </h2>
         <p className="text-sm text-muted-foreground">{m.import_map_help()}</p>
       </div>
       <ul className="flex flex-col gap-4 px-4">

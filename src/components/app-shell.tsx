@@ -23,6 +23,7 @@ import type { LinkProps } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { cn } from 'cn'
 import { useEffect } from 'react'
+import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
@@ -43,6 +44,7 @@ import { OfflineBanner } from '#/components/offline/offline-banner'
 import { Tip } from '#/components/tip'
 import { buttonVariants } from '#/components/ui/button'
 import { TooltipProvider } from '#/components/ui/tooltip'
+import { errorMessage } from '#/lib/errors'
 import { initials } from '#/lib/initials'
 import { wipeSnapshots } from '#/lib/offline-store'
 import { isShortcut, shortcutBlockedAt } from '#/lib/shortcuts'
@@ -162,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 const MAC =
   typeof navigator !== 'undefined' &&
   /Mac|iPhone|iPad/.test(navigator.userAgent)
-const SEARCH_SHORTCUT = MAC ? '⌘K' : 'Ctrl K'
+const SEARCH_SHORTCUT = MAC ? '⌘K' : 'Ctrl K'
 const NEW_JOB_SHORTCUT = 'N'
 
 /**
@@ -352,19 +354,18 @@ export function BusinessSwitcher() {
 
   const switchTo = (businessId: string) => {
     if (businessId === business._id) return
-    void setActive({ businessId: businessId as Id<'businesses'> }).then(() =>
-      navigate({ to: '/' }),
-    )
+    setActive({ businessId: businessId as Id<'businesses'> })
+      .then(() => navigate({ to: '/' }))
+      .catch((error: unknown) => toast.error(errorMessage(error)))
   }
 
   if (businesses.length < 2) {
     return (
-      <span
-        className="flex min-h-11 min-w-0 items-center gap-2 text-sm font-medium lg:px-2"
-        aria-label={m.business_current()}
-      >
+      <span className="flex min-h-11 min-w-0 items-center gap-2 text-sm font-medium lg:px-2">
         <BusinessMark />
-        <span className="truncate">{business.name}</span>
+        <span className="truncate" translate="no">
+          {business.name}
+        </span>
       </span>
     )
   }
@@ -375,7 +376,9 @@ export function BusinessSwitcher() {
         className="group/switch -ml-2 flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-left text-sm font-medium transition-colors outline-none hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-foreground/5 lg:ml-0"
       >
         <BusinessMark />
-        <span className="min-w-0 flex-1 truncate">{business.name}</span>
+        <span className="min-w-0 flex-1 truncate" translate="no">
+          {business.name}
+        </span>
         <CaretDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-aria-expanded/switch:rotate-180" />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64">
@@ -389,7 +392,7 @@ export function BusinessSwitcher() {
                 closeOnClick
                 className="min-h-11"
               >
-                {item.name}
+                <span translate="no">{item.name}</span>
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
@@ -406,7 +409,6 @@ export function BusinessSwitcher() {
 function AccountMenu({ wide = false }: { wide?: boolean }) {
   const { user } = useViewer()
   const { signOut } = useClerk()
-  const navigate = useNavigate()
   const avatar = (
     <Avatar className="ring-2 ring-background">
       {user.imageUrl && <AvatarImage src={user.imageUrl} alt="" />}
@@ -425,11 +427,14 @@ function AccountMenu({ wide = false }: { wide?: boolean }) {
         >
           {avatar}
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium">
+            <span className="truncate text-sm font-medium" translate="no">
               {user.name || user.email}
             </span>
             {user.name && user.email && (
-              <span className="truncate text-xs text-muted-foreground">
+              <span
+                className="truncate text-xs text-muted-foreground"
+                translate="no"
+              >
                 {user.email}
               </span>
             )}
@@ -452,15 +457,12 @@ function AccountMenu({ wide = false }: { wide?: boolean }) {
         className="w-64"
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="truncate">
+          <DropdownMenuLabel className="truncate" translate="no">
             {user.email ?? user.name}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="min-h-11"
-          onClick={() => void navigate({ to: '/settings' })}
-        >
+        <DropdownMenuItem className="min-h-11" render={<Link to="/settings" />}>
           <GearSixIcon />
           {m.account_settings()}
         </DropdownMenuItem>

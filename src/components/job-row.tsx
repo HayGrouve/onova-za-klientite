@@ -136,14 +136,14 @@ export function JobRow({
   const client = showClient && job.clientName
 
   return (
-    <li>
+    <li className="row-lazy">
       <Link
         to="/jobs/$jobId"
         params={{ jobId: job._id }}
         className="flex flex-col gap-1.5 pressable px-4 py-3"
       >
         <div className="flex items-start justify-between gap-3">
-          <span className="min-w-0 text-base leading-snug font-medium">
+          <span className="min-w-0 text-base leading-snug font-medium break-words">
             {job.title}
           </span>
           {/* Pulled over the row's padding onto its top and right edges. */}

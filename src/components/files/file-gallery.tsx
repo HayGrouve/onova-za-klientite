@@ -146,15 +146,18 @@ export function FileGallery({
           <PaperclipIcon data-icon="inline-start" />
           {m.files_add()}
         </Button>
-        {uploading > 0 && (
-          <span
-            className="flex items-center gap-2 text-sm text-muted-foreground"
-            aria-live="polite"
-          >
-            <Spinner />
-            {m.files_uploading()}
-          </span>
-        )}
+        {/* Always on the page, so a screen reader hears the text arrive. */}
+        <span
+          className="flex items-center gap-2 text-sm text-muted-foreground empty:hidden"
+          role="status"
+        >
+          {uploading > 0 && (
+            <>
+              <Spinner />
+              {m.files_uploading()}
+            </>
+          )}
+        </span>
       </div>
 
       {files?.length === 0 && uploading === 0 && (
@@ -178,6 +181,7 @@ export function FileGallery({
                     src={file.url}
                     alt={fileLabel(file)}
                     loading="lazy"
+                    decoding="async"
                     className="size-full object-cover"
                   />
                 ) : (
@@ -215,7 +219,11 @@ export function FileGallery({
                     <img
                       src={opened.url}
                       alt={fileLabel(opened)}
-                      className="max-h-[60dvh] w-full rounded-xl object-contain"
+                      // The size isn't stored: 4:3 holds the room until the photo's own ratio is known.
+                      width={800}
+                      height={600}
+                      decoding="async"
+                      className="max-h-[60dvh] w-full rounded-xl bg-muted object-contain"
                     />
                   </a>
                 )}

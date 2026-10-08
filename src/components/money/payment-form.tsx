@@ -10,6 +10,7 @@ import { Button } from '#/components/ui/button'
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
@@ -29,6 +30,11 @@ export type OpenJob = {
 type Target =
   | { kind: 'job'; jobId: Id<'jobs'>; balanceCents: number }
   | { kind: 'client'; clientId: Id<'clients'>; openJobs: OpenJob[] }
+
+/** A split row below zero, or above what the job still owes. */
+function rowOver(cents: number, balanceCents: number) {
+  return cents < 0 || cents > balanceCents
+}
 
 /**
  * A payment. From a job it goes to that job, up to its balance. From a client
@@ -62,6 +68,7 @@ export function PaymentForm({
   const [date, setDate] = useState(today)
   const [method, setMethod] = useState<PaymentMethod>(defaultMethod)
   const [label, setLabel] = useState('')
+  const [tried, setTried] = useState(false)
   const [splitEdits, setSplitEdits] = useState<Record<string, string>>({})
 
   const amountCents = parseMoney(amount)
@@ -108,12 +115,25 @@ export function PaymentForm({
       : (amountCents ?? 0) - allocated
   const splitInvalid =
     target.kind === 'client' &&
-    (rest < 0 ||
-      split.some((row) => row.cents < 0 || row.cents > row.job.balanceCents))
+    (rest < 0 || split.some((row) => rowOver(row.cents, row.job.balanceCents)))
+
+  const amountMissing = tried && (!amountCents || amountCents <= 0)
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
-    if (!amountCents || amountCents <= 0 || splitInvalid) return
+    if (!amountCents || amountCents <= 0) {
+      setTried(true)
+      document.getElementById('pay-amount')?.focus()
+      return
+    }
+    if (splitInvalid) {
+      setTried(true)
+      const bad = split.find((row) => rowOver(row.cents, row.job.balanceCents))
+      document
+        .getElementById(bad ? `pay-split-${bad.job._id}` : 'pay-amount')
+        ?.focus()
+      return
+    }
     const common = {
       businessId,
       amountCents,
@@ -145,12 +165,21 @@ export function PaymentForm({
             value={amount}
             onChange={setAmount}
             autoFocus
+            invalid={amountMissing}
+            describedBy={amountMissing ? 'pay-amount-error' : undefined}
           />
-          {rest > 0 && (
-            <FieldDescription>
-              {m.pay_rest_credit({ amount: formatMoney(rest) })}
-            </FieldDescription>
+          {amountMissing && (
+            <FieldError id="pay-amount-error">
+              {m.error_payment_zero()}
+            </FieldError>
           )}
+          <div aria-live="polite" className="empty:hidden">
+            {rest > 0 && (
+              <FieldDescription>
+                {m.pay_rest_credit({ amount: formatMoney(rest) })}
+              </FieldDescription>
+            )}
+          </div>
         </Field>
 
         {target.kind === 'client' && (
@@ -162,7 +191,7 @@ export function PaymentForm({
               <>
                 <FieldDescription>{m.pay_split_hint()}</FieldDescription>
                 <div className="flex flex-col gap-2">
-                  {split.map(({ job, text }) => (
+                  {split.map(({ job, text, cents }) => (
                     <div
                       key={job._id}
                       className="grid grid-cols-[minmax(0,1fr)_8rem] items-center gap-2"
@@ -176,20 +205,32 @@ export function PaymentForm({
                         </span>
                       </span>
                       <MoneyInput
+                        id={`pay-split-${job._id}`}
+                        name={`split-${job._id}`}
                         label={job.title}
                         value={text}
+                        invalid={rowOver(cents, job.balanceCents)}
+                        describedBy={
+                          rowOver(cents, job.balanceCents)
+                            ? `pay-split-${job._id}-error`
+                            : undefined
+                        }
                         onChange={(value) =>
                           setSplitEdits({ ...splitEdits, [job._id]: value })
                         }
                       />
+                      {rowOver(cents, job.balanceCents) && (
+                        <FieldError
+                          id={`pay-split-${job._id}-error`}
+                          className="col-span-2"
+                        >
+                          {m.pay_split_row_over()}
+                        </FieldError>
+                      )}
                     </div>
                   ))}
                 </div>
-                {rest < 0 && (
-                  <p className="text-sm text-destructive">
-                    {m.pay_split_over()}
-                  </p>
-                )}
+                {rest < 0 && <FieldError>{m.pay_split_over()}</FieldError>}
               </>
             )}
           </Field>
@@ -204,6 +245,7 @@ export function PaymentForm({
             <FieldLabel htmlFor="pay-date">{m.pay_date()}</FieldLabel>
             <Input
               id="pay-date"
+              name="date"
               type="date"
               required
               value={date}
@@ -214,6 +256,7 @@ export function PaymentForm({
             <FieldLabel htmlFor="pay-label">{m.pay_label()}</FieldLabel>
             <Input
               id="pay-label"
+              name="label"
               maxLength={100}
               value={label}
               onChange={(event) => setLabel(event.target.value)}
@@ -231,11 +274,7 @@ export function PaymentForm({
           </Button>
         )}
       </FieldGroup>
-      <Button
-        type="submit"
-        size="xl"
-        disabled={busy || !amountCents || amountCents <= 0 || splitInvalid}
-      >
+      <Button type="submit" size="xl" disabled={busy}>
         {busy && <Spinner data-icon="inline-start" />}
         {m.pay_save()}
       </Button>

@@ -16,7 +16,7 @@ const ERRORS = {
 }
 
 const optionClass =
-  'flex min-h-20 w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left outline-none hover:bg-muted/60 focus-within:ring-3 focus-within:ring-ring/50'
+  'flex min-h-20 w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50'
 
 /** Where the clients come from: the phone's contacts (where the browser has them) or a file. */
 export function SourceStep({
@@ -32,10 +32,20 @@ export function SourceStep({
   const chooseContacts = async () => {
     setError(null)
     try {
-      const rows = rowsFromContacts(await pickContacts())
+      const picked = await pickContacts()
+      const rows = rowsFromContacts(picked)
       if (rows.length > 0) onContacts(rows)
-    } catch {
-      // Cancelled, or the permission was refused: nothing to import.
+      // Picking nobody is a cancel; picking people with no name or phone is not.
+      else if (picked.length > 0) setError(m.import_error_contacts_empty())
+    } catch (caught) {
+      // Cancelled: nothing to say. A refused permission says how to allow it.
+      const name = caught instanceof DOMException ? caught.name : ''
+      if (name === 'AbortError') return
+      setError(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? m.import_error_contacts()
+          : m.error_unknown(),
+      )
     }
   }
 

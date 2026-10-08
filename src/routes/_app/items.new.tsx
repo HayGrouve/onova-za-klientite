@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
+import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ItemForm } from '#/components/item-form'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { PageTitle } from '#/components/page'
+import { usePageGuard } from '#/hooks/use-discard-guard'
 import { useViewer } from '#/hooks/use-viewer'
 
 export const Route = createFileRoute('/_app/items/new')({
@@ -23,6 +25,8 @@ function NewItemPage() {
   const { business } = useViewer()
   const { clientId, jobId } = Route.useSearch()
   const navigate = useNavigate()
+  const [dirty, setDirty] = useState(false)
+  const guard = usePageGuard(dirty)
   const fields = useQuery(api.fields.list, {
     businessId: business._id,
     target: 'item',
@@ -39,7 +43,9 @@ function NewItemPage() {
             clientId={clientId as Id<'clients'>}
             jobId={jobId as Id<'jobs'> | undefined}
             fields={fields}
-            onSaved={(itemId) =>
+            onDirtyChange={setDirty}
+            onSaved={(itemId) => {
+              guard.release()
               void (jobId
                 ? navigate({
                     to: '/jobs/$jobId',
@@ -51,10 +57,11 @@ function NewItemPage() {
                     params: { itemId },
                     replace: true,
                   }))
-            }
+            }}
           />
         )}
       </div>
+      {guard.prompt}
     </>
   )
 }

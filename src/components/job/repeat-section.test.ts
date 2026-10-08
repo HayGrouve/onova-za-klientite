@@ -10,15 +10,19 @@ describe('repeatLabel', () => {
       'Всяка седмица',
       'През седмица',
       'Всеки месец',
-      'Всеки 2 месеца',
-      'Всеки 3 месеца',
-      'Всеки 6 месеца',
+      'Всеки 2\u00a0месеца',
+      'Всеки 3\u00a0месеца',
+      'Всеки 6\u00a0месеца',
       'Всяка година',
     ])
   })
 
   it('writes an interval the server stores but the screen does not offer in Bulgarian', () => {
-    expect(repeatLabel({ every: 3, unit: 'week' })).toBe('На всеки 3 седмици')
-    expect(repeatLabel({ every: 4, unit: 'month' })).toBe('На всеки 4 месеца')
+    expect(repeatLabel({ every: 3, unit: 'week' })).toBe(
+      'На всеки 3\u00a0седмици',
+    )
+    expect(repeatLabel({ every: 4, unit: 'month' })).toBe(
+      'На всеки 4\u00a0месеца',
+    )
   })
 })

@@ -24,13 +24,17 @@ export function ImportDone({
   return (
     <div className="flex flex-col items-center gap-4 px-4 py-6 text-center lg:mx-auto lg:max-w-md">
       <CheckCircleIcon className="size-14 text-primary" weight="fill" />
-      <h2 className="text-xl font-semibold">{m.import_done_title()}</h2>
-      <p className="text-lg" data-testid="import-result">
-        {m.import_result({
-          created: outcome.created,
-          skipped: outcome.skipped,
-        })}
-      </p>
+      <div role="status" className="flex flex-col gap-4">
+        <h2 className="text-xl font-semibold text-balance">
+          {m.import_done_title()}
+        </h2>
+        <p className="text-lg" data-testid="import-result">
+          {m.import_result({
+            created: outcome.created,
+            skipped: outcome.skipped,
+          })}
+        </p>
+      </div>
       {outcome.failed && (
         <p role="alert" className="text-sm text-destructive">
           {m.import_failed()}

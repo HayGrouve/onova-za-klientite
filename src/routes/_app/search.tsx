@@ -4,9 +4,8 @@ import {
   StackIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
-import { useEffect, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { ListExtras } from '#/components/list-extras'
 import { InitialsAvatar } from '#/components/initials-avatar'
@@ -18,6 +17,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from '#/components/ui/input-group'
+import { useUrlText } from '#/hooks/use-url-text'
 import { usePageTitle } from '#/hooks/use-page-title'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
@@ -25,34 +25,45 @@ import { m } from '#/paraglide/messages.js'
 import { formatPhone } from '../../../shared/phone-format'
 
 export const Route = createFileRoute('/_app/search')({
+  // The words live in the address, so Back from a result returns to them.
+  validateSearch: (search: Record<string, unknown>): { q?: string } => {
+    // The address parser reads "12" as a number.
+    const q =
+      typeof search.q === 'string' || typeof search.q === 'number'
+        ? String(search.q)
+        : ''
+    return q.trim() ? { q } : {}
+  },
   staticData: { layout: 'wide' },
   component: SearchPage,
 })
-
-/** Waits until typing pauses, so each keystroke doesn't run a search. */
-function useDebounced(value: string, ms = 250) {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebounced(value), ms)
-    return () => window.clearTimeout(id)
-  }, [value, ms])
-  return debounced
-}
 
 function SearchPage() {
   usePageTitle(m.search_open())
   const { business } = useViewer()
   const today = useToday()
-  const [query, setQuery] = useState('')
-  const debounced = useDebounced(query.trim())
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+  // The box commits to the address once typing pauses, so each keystroke
+  // doesn't run a search; the address is what the query reads.
+  const searchText = useUrlText(
+    search.q ?? '',
+    (value) =>
+      void navigate({
+        search: { q: value.trim() ? value : undefined },
+        replace: true,
+      }),
+  )
+  const debounced = (search.q ?? '').trim()
   const results = useQuery(
     api.search.all,
     debounced ? { businessId: business._id, query: debounced } : 'skip',
   )
   const { words } = business
-  const empty =
-    results &&
-    results.clients.length + results.jobs.length + results.items.length === 0
+  const total = results
+    ? results.clients.length + results.jobs.length + results.items.length
+    : 0
+  const empty = results && total === 0
 
   return (
     <div className="flex flex-col gap-4 pt-2">
@@ -65,10 +76,12 @@ function SearchPage() {
           <InputGroupInput
             autoFocus
             type="search"
+            name="q"
+            enterKeyHint="search"
+            spellCheck={false}
             aria-label={m.search_open()}
             placeholder={m.search_placeholder()}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            {...searchText}
           />
         </InputGroup>
         {!debounced && (
@@ -76,13 +89,21 @@ function SearchPage() {
             {m.search_hint()}
           </p>
         )}
+        {/* Mounted empty, then filled, so a screen reader announces the answer. */}
+        <div role="status">
+          {empty && (
+            <p className="animate-rise py-6 text-center text-muted-foreground">
+              {m.search_none()}
+            </p>
+          )}
+          {results && total > 0 && (
+            <span className="sr-only">
+              {m.search_results_status({ count: total })}
+            </span>
+          )}
+        </div>
       </div>
       {debounced && !results && <ListSkeleton />}
-      {empty && (
-        <p className="animate-rise px-4 py-6 text-center text-muted-foreground">
-          {m.search_none()}
-        </p>
-      )}
       {/* A wide screen shows the kinds of result side by side. */}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(22rem,1fr))] lg:items-start">
         {results && results.clients.length > 0 && (
@@ -138,10 +159,10 @@ function SearchPage() {
                 <Link
                   to="/items/$itemId"
                   params={{ itemId: item._id }}
-                  className="flex flex-col pressable px-4 py-3"
+                  className="flex min-w-0 flex-col pressable px-4 py-3"
                 >
-                  <span className="font-medium">{item.name}</span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="font-medium break-words">{item.name}</span>
+                  <span className="text-sm break-words text-muted-foreground">
                     {item.clientName}
                   </span>
                   <ListExtras target="item" values={item.listExtra} />

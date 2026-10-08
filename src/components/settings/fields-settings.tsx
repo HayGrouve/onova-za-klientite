@@ -137,8 +137,14 @@ export function FieldsSettings({
         >
           <TabsList className="h-11 w-full">
             {visibleTargets.map((item) => (
-              <TabsTrigger key={item} value={item} className="px-2 text-base">
-                {business.words[item].plural}
+              <TabsTrigger
+                key={item}
+                value={item}
+                className="min-w-0 px-2 text-base"
+              >
+                <span className="min-w-0 truncate">
+                  {business.words[item].plural}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>

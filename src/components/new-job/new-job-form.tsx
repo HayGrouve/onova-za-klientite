@@ -21,7 +21,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ClientPicker } from '#/components/new-job/client-picker'
-import { DiscardSheet } from '#/components/new-job/discard-sheet'
+import { DiscardSheet } from '#/components/discard-sheet'
 import type {
   ClientChoice,
   ItemRef,
@@ -44,6 +44,7 @@ import { Textarea } from '#/components/ui/textarea'
 import { repeatLabel } from '#/components/job/repeat-section'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { usePageTitle } from '#/hooks/use-page-title'
+import { useWide } from '#/hooks/use-wide'
 import type { ActiveBusiness } from '#/hooks/use-viewer'
 import { formatDay, formatTime } from '#/i18n/dates'
 import { lower } from '#/i18n/words'
@@ -93,6 +94,7 @@ function ReadRow({
   icon: IconComponent,
   value,
   missing,
+  errorId,
   onFix,
   fixing = false,
   children,
@@ -101,6 +103,8 @@ function ReadRow({
   icon: Icon
   value: React.ReactNode
   missing?: string | false
+  /** Where the missing message can be found, to move focus to it. */
+  errorId?: string
   /** Left out for a row that is changed by tapping what it shows. */
   onFix?: () => void
   fixing?: boolean
@@ -119,23 +123,44 @@ function ReadRow({
           />
           {label}
         </span>
+        {/* The one live region: it announces what the line was read as, and
+            nothing of the fields below it. */}
         <span
-          // Re-keyed when a value first appears, so it rises in as it's understood.
-          key={value ? 'set' : 'unset'}
-          className={cn(
-            'min-w-0 flex-1 text-base',
-            value ? 'animate-rise' : 'text-muted-foreground',
-          )}
+          aria-live="polite"
+          className="min-w-0 flex-1 text-base break-words"
         >
-          {value || '-'}
+          <span
+            // Re-keyed when a value first appears, so it rises in as it's understood.
+            key={value ? 'set' : 'unset'}
+            className={cn(
+              'block',
+              value ? 'animate-rise' : 'text-muted-foreground',
+            )}
+          >
+            {value || '–'}
+          </span>
         </span>
         {onFix && !fixing && (
-          <Button variant="link" className="h-11 shrink-0 px-1" onClick={onFix}>
+          <Button
+            variant="link"
+            className="h-11 shrink-0 px-1"
+            aria-label={`${m.new_fix()}: ${label}`}
+            onClick={onFix}
+          >
             {m.new_fix()}
           </Button>
         )}
       </div>
-      {missing && <p className="ps-27 text-sm text-destructive">{missing}</p>}
+      {missing && (
+        <p
+          id={errorId}
+          role="alert"
+          tabIndex={-1}
+          className="ps-27 text-sm text-destructive outline-none"
+        >
+          {missing}
+        </p>
+      )}
       {children && <div className="ps-27">{children}</div>}
     </div>
   )
@@ -341,9 +366,27 @@ export function NewJobForm({
     withResolver: true,
   })
 
+  const wide = useWide()
+  // Set when a save finds something missing: the first thing wrong gets focus.
+  const [failure, setFailure] = useState<{
+    id: number
+    client: boolean
+  }>()
+  useEffect(() => {
+    if (!failure) return
+    document
+      .getElementById(failure.client ? 'new-error-client' : 'new-title')
+      ?.focus()
+  }, [failure])
+
   const submit = async (markDone = false) => {
     setTried(true)
-    if (!chosenClient || !chosenTitle.trim()) return
+    if (!chosenClient || !chosenTitle.trim()) {
+      // A missing title opens its input; a missing client shows its picker.
+      if (!chosenTitle.trim()) setFixing('title')
+      setFailure({ id: Date.now(), client: !chosenClient })
+      return
+    }
     if (!navigator.onLine) {
       toast.error(m.offline_edit_blocked())
       return
@@ -519,6 +562,7 @@ export function NewJobForm({
           </FieldLabel>
           <Textarea
             id="line"
+            name="line"
             autoFocus
             rows={3}
             maxLength={500}
@@ -526,7 +570,11 @@ export function NewJobForm({
             value={text}
             onChange={(event) => onText(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
                 event.preventDefault()
                 void submit()
               }
@@ -547,7 +595,7 @@ export function NewJobForm({
           </FieldDescription>
         </Field>
 
-        <section className="mt-4 flex flex-col divide-y" aria-live="polite">
+        <section className="mt-4 flex flex-col divide-y">
           <h2 className="pb-1 text-sm font-semibold">{m.new_readback()}</h2>
 
           <ReadRow
@@ -573,9 +621,12 @@ export function NewJobForm({
               )
             }
             missing={tried && !chosenClient && m.new_missing_client()}
+            errorId="new-error-client"
           >
             {fixing === 'client' || (tried && !chosenClient) ? (
               <ClientPicker
+                // Only a tap on "Fix" raises the keyboard, never a failed save.
+                autoFocus={wide && fixing === 'client'}
                 clients={clients}
                 initialQuery={
                   parsed.client?.kind === 'new' ? parsed.client.name : ''
@@ -601,7 +652,7 @@ export function NewJobForm({
                         }
                         variant={isChosen(choice) ? 'secondary' : 'outline'}
                         aria-pressed={isChosen(choice)}
-                        className="h-11 rounded-xl"
+                        className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal"
                         onClick={() => setClient(choice)}
                       >
                         {label}
@@ -628,12 +679,19 @@ export function NewJobForm({
             fixing={fixing === 'title'}
             onFix={() => setFixing('title')}
             missing={tried && !chosenTitle.trim() && m.new_missing_title()}
+            errorId="new-error-title"
           >
             {fixing === 'title' && (
               <div className="flex gap-2">
                 <Input
+                  id="new-title"
+                  name="title"
                   autoFocus
                   aria-label={m.new_what()}
+                  aria-invalid={tried && !chosenTitle.trim()}
+                  aria-describedby={
+                    tried && !chosenTitle.trim() ? 'new-error-title' : undefined
+                  }
                   maxLength={200}
                   value={chosenTitle}
                   onChange={(event) => setTitle(event.target.value)}
@@ -660,7 +718,7 @@ export function NewJobForm({
                       pickedItems.includes(item.id) ? 'secondary' : 'outline'
                     }
                     aria-pressed={pickedItems.includes(item.id)}
-                    className="h-11 rounded-xl aria-pressed:border-primary"
+                    className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal aria-pressed:border-primary"
                     onClick={() => toggleItem(item.id)}
                   >
                     {item.name}
@@ -693,6 +751,7 @@ export function NewJobForm({
             {fixing === 'price' && (
               <div className="flex gap-2">
                 <MoneyInput
+                  name="price"
                   label={m.new_price()}
                   value={
                     price ??
@@ -722,6 +781,7 @@ export function NewJobForm({
               {fixing === 'deposit' && (
                 <div className="flex flex-col gap-3">
                   <MoneyInput
+                    name="deposit"
                     label={isPayment ? m.new_paid() : m.new_deposit()}
                     value={
                       deposit ??
@@ -753,6 +813,7 @@ export function NewJobForm({
                     </FieldLabel>
                     <Input
                       id="deposit-date"
+                      name="deposit-date"
                       type="date"
                       value={depositDate}
                       onChange={(event) =>
@@ -782,6 +843,7 @@ export function NewJobForm({
                     </FieldLabel>
                     <Input
                       id="job-date"
+                      name="date"
                       type="date"
                       value={chosenDate?.date ?? ''}
                       onChange={(event) =>
@@ -805,6 +867,7 @@ export function NewJobForm({
                       </FieldLabel>
                       <Input
                         id="job-time"
+                        name="time"
                         type="time"
                         disabled={!chosenDate}
                         value={
@@ -901,16 +964,22 @@ export function NewJobForm({
         open={blocker.status === 'blocked'}
         onKeep={() => blocker.reset?.()}
         onDiscard={() => blocker.proceed?.()}
+        title={m.new_discard_title()}
+        body={m.new_discard_body()}
+        discardLabel={m.new_discard()}
+        keepLabel={m.new_keep_writing()}
       />
     </main>
   )
 }
 
 function MoneyInput({
+  name,
   label,
   value,
   onChange,
 }: {
+  name: string
   label: string
   value: string
   onChange: (value: string) => void
@@ -918,6 +987,7 @@ function MoneyInput({
   return (
     <InputGroup>
       <InputGroupInput
+        name={name}
         autoFocus
         aria-label={label}
         inputMode="decimal"
