@@ -193,6 +193,60 @@ describe('files', () => {
     expect(await storageBytes(t, businessId)).toBe(1024 * MB)
   })
 
+  it('replacing the logo counts the old logo’s bytes as freed against the 1 GB cap', async () => {
+    const { t, owner, businessId } = await withJob()
+    const target = { kind: 'logo' as const }
+    const first = await owner.mutation(api.files.save, {
+      businessId,
+      storageId: await storeBlob(t, 1000, 'image/png'),
+      target,
+    })
+    if (!('fileId' in first)) throw new Error('rejected')
+    // The business is exactly full, with that logo in the count.
+    await t.run((ctx) =>
+      ctx.db.patch('businesses', businessId, { storageBytes: 1024 * MB }),
+    )
+    // One byte more than the logo it replaces does not fit.
+    await expect(
+      owner.mutation(api.files.save, {
+        businessId,
+        storageId: await storeBlob(t, 1001, 'image/png'),
+        target,
+      }),
+    ).rejects.toThrow(/storage.full/)
+    expect(await storageBytes(t, businessId)).toBe(1024 * MB)
+    // The same size, or a smaller one, replaces it.
+    const second = await owner.mutation(api.files.save, {
+      businessId,
+      storageId: await storeBlob(t, 1000, 'image/png'),
+      target,
+    })
+    expect('fileId' in second).toBe(true)
+    expect(await storageBytes(t, businessId)).toBe(1024 * MB)
+    expect(await t.run((ctx) => ctx.db.query('files').collect())).toHaveLength(
+      1,
+    )
+  })
+
+  it('a file that is not a logo still has to fit on top of the logo', async () => {
+    const { t, owner, businessId, target } = await withJob()
+    await owner.mutation(api.files.save, {
+      businessId,
+      storageId: await storeBlob(t, 1000, 'image/png'),
+      target: { kind: 'logo' },
+    })
+    await t.run((ctx) =>
+      ctx.db.patch('businesses', businessId, { storageBytes: 1024 * MB }),
+    )
+    await expect(
+      owner.mutation(api.files.save, {
+        businessId,
+        storageId: await storeBlob(t, 1, 'image/png'),
+        target,
+      }),
+    ).rejects.toThrow(/storage.full/)
+  })
+
   it('refuses a blob another file already points to, and keeps it', async () => {
     const { t, owner, businessId, target } = await withJob()
     const storageId = await storeBlob(t, 100, 'image/png')

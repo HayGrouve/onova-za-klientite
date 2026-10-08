@@ -111,7 +111,13 @@ export const save = businessMutation({
       await ctx.storage.delete(args.storageId)
       return { rejected: 'size' as const }
     }
-    if (ctx.business.storageBytes + meta.size > STORAGE_CAP_BYTES) {
+    // A new logo replaces the old one, so the old one's bytes are freed.
+    const old =
+      args.target.kind === 'logo' && ctx.business.logoFileId
+        ? await ctx.db.get('files', ctx.business.logoFileId)
+        : null
+    const freed = old?.size ?? 0
+    if (ctx.business.storageBytes - freed + meta.size > STORAGE_CAP_BYTES) {
       // The blob stays until cleanupOrphans removes it: a delete here would
       // be rolled back by the throw.
       fail('storage.full')
@@ -130,15 +136,14 @@ export const save = businessMutation({
       visibleToClient: false,
       uploadedBy: ctx.member._id,
     })
-    let storageBytes = ctx.business.storageBytes + meta.size
+    const storageBytes = Math.max(
+      0,
+      ctx.business.storageBytes - freed + meta.size,
+    )
     if (args.target.kind === 'logo') {
-      const old = ctx.business.logoFileId
-        ? await ctx.db.get('files', ctx.business.logoFileId)
-        : null
       if (old) {
         await ctx.storage.delete(old.storageId)
         await ctx.db.delete('files', old._id)
-        storageBytes = Math.max(0, storageBytes - old.size)
       }
       await ctx.db.patch('businesses', ctx.business._id, {
         logoFileId: fileId,
