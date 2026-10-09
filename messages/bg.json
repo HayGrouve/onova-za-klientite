@@ -885,5 +885,12 @@
   "job_next_appointment": "{appointment}: {when}",
   "settings_group_business": "Вашият бизнес",
   "settings_group_work": "Как работите",
-  "settings_group_data": "Данни и профил"
+  "settings_group_data": "Данни и профил",
+  "settings_theme": "Изглед",
+  "settings_theme_body": "Светъл, тъмен или като на устройството",
+  "theme_help": "Важи само за това устройство.",
+  "theme_label": "Тема",
+  "theme_light": "Светъл",
+  "theme_dark": "Тъмен",
+  "theme_system": "Като устройството"
 }

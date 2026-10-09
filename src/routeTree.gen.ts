@@ -36,6 +36,7 @@ import { Route as AppSettingsNotificationsRouteImport } from './routes/_app/sett
 import { Route as AppSettingsRemindersRouteImport } from './routes/_app/settings.reminders'
 import { Route as AppSettingsServicesRouteImport } from './routes/_app/settings.services'
 import { Route as AppSettingsStagesRouteImport } from './routes/_app/settings.stages'
+import { Route as AppSettingsThemeRouteImport } from './routes/_app/settings.theme'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -172,6 +173,11 @@ const AppSettingsStagesRoute = AppSettingsStagesRouteImport.update({
   path: '/stages',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsThemeRoute = AppSettingsThemeRouteImport.update({
+  id: '/theme',
+  path: '/theme',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -197,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/settings/reminders': typeof AppSettingsRemindersRoute
   '/settings/services': typeof AppSettingsServicesRoute
   '/settings/stages': typeof AppSettingsStagesRoute
+  '/settings/theme': typeof AppSettingsThemeRoute
   '/clients/': typeof AppClientsIndexRoute
   '/jobs/': typeof AppJobsIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/settings/reminders': typeof AppSettingsRemindersRoute
   '/settings/services': typeof AppSettingsServicesRoute
   '/settings/stages': typeof AppSettingsStagesRoute
+  '/settings/theme': typeof AppSettingsThemeRoute
   '/clients': typeof AppClientsIndexRoute
   '/jobs': typeof AppJobsIndexRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/_app/settings/reminders': typeof AppSettingsRemindersRoute
   '/_app/settings/services': typeof AppSettingsServicesRoute
   '/_app/settings/stages': typeof AppSettingsStagesRoute
+  '/_app/settings/theme': typeof AppSettingsThemeRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/jobs/': typeof AppJobsIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/settings/reminders'
     | '/settings/services'
     | '/settings/stages'
+    | '/settings/theme'
     | '/clients/'
     | '/jobs/'
     | '/settings/'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/settings/reminders'
     | '/settings/services'
     | '/settings/stages'
+    | '/settings/theme'
     | '/clients'
     | '/jobs'
     | '/settings'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/_app/settings/reminders'
     | '/_app/settings/services'
     | '/_app/settings/stages'
+    | '/_app/settings/theme'
     | '/_app/clients/'
     | '/_app/jobs/'
     | '/_app/settings/'
@@ -541,6 +553,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsStagesRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/theme': {
+      id: '/_app/settings/theme'
+      path: '/theme'
+      fullPath: '/settings/theme'
+      preLoaderRoute: typeof AppSettingsThemeRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
   }
 }
 
@@ -554,6 +573,7 @@ interface AppSettingsRouteChildren {
   AppSettingsRemindersRoute: typeof AppSettingsRemindersRoute
   AppSettingsServicesRoute: typeof AppSettingsServicesRoute
   AppSettingsStagesRoute: typeof AppSettingsStagesRoute
+  AppSettingsThemeRoute: typeof AppSettingsThemeRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
@@ -567,6 +587,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsRemindersRoute: AppSettingsRemindersRoute,
   AppSettingsServicesRoute: AppSettingsServicesRoute,
   AppSettingsStagesRoute: AppSettingsStagesRoute,
+  AppSettingsThemeRoute: AppSettingsThemeRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
 
