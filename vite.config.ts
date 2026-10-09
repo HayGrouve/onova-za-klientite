@@ -6,6 +6,7 @@ import { nitro } from 'nitro/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { trimClerkBundle } from './build/clerk-localization.ts'
 import { serviceWorker } from './build/service-worker.ts'
+import { vendorGuard } from './build/vendor-guard.ts'
 
 const isVitest = Boolean(process.env.VITEST)
 
@@ -143,5 +144,6 @@ export default defineConfig({
         ]),
     viteReact(),
     serviceWorker(),
+    vendorGuard(),
   ],
 })
