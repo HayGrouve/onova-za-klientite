@@ -21,6 +21,7 @@ import { recomputeClient, recomputeJob, recomputeMoney } from './recompute'
 export {
   clearJobIndex,
   dropStaleAssignments,
+  isBuiltOrBuilding,
   rebuildPage,
   startRebuild,
   syncAssignments,

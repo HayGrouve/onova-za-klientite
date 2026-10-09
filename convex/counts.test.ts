@@ -433,6 +433,84 @@ describe('the backfill', () => {
   })
 })
 
+describe('the deploy-time backfill (onlyMissing)', () => {
+  it('builds a business with no counts and leaves a built one unread', async () => {
+    const { t, owner, businessId, clients } = await setup()
+    await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: clients[0],
+      title: 'Една',
+    })
+    // Built: a wrong counter stays as it is, since the run doesn't look at it.
+    const row = await t.run((ctx) =>
+      ctx.db
+        .query('jobCounts')
+        .withIndex('by_business_member', (q) =>
+          q.eq('businessId', businessId).eq('membershipId', undefined),
+        )
+        .unique(),
+    )
+    await t.run((ctx) =>
+      ctx.db.patch('jobCounts', row!._id, {
+        groups: { ...row!.groups, new: 99 },
+      }),
+    )
+    await t.mutation(internal.counts.backfill, { onlyMissing: true })
+    await t.finishAllScheduledFunctions(() => {})
+    expect((await owner.query(api.jobs.list, { businessId })).counts.new).toBe(
+      99,
+    )
+
+    // Not built: the run builds it.
+    await wipe(t)
+    await t.mutation(internal.counts.backfill, { onlyMissing: true })
+    for (let round = 0; round < 6; round++) {
+      await t.finishAllScheduledFunctions(() => {})
+    }
+    expect(await jobIndexProblems(t)).toEqual([])
+  })
+})
+
+describe('an abandoned recount', () => {
+  it('is dropped by the next job change instead of taxing every write', async () => {
+    const { t, owner, businessId, clients } = await setup()
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: clients[0],
+      title: 'Една',
+    })
+    await t.run((ctx) =>
+      ctx.db.insert('jobCountRebuilds', {
+        businessId,
+        runId: 'lost',
+        after: Number.MAX_SAFE_INTEGER,
+        groups: { new: 0, in_progress: 0, done: 0, cancelled: 0 },
+        stages: {},
+        members: {},
+      }),
+    )
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000)
+    const working = await t.run(async (ctx) =>
+      (await ctx.db.query('stages').collect()).find(
+        (stage) =>
+          stage.businessId === businessId && stage.group === 'in_progress',
+      ),
+    )
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId,
+      stageId: working!._id,
+    })
+    vi.useRealTimers()
+    const rows = await t.run((ctx) =>
+      ctx.db.query('jobCountRebuilds').collect(),
+    )
+    expect(rows).toEqual([])
+    expect(await jobIndexProblems(t)).toEqual([])
+  })
+})
+
 describe('counts that are not built yet', () => {
   /** A business with three jobs, one of them a Worker's, and nothing derived. */
   async function unbuilt() {

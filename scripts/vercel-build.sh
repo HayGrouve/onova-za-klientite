@@ -5,8 +5,10 @@
 # - Every deploy: `convex deploy` typechecks and pushes the functions and the
 #   schema, runs `pnpm build` with VITE_CONVEX_URL set, and, on a new preview
 #   deployment only, seeds it (`seed:preview`).
-# - Production only: `counts:backfill` (D105, D106) then rebuilds the job
-#   counts and Worker assignment rows. `convex deploy` has no flag for running
+# - Production only: `counts:backfill` (D105, D106) then builds the job
+#   counts and Worker assignment rows of any business that has none yet
+#   (`onlyMissing`: a built business isn't re-read, a recount under way isn't
+#   restarted). `convex deploy` has no flag for running
 #   a function after a production push, so it is a second command (`--prod`
 #   is ignored for a production deploy key, and picks production for a project
 #   key). It is cheap and idempotent: a business that is already right isn't
@@ -24,7 +26,7 @@ npx convex deploy --cmd 'pnpm build' --preview-run 'seed:preview'
 
 if [ "${VERCEL_ENV:-}" = "production" ]; then
   echo "convex: scheduling counts:backfill on the production deployment"
-  if npx convex run counts:backfill '{}' --prod; then
+  if npx convex run counts:backfill '{"onlyMissing": true}' --prod; then
     echo "convex: counts:backfill scheduled"
   else
     echo "convex: WARNING counts:backfill failed; run it by hand: npx convex run counts:backfill '{}' --prod" >&2

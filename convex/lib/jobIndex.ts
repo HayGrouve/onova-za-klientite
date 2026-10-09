@@ -125,6 +125,24 @@ const findRebuild = (ctx: QueryCtx, businessId: Id<'businesses'>) =>
     .withIndex('by_business', (q) => q.eq('businessId', businessId))
     .first()
 
+/**
+ * A recount whose pages stopped (one failed, or its next page was lost) would
+ * otherwise be patched by every job change for good. Pages follow each other
+ * at once, so a recount still there after this long has been abandoned.
+ */
+const REBUILD_ABANDONED_MS = 60 * 60 * 1000
+
+/** Whether the business's counts exist or a recount of them is under way. */
+export async function isBuiltOrBuilding(
+  ctx: QueryCtx,
+  businessId: Id<'businesses'>,
+) {
+  return (
+    (await findCountRow(ctx, businessId)) !== null ||
+    (await findRebuild(ctx, businessId)) !== null
+  )
+}
+
 /** Whether the business has no job but this one, which is just made. */
 async function isFirstJob(ctx: QueryCtx, businessId: Id<'businesses'>) {
   const jobs = await ctx.db
@@ -154,7 +172,11 @@ async function moveCounts(
   if (before) countJob(delta, before, -1)
   if (after) countJob(delta, after, 1)
   if (isEmptyDelta(delta)) return
-  const rebuild = await findRebuild(ctx, businessId)
+  let rebuild = await findRebuild(ctx, businessId)
+  if (rebuild && Date.now() - rebuild._creationTime > REBUILD_ABANDONED_MS) {
+    await ctx.db.delete('jobCountRebuilds', rebuild._id)
+    rebuild = null
+  }
   const business = await findCountRow(ctx, businessId)
   if (business || (before === null && (await isFirstJob(ctx, businessId)))) {
     await applyDelta(
