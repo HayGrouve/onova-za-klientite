@@ -1,79 +1,56 @@
 import { useMutation } from 'convex/react'
+import { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
-import { useNow } from '#/hooks/use-now'
+import { useStableCallback } from '#/hooks/use-stable-callback'
 import { useViewer } from '#/hooks/use-viewer'
 import { GROUP_LABEL } from '#/i18n/groups'
+import { moveOnBoard } from '#/lib/board-move'
 import { runChange } from '#/lib/change'
+import { targetGroup } from '#/lib/move-plan'
 import { m } from '#/paraglide/messages.js'
-import { jobOwedCents, jobOwes } from '../../shared/allocation'
-import { boardColumn } from '../../shared/board'
 import { offersRuleReminder } from '../../shared/reminder-rule'
-import { enterGroup } from '../../shared/stages'
 import type { StageGroup } from '../../shared/stages'
 
 type Stage = { _id: Id<'stages'>; name: string; group: StageGroup }
 
+/** The job as the move needs it, from a board card or the job page. */
+type Moving = {
+  _id: Id<'jobs'>
+  title: string
+  stageGroup: StageGroup
+  isNoClient: boolean
+  balanceCents: number
+  /** The item the reminder rule's reminder is about, if the job has one. */
+  itemId?: Id<'items'>
+}
+
+/** What the reminder rule's sheet needs to open. */
+export type RuleOffer = { _id: Id<'jobs'>; title: string; itemId?: Id<'items'> }
+
 /**
- * Moves a job to another stage, from the job page or the board. The board
- * shows the move at once and settles when the server answers. `announce`
- * says where the job went, with Undo, the same way on both.
+ * Moves a job to another stage, from the job page or the board, and says
+ * where it went. The board shows the move at once and settles when the server
+ * answers. `moveAndAnnounce` is the one flow for both: the move, the reminder
+ * rule's offer when the job reaches Done (Q5, `ruleOffer` and `closeRuleOffer`
+ * drive its sheet), and the toast with Undo, which waits while the offer is open.
  */
 export function useMoveJob() {
   const { business } = useViewer()
-  // The board's query arguments, so the optimistic update finds its result.
-  const now = useNow()
   const changeStage = useMutation(api.jobs.changeStage).withOptimisticUpdate(
     (store, { businessId, jobId, stageId }) => {
-      const board = store.getQuery(api.jobs.board, { businessId, now })
-      const stage = board?.stages.find((item) => item._id === stageId)
-      const moving = board?.columns
-        .flatMap((column) => column.jobs)
-        .find((job) => job._id === jobId)
-      if (!board || !stage || !moving) return
-      // The same rule the server applies: Cancelled never owes, Done
-      // records when it was reached.
-      const moved = {
-        ...moving,
-        stageId: stage._id,
-        stageName: stage.name,
-        stageGroup: stage.group,
-        owes: jobOwes(moving.balanceCents, stage.group),
-        doneAt: enterGroup(moving, stage.group, Date.now()).doneAt,
+      // Every cached board of this business, whatever `now` it was asked
+      // with: the screen's clock may be a step ahead of the one a cached
+      // result was read for.
+      for (const { args, value } of store.getAllQueries(api.jobs.board)) {
+        if (!value || args.businessId !== businessId) continue
+        const moved = moveOnBoard(value, jobId, stageId, Date.now())
+        if (moved) store.setQuery(api.jobs.board, args, moved)
       }
-      store.setQuery(
-        api.jobs.board,
-        { businessId, now },
-        {
-          ...board,
-          columns: board.columns.map((column) => {
-            const rest = column.jobs.filter((job) => job._id !== jobId)
-            const left = rest.length < column.jobs.length
-            const arrives = column.group === stage.group
-            const jobs = arrives ? [...rest, moved] : rest
-            return {
-              ...column,
-              jobs: boardColumn(column.group, jobs, jobs.length).jobs,
-              olderOwing: column.olderOwing.filter((job) => job._id !== jobId),
-              total: column.total - (left ? 1 : 0) + (arrives ? 1 : 0),
-              owedCents:
-                column.owedCents -
-                (left ? jobOwedCents(moving) : 0) +
-                (arrives ? jobOwedCents(moved) : 0),
-            }
-          }),
-        },
-      )
     },
   )
   const cancel = useMutation(api.jobs.cancel)
-
-  type Moving = {
-    _id: Id<'jobs'>
-    stageGroup: StageGroup
-    isNoClient: boolean
-  }
 
   /**
    * Moves the job. Resolves to whether it moved and whether the reminder
@@ -81,7 +58,7 @@ export function useMoveJob() {
    * failure it doesn't move and says why.
    */
   const move = async (
-    job: Moving,
+    job: Pick<Moving, '_id' | 'stageGroup' | 'isNoClient'>,
     /** The stage, or Cancelled when the business has no Cancelled stage left. */
     target: Stage | 'cancelled',
   ) => {
@@ -109,22 +86,45 @@ export function useMoveJob() {
     }
   }
 
+  const [ruleOffer, setRuleOffer] = useState<RuleOffer | null>(null)
+  // The move's toast waits here while the offer's sheet covers the screen.
+  const pending = useRef<{ jobId: Id<'jobs'>; say: () => void } | null>(null)
+
+  /** The offer is done with (answered, skipped, or the move was undone). */
+  const closeRuleOffer = useCallback(() => {
+    setRuleOffer(null)
+    const waiting = pending.current
+    pending.current = null
+    waiting?.say()
+  }, [])
+
+  /** Closes the offer of a job that left Done again, without its stale toast. */
+  const dropRuleOffer = (jobId: Id<'jobs'>) => {
+    if (pending.current?.jobId === jobId) pending.current = null
+    setRuleOffer((open) => (open?._id === jobId ? null : open))
+  }
+
   /**
    * Tells which stage the job is in now, with a way back to `previous`. One
    * toast at a time: a new move replaces the last. With `onPay`, reaching Done
    * with a balance also offers the payment.
    */
   const announce = (
-    job: Moving & { balanceCents: number },
+    job: Moving,
     target: Stage | 'cancelled',
     previous: Stage | undefined,
     onPay?: () => void,
   ) => {
-    const group = target === 'cancelled' ? 'cancelled' : target.group
+    const group = targetGroup(target)
     const undo = previous
       ? {
           label: m.undo(),
-          onClick: () => void move({ ...job, stageGroup: group }, previous),
+          onClick: () =>
+            void move({ ...job, stageGroup: group }, previous).then(
+              ({ moved }) => {
+                if (moved) dropRuleOffer(job._id)
+              },
+            ),
         }
       : undefined
     const offerPayment =
@@ -146,7 +146,32 @@ export function useMoveJob() {
     )
   }
 
-  return { move, announce }
+  /**
+   * Moves the job, then offers the reminder rule's reminder if it applies
+   * (the toast follows once that is closed), or announces the move at once.
+   * `previous` is the stage Undo goes back to; `onPay` adds the payment
+   * button when Done leaves a balance. Offline or on a failure nothing moves.
+   */
+  const moveAndAnnounce = useStableCallback(
+    async (
+      job: Moving,
+      target: Stage | 'cancelled',
+      previous: Stage | undefined,
+      onPay?: () => void,
+    ) => {
+      const { moved, offerRule } = await move(job, target)
+      if (!moved) return
+      const say = () => announce(job, target, previous, onPay)
+      if (offerRule) {
+        pending.current = { jobId: job._id, say }
+        setRuleOffer({ _id: job._id, title: job.title, itemId: job.itemId })
+      } else {
+        say()
+      }
+    },
+  )
+
+  return { moveAndAnnounce, ruleOffer, closeRuleOffer }
 }
 
 /** One toast at a time for stage changes: a new one replaces the last. */

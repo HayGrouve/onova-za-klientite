@@ -8,7 +8,6 @@ import {
   WarningCircleIcon,
 } from '@phosphor-icons/react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import { JobRow } from '#/components/job-row'
@@ -19,6 +18,7 @@ import { EmptyState, PageTitle } from '#/components/page'
 import { TodayWide } from '#/components/today/today-wide'
 import { VisitRow } from '#/components/today/visit-row'
 import { useNow } from '#/hooks/use-now'
+import { useQueryKeepPrevious } from '#/hooks/use-query-keep-previous'
 import { useToday } from '#/hooks/use-today'
 import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
@@ -68,7 +68,7 @@ function TodayPage() {
   const { business } = useViewer()
   const today = useToday()
   const now = useNow()
-  const data = useQuery(api.today.list, {
+  const data = useQueryKeepPrevious(api.today.list, {
     businessId: business._id,
     today,
     now,
