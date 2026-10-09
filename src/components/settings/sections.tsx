@@ -5,6 +5,7 @@ import {
   DatabaseIcon,
   FlowArrowIcon,
   ListPlusIcon,
+  PaletteIcon,
   PuzzlePieceIcon,
   StorefrontIcon,
   TagIcon,
@@ -95,6 +96,12 @@ export function settingsGroups(): SettingsGroup[] {
     {
       title: m.settings_group_data(),
       sections: [
+        {
+          to: '/settings/theme',
+          icon: PaletteIcon,
+          title: m.settings_theme(),
+          body: m.settings_theme_body(),
+        },
         {
           to: '/settings/data',
           icon: DatabaseIcon,

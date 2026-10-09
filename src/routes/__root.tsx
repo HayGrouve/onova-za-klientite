@@ -13,6 +13,7 @@ import { ServiceWorkerRegister } from '#/components/service-worker-register'
 import { Toaster } from '#/components/ui/sonner'
 import { TOAST_MOBILE_OFFSET, TOAST_OFFSET } from '#/lib/toast-layout'
 import { applyTimingFlag } from '#/lib/timing'
+import { THEME_SCRIPT, useTheme } from '#/lib/theme'
 import { IconContext } from '@phosphor-icons/react'
 import type { IconProps } from '@phosphor-icons/react'
 import { lazy, Suspense, useEffect, useState } from 'react'
@@ -22,12 +23,6 @@ import appCss from '../styles.css?url'
 // content, so this URL is the one the stylesheet's @font-face points at.
 import cyrillicFont from '@fontsource-variable/sofia-sans/files/sofia-sans-cyrillic-wght-normal.woff2?url'
 import latinFont from '@fontsource-variable/sofia-sans/files/sofia-sans-latin-wght-normal.woff2?url'
-
-// The theme follows the system's light or dark setting. It runs in <head>,
-// before the first paint, so a dark screen never flashes white, and it
-// follows a change while the app is open.
-// The browser bar takes the brand blue in light and the page colour in dark.
-const THEME_SCRIPT = `(function(){var q=window.matchMedia('(prefers-color-scheme: dark)');function a(){var d=q.matches,e=document.documentElement,t=document.querySelectorAll('meta[name="theme-color"]');e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';t.forEach(function(m){m.setAttribute('content',d?'#040405':'#2453a4')})}a();q.addEventListener('change',a)})()`
 
 // Icons are decoration: the text or aria-label next to them says what they
 // mean, so screen readers skip them. An icon can opt back in with its own prop.
@@ -117,6 +112,7 @@ function RootError({ error }: ErrorComponentProps) {
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const theme = useTheme()
   return (
     // The theme script sets the class before React loads.
     <html lang="bg" suppressHydrationWarning>
@@ -133,6 +129,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           position="bottom-center"
           offset={TOAST_OFFSET}
           mobileOffset={TOAST_MOBILE_OFFSET}
+          theme={theme}
         />
         <ServiceWorkerRegister />
         <Scripts />
