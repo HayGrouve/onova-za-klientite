@@ -25,7 +25,7 @@ import {
   isWorker,
   seesEvent,
   visibleJobsOfClient,
-  workerJobs,
+  workerAssignments,
 } from './lib/scope'
 import type { ScopedCtx } from './lib/scope'
 import { optionalText, requiredText } from './lib/validate'
@@ -181,11 +181,11 @@ export const list = businessQuery({
 
 /** The clients of a Worker's jobs, as `list` shows them, with no money. */
 async function workerClients(ctx: ScopedCtx) {
-  const jobs = await workerJobs(ctx)
+  // From their assignments, an index on the Worker (D106): no job is read.
   const open = new Map<string, number>()
-  for (const job of jobs) {
-    const count = isOpenGroup(job.stageGroup) ? 1 : 0
-    open.set(job.clientId, (open.get(job.clientId) ?? 0) + count)
+  for (const row of await workerAssignments(ctx)) {
+    const count = isOpenGroup(row.stageGroup) ? 1 : 0
+    open.set(row.clientId, (open.get(row.clientId) ?? 0) + count)
   }
   const shown = await listFieldIds(ctx, ctx.business._id, 'client')
   const rows = []

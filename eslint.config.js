@@ -35,6 +35,11 @@ export default [
               group: ['**/recompute'],
               message: 'Change money through convex/lib/ledger.ts.',
             },
+            {
+              group: ['**/jobIndex'],
+              message:
+                'The job counts and assignments change through convex/lib/ledger.ts.',
+            },
           ],
         },
       ],
@@ -53,9 +58,9 @@ export default [
         },
         {
           selector:
-            "CallExpression[callee.property.name=/^(insert|patch|replace)$/][arguments.0.value='jobs'] Property[key.name=/^(lines|typedPriceCents|writeOff|stageGroup|priceCents|paidCents|costCents|balanceCents|owes)$/]",
+            "CallExpression[callee.property.name=/^(insert|patch|replace)$/][arguments.0.value='jobs'] Property[key.name=/^(lines|typedPriceCents|writeOff|stageId|stageGroup|assigneeIds|dueDate|clientId|priceCents|paidCents|costCents|balanceCents|owes)$/]",
           message:
-            'Change what a job costs or its stage group with patchJob from convex/lib/ledger.ts.',
+            'Change what a job costs, its stage, assignees, due date or client with patchJob from convex/lib/ledger.ts.',
         },
       ],
     },

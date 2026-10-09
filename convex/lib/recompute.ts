@@ -6,6 +6,7 @@ import {
   jobPriceCents,
 } from '../../shared/allocation'
 import { sumCents } from '../../shared/money'
+import { syncAssignments } from './jobIndex'
 
 /**
  * The only writers of cached money (ADR 0008). Call them in the same mutation
@@ -47,6 +48,10 @@ export async function recomputeJob(ctx: MutationCtx, jobId: Id<'jobs'>) {
     (key) => job[key] !== cache[key],
   )
   if (changed) await ctx.db.patch('jobs', jobId, cache)
+  // A Worker's "done but unpaid" reads `owes` from the assignment rows (D106).
+  if (job.owes !== cache.owes && job.assigneeIds.length > 0) {
+    await syncAssignments(ctx, { ...job, ...cache })
+  }
 }
 
 export async function computePaymentCache(

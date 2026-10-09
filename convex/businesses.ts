@@ -9,6 +9,7 @@ import {
 } from './lib/auth'
 import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
+import { readJobCounts } from './lib/jobCounts'
 import { spend } from './lib/rateLimit'
 import { optionalText, requiredText } from './lib/validate'
 import { vModules, vWords } from './validators'
@@ -59,9 +60,6 @@ export const settings = businessQuery({
   },
 })
 
-/** Most jobs counted in one stage; a stage past it reads as this many. */
-const STAGE_COUNT_CAP = 1000
-
 /**
  * How many jobs each stage holds, for the Stages screen only: Settings itself
  * stays small, and a job change doesn't re-run every other Settings screen.
@@ -78,16 +76,12 @@ export const stageJobCounts = businessQuery({
         q.eq('businessId', ctx.business._id),
       )
       .collect()
-    const counts = []
-    for (const stage of stages) {
-      const jobs = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_stage', (q) =>
-          q.eq('businessId', ctx.business._id).eq('stageId', stage._id),
-        )
-        .take(STAGE_COUNT_CAP)
-      counts.push({ stageId: stage._id, jobCount: jobs.length })
-    }
+    // Exact, from the counts the ledger keeps (D105); no job is read.
+    const { stages: held } = await readJobCounts(ctx, ctx.business._id)
+    const counts = stages.map((stage) => ({
+      stageId: stage._id,
+      jobCount: held[stage._id] ?? 0,
+    }))
     return counts
   },
 })

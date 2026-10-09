@@ -29,6 +29,14 @@ export const vStageGroup = v.union(
   ...STAGE_GROUPS.map((group) => v.literal(group)),
 )
 
+/** How many jobs sit in each stage group (convex/lib/jobIndex.ts). */
+export const vGroupCounts = v.object({
+  new: v.number(),
+  in_progress: v.number(),
+  done: v.number(),
+  cancelled: v.number(),
+})
+
 export const vStageColor = v.union(
   ...STAGE_COLORS.map((color) => v.literal(color)),
 )

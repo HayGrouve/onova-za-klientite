@@ -13,6 +13,8 @@ import {
   storeBlob,
 } from './test.setup'
 
+const DERIVED = ['jobCounts', 'jobAssignments'] as const
+
 afterEach(() => {
   vi.unstubAllEnvs()
 })
@@ -294,11 +296,15 @@ describe('delete the account', () => {
     })
 
     await owner.mutation(api.account.deleteAccount, {})
-    await t.finishAllScheduledFunctions(() => {})
+    // One step per table: the test scheduler gives up after about twenty
+    // steps in a row, so it is asked again for each business.
+    for (let round = 0; round < 4; round++) {
+      await t.finishAllScheduledFunctions(() => {})
+    }
 
     const left = await t.run(async (ctx) => {
       const result: Record<string, number> = {}
-      for (const table of BUSINESS_TABLE_NAMES) {
+      for (const table of [...BUSINESS_TABLE_NAMES, ...DERIVED]) {
         result[table] = (await ctx.db.query(table).collect()).filter(
           (row) => (row as { businessId: string }).businessId === businessId,
         ).length

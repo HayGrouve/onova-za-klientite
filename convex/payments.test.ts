@@ -6,6 +6,7 @@ import type { Id } from './_generated/dataModel'
 import {
   STRANGER,
   addMember,
+  assignJob,
   expectCachesFresh,
   getDoc,
   lastActivity,
@@ -68,9 +69,7 @@ describe('payments', () => {
       { owner, businessId, ...b },
       'manager',
     )
-    await t.run((ctx) =>
-      ctx.db.patch('jobs', jobIds[0], { assigneeIds: [membershipId] }),
-    )
+    await assignJob(t, jobIds[0], [membershipId])
     const pay = (who: typeof worker, amountCents: number) =>
       who.mutation(api.payments.addFromJob, {
         businessId,
@@ -534,9 +533,7 @@ describe('payments.get: how a payment was split', () => {
     await expect(
       worker.query(api.payments.get, { businessId, paymentId }),
     ).rejects.toThrow(/auth.forbidden/)
-    await t.run((ctx) =>
-      ctx.db.patch('jobs', jobId, { assigneeIds: [membershipId] }),
-    )
+    await assignJob(t, jobId, [membershipId])
     const seen = await worker.query(api.payments.get, { businessId, paymentId })
     expect(seen.amountCents).toBe(4000)
     // A worker may look, never change.

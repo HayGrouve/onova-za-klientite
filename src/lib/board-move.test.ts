@@ -17,7 +17,6 @@ const column = (group: string, jobs: ReturnType<typeof job>[]) => ({
   jobs,
   olderOwing: [],
   total: jobs.length,
-  totalCapped: false,
   owedCents: jobs.reduce(
     (sum, item) => sum + (item.owes ? item.balanceCents : 0),
     0,

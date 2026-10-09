@@ -1,5 +1,6 @@
 import type { Doc, Id } from '../_generated/dataModel'
 import type { QueryCtx } from '../_generated/server'
+import type { StageGroup } from '../../shared/stages'
 import { getOwnedFromUrl } from './auth'
 import { fail } from './errors'
 
@@ -44,18 +45,124 @@ export function seesAppointment(
   )
 }
 
-/** Most jobs read to find a Worker's own; Level 2 can index assignments instead. */
-const MAX_SCANNED_JOBS = 4000
+/**
+ * A Worker's assigned jobs come from `jobAssignments` (D106), an index on
+ * the member, so they are found whatever the business's size. The rows are the
+ * ledger's copy of each job's group, due date, client and `owes`.
+ */
 
-/** The jobs assigned to a Worker, in any stage group. */
-export async function workerJobs(ctx: ScopedCtx) {
-  const jobs = await ctx.db
-    .query('jobs')
-    .withIndex('by_business_group_due', (q) =>
-      q.eq('businessId', ctx.business._id),
+/** Most of a Worker's own assignment rows read at once, for their clients. */
+const MAX_ASSIGNED = 4000
+
+/** The jobs behind assignment rows, those the member still sees. */
+async function jobsOf(
+  ctx: QueryCtx,
+  member: Member,
+  rows: Array<Doc<'jobAssignments'>>,
+) {
+  const jobs: Array<Doc<'jobs'>> = []
+  for (const row of rows) {
+    const job = await ctx.db.get('jobs', row.jobId)
+    if (job && seesJob(member, job)) jobs.push(job)
+  }
+  return jobs
+}
+
+/** A Worker's jobs in one stage group, soonest due first, undated first (as `jobs`' own index). */
+export async function workerJobsIn(
+  ctx: QueryCtx,
+  member: Member,
+  group: StageGroup,
+  limit: number,
+) {
+  return await jobsOf(
+    ctx,
+    member,
+    await ctx.db
+      .query('jobAssignments')
+      .withIndex('by_member_group_due', (q) =>
+        q.eq('membershipId', member._id).eq('stageGroup', group),
+      )
+      .take(limit),
+  )
+}
+
+/** A Worker's jobs in a group that are due before `today`: overdue, if open. */
+export async function workerJobsLate(
+  ctx: QueryCtx,
+  member: Member,
+  group: StageGroup,
+  today: string,
+) {
+  return await jobsOf(
+    ctx,
+    member,
+    await ctx.db
+      .query('jobAssignments')
+      .withIndex('by_member_group_due', (q) =>
+        q
+          .eq('membershipId', member._id)
+          .eq('stageGroup', group)
+          .gt('dueDate', '')
+          .lt('dueDate', today),
+      )
+      .collect(),
+  )
+}
+
+/** A Worker's jobs in a group due from `from` to `to`, both days included. */
+export async function workerJobsDue(
+  ctx: QueryCtx,
+  member: Member,
+  group: StageGroup,
+  from: string,
+  to: string,
+) {
+  return await jobsOf(
+    ctx,
+    member,
+    await ctx.db
+      .query('jobAssignments')
+      .withIndex('by_member_group_due', (q) =>
+        q
+          .eq('membershipId', member._id)
+          .eq('stageGroup', group)
+          .gte('dueDate', from)
+          .lte('dueDate', to),
+      )
+      .collect(),
+  )
+}
+
+/** A Worker's Done jobs that still owe. */
+export async function workerJobsOwing(
+  ctx: QueryCtx,
+  member: Member,
+  limit?: number,
+) {
+  const query = ctx.db
+    .query('jobAssignments')
+    .withIndex('by_member_owes_group', (q) =>
+      q
+        .eq('membershipId', member._id)
+        .eq('owes', true)
+        .eq('stageGroup', 'done'),
     )
-    .take(MAX_SCANNED_JOBS)
-  return jobs.filter((job) => job.assigneeIds.includes(ctx.member._id))
+  return await jobsOf(
+    ctx,
+    member,
+    limit === undefined ? await query.collect() : await query.take(limit),
+  )
+}
+
+/** Every assignment of the Worker, in any group: for their clients. */
+export async function workerAssignments(ctx: ScopedCtx) {
+  return await ctx.db
+    .query('jobAssignments')
+    .withIndex('by_member_group_due', (q) =>
+      q.eq('membershipId', ctx.member._id),
+    )
+    .take(MAX_ASSIGNED)
 }
 
 /** The member's own jobs for a client. Everything for an Owner or Manager. */
