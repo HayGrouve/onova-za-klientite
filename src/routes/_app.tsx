@@ -9,10 +9,10 @@ import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { AppShell } from '#/components/app-shell'
 import { SnapshotKeeper } from '#/components/offline/snapshot-keeper'
+import { StartedUp, StartingUp } from '#/components/offline/starting-up'
 import { CenteredMessage } from '#/components/centered-message'
 import { PushKeeper } from '#/components/push-keeper'
 import { Button } from '#/components/ui/button'
-import { Spinner } from '#/components/ui/spinner'
 import { ViewerProvider } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
 
@@ -25,17 +25,6 @@ function ProfileError() {
       <Button size="xl" onClick={() => window.location.reload()}>
         {m.error_retry()}
       </Button>
-    </CenteredMessage>
-  )
-}
-
-function Loading() {
-  return (
-    <CenteredMessage>
-      <Spinner
-        aria-label={m.loading()}
-        className="size-6 text-muted-foreground"
-      />
     </CenteredMessage>
   )
 }
@@ -58,7 +47,7 @@ function SignedInLayout() {
     }
   }, [isLoading, isAuthenticated, navigate])
 
-  if (isLoading || !isAuthenticated) return <Loading />
+  if (isLoading || !isAuthenticated) return <StartingUp />
   return <EnsureUser />
 }
 
@@ -77,7 +66,7 @@ function EnsureUser() {
   }, [ensureCurrent])
 
   if (state === 'failed') return <ProfileError />
-  if (state === 'pending') return <Loading />
+  if (state === 'pending') return <StartingUp />
   return <WithViewer />
 }
 
@@ -93,10 +82,11 @@ function WithViewer() {
     if (needsSetup) void navigate({ to: '/setup', replace: true })
   }, [needsSetup, navigate])
 
-  if (viewer === undefined || needsSetup) return <Loading />
+  if (viewer === undefined || needsSetup) return <StartingUp />
   if (!viewer?.business) return <ProfileError />
   return (
     <ViewerProvider value={viewer}>
+      <StartedUp />
       <PushKeeper />
       <SnapshotKeeper />
       <AppShell>

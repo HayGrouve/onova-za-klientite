@@ -841,6 +841,8 @@
   "offline_updated": "Последно обновено: {when}",
   "offline_no_snapshot": "Няма запазени данни. Отворете приложението веднъж с връзка, за да се запазят.",
   "offline_retry": "Опитай пак",
+  "offline_connection_back": "Връзката е налична",
+  "offline_reload": "Презареди",
   "offline_today": "Днес",
   "offline_open": "Отворени",
   "offline_back": "Назад",

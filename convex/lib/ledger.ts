@@ -23,6 +23,7 @@ export {
   dropStaleAssignments,
   isBuiltOrBuilding,
   rebuildPage,
+  setJobSearchText,
   startRebuild,
   syncAssignments,
 } from './jobIndex'

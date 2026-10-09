@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from './_generated/api'
 import type { Id } from './_generated/dataModel'
+import { lateJobCount } from '../shared/today'
 import { setupBusiness, setupConvex } from './test.setup'
 
 // 8 Oct 2026 is a Thursday, so "this week" runs to the following Thursday.
@@ -259,10 +260,12 @@ describe('the morning summary counts what Today lists', () => {
     })
     expect(counts).toEqual({
       appointments: shown.appointments.length,
-      overdue: shown.overdue.length,
+      overdue: lateJobCount(shown, TODAY),
       reminders: shown.reminders.length,
     })
-    // And the numbers are the ones Today's own rules give.
-    expect(counts).toEqual({ appointments: 2, overdue: 2, reminders: 2 })
+    // And the numbers are the ones Today's own rules give: the late job under
+    // today's visit is late too, though the overdue list leaves it out.
+    expect(shown.overdue).toHaveLength(2)
+    expect(counts).toEqual({ appointments: 2, overdue: 3, reminders: 2 })
   })
 })

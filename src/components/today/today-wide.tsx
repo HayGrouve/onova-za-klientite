@@ -26,6 +26,7 @@ import { dateInSofia, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 import { jobOwedCents } from '../../../shared/allocation'
 import { isJobLate } from '../../../shared/stages'
+import { lateJobs } from '../../../shared/today'
 import { hasRole } from '../../../shared/roles'
 
 type TodayData = FunctionReturnType<typeof api.today.list>
@@ -68,21 +69,24 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
           .join(' · ')
       : undefined
 
+  // Every late job, also one with a visit in the schedule beside it, as the
+  // morning push counts: the tile, this section and its count agree (D110).
+  const late = lateJobs(data, today)
   const attention =
-    data.overdue.length +
+    late.length +
     data.dueSoon.length +
     data.reminders.length +
     data.doneUnpaid.length
   const attentionLists = (
     <>
-      {data.overdue.length > 0 && (
+      {late.length > 0 && (
         <ListSection
           title={m.today_overdue()}
           icon={WarningCircleIcon}
           tone="danger"
-          count={data.overdue.length}
+          count={late.length}
         >
-          {data.overdue.map((job) => (
+          {late.map((job) => (
             <JobRow
               key={job._id}
               job={job}
@@ -181,9 +185,9 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
           to="/"
           hash="attention"
           icon={WarningCircleIcon}
-          tone={data.overdue.length > 0 ? 'danger' : 'muted'}
+          tone={late.length > 0 ? 'danger' : 'muted'}
           label={m.today_overdue()}
-          value={String(data.overdue.length)}
+          value={String(late.length)}
           detail={m.count({
             label: m.today_due_soon(),
             count: data.dueSoon.length,

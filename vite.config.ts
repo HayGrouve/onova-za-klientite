@@ -1,38 +1,19 @@
+import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
+import {
+  clerkFrontendHost,
+  contentSecurityPolicy,
+} from './build/content-security-policy.ts'
 import { trimClerkBundle } from './build/clerk-localization.ts'
 import { serviceWorker } from './build/service-worker.ts'
 import { vendorGuard } from './build/vendor-guard.ts'
 
 const isVitest = Boolean(process.env.VITEST)
-
-/**
- * Enforced (D108). The Clerk host is the development instance's; the
- * production instance needs its own (`clerk.<domain>`) at launch (D50).
- * `'wasm-unsafe-eval'` (WebAssembly only, not `eval`) and `data:` in
- * `connect-src` are for satori's layout engine in the job summary, which
- * compiles a wasm module it carries as a data URL. `blob:` lets the page
- * read back what it made itself (the summary PNG, picked or converted files).
- */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:",
-  "img-src 'self' data: blob: https://img.clerk.com https://*.convex.cloud",
-  "connect-src 'self' data: blob: https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://clerk-telemetry.com",
-  'frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev',
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join('; ')
 
 /**
  * The libraries the app always loads and rarely upgrades. They go in one
@@ -85,66 +66,84 @@ function isVendor(id: string) {
   )
 }
 
-export default defineConfig({
-  resolve: { tsconfigPaths: true },
-  environments: {
-    client: {
-      build: {
-        rolldownOptions: {
-          output: {
-            codeSplitting: {
-              groups: [
-                {
-                  name: 'vendor',
-                  test: isVendor,
-                  includeDependenciesRecursively: false,
-                  tags: ['$initial'],
-                },
-              ],
+/**
+ * The CSP is enforced (D108). Its Clerk host comes from the publishable key
+ * the build is given (D111), so the production instance needs no edit.
+ */
+export default defineConfig(({ mode }) => {
+  const { VITE_CLERK_PUBLISHABLE_KEY } = loadEnv(mode, process.cwd(), 'VITE_')
+  // On Vercel the key is always there (the app can't sign in without it), so
+  // a key the CSP can't read means the policy would fall back to the dev
+  // instance's hosts and block sign-in: fail the build instead.
+  if (process.env.VERCEL && !clerkFrontendHost(VITE_CLERK_PUBLISHABLE_KEY)) {
+    throw new Error(
+      'VITE_CLERK_PUBLISHABLE_KEY is missing or unreadable: the CSP would block Clerk.',
+    )
+  }
+  const CONTENT_SECURITY_POLICY = contentSecurityPolicy(
+    VITE_CLERK_PUBLISHABLE_KEY,
+  )
+  return {
+    resolve: { tsconfigPaths: true },
+    environments: {
+      client: {
+        build: {
+          rolldownOptions: {
+            output: {
+              codeSplitting: {
+                groups: [
+                  {
+                    name: 'vendor',
+                    test: isVendor,
+                    includeDependenciesRecursively: false,
+                    tags: ['$initial'],
+                  },
+                ],
+              },
             },
           },
         },
       },
     },
-  },
-  test: {
-    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**', '.worktrees/**'],
-    // Convex function tests (`convex/*.test.ts`) run on convex-test.
-    server: { deps: { inline: ['convex-test'] } },
-  },
-  plugins: [
-    paraglideVitePlugin({
-      project: './project.inlang',
-      outdir: './src/paraglide',
-      strategy: ['baseLocale'],
-      emitTsDeclarations: true,
-    }),
-    tailwindcss(),
-    trimClerkBundle(),
-    tanstackStart({ spa: { enabled: true } }),
-    // Nitro's server runtime is for dev and build only. Under Vitest it loads
-    // CJS React in an ESM runner and keeps the process alive.
-    ...(isVitest
-      ? []
-      : [
-          nitro({
-            preset: 'vercel',
-            routeRules: {
-              '/**': {
-                headers: {
-                  'X-Frame-Options': 'DENY',
-                  'X-Content-Type-Options': 'nosniff',
-                  'Referrer-Policy': 'strict-origin-when-cross-origin',
-                  'Permissions-Policy':
-                    'camera=(self), microphone=(), geolocation=()',
-                  'Content-Security-Policy': CONTENT_SECURITY_POLICY,
+    test: {
+      exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**', '.worktrees/**'],
+      // Convex function tests (`convex/*.test.ts`) run on convex-test.
+      server: { deps: { inline: ['convex-test'] } },
+    },
+    plugins: [
+      paraglideVitePlugin({
+        project: './project.inlang',
+        outdir: './src/paraglide',
+        strategy: ['baseLocale'],
+        emitTsDeclarations: true,
+      }),
+      tailwindcss(),
+      trimClerkBundle(),
+      tanstackStart({ spa: { enabled: true } }),
+      // Nitro's server runtime is for dev and build only. Under Vitest it loads
+      // CJS React in an ESM runner and keeps the process alive.
+      ...(isVitest
+        ? []
+        : [
+            nitro({
+              preset: 'vercel',
+              routeRules: {
+                '/**': {
+                  headers: {
+                    'X-Frame-Options': 'DENY',
+                    'X-Content-Type-Options': 'nosniff',
+                    'Referrer-Policy': 'strict-origin-when-cross-origin',
+                    'Permissions-Policy':
+                      'camera=(self), microphone=(), geolocation=()',
+                    'Content-Security-Policy': CONTENT_SECURITY_POLICY,
+                  },
                 },
               },
-            },
-          }),
-        ]),
-    viteReact(),
-    serviceWorker(),
-    vendorGuard(),
-  ],
+            }),
+          ]),
+      viteReact(),
+      serviceWorker(),
+      vendorGuard(),
+    ],
+  }
 })

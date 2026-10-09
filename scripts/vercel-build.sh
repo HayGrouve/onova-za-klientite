@@ -14,7 +14,9 @@
 #   key). It is cheap and idempotent: a business that is already right isn't
 #   written. It only schedules the rebuild, so the build doesn't wait for it,
 #   and until a business is rebuilt the screens count its jobs from the jobs
-#   themselves.
+#   themselves. (`counts:fillAssignmentSearch`, D109, is a one-time fill of the
+#   assignment rows' search text, run by hand once; new and changed rows get it
+#   from `syncAssignments`, so a deploy doesn't walk every row.)
 #
 # `set -e`: a failed push fails the Vercel build. A failed backfill call does
 # not: the functions are already live by then, the screens recount an unbuilt

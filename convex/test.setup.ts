@@ -99,6 +99,7 @@ export async function jobIndexProblems(t: TestConvex) {
               job.stageGroup,
               job.dueDate,
               job.owes,
+              job.searchText,
             ].join('|'),
           )
         }
@@ -140,6 +141,7 @@ export async function jobIndexProblems(t: TestConvex) {
             row.stageGroup,
             row.dueDate,
             row.owes,
+            row.searchText,
           ].join('|'),
         )
       if (

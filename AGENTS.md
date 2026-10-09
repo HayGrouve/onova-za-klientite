@@ -33,6 +33,7 @@ pnpm dev                  # terminal 2: http://localhost:3000
 npx convex run seed:dev   # two test businesses: Мебели Стоянов, Хладина Сервиз
 npx convex run system:whereAmI   # the deployment's region
 npx convex run counts:backfill '{}'      # rebuild the job counts and Worker assignment rows from the jobs (D105, D106); production deploys run it themselves
+npx convex run counts:fillAssignmentSearch '{}'   # one-time fill of the Worker assignment rows' job search text (D109); already run on dev, run once on production after the merge, not part of the deploy
 npx convex run search:rebuildAll '{}'   # re-key every record's search text after a change to the search keys (D60)
 ```
 

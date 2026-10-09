@@ -226,13 +226,15 @@ export async function syncAssignments(ctx: MutationCtx, job: Doc<'jobs'>) {
       row.clientId !== job.clientId ||
       row.stageGroup !== job.stageGroup ||
       row.dueDate !== job.dueDate ||
-      row.owes !== job.owes
+      row.owes !== job.owes ||
+      row.searchText !== job.searchText
     ) {
       await ctx.db.patch('jobAssignments', row._id, {
         clientId: job.clientId,
         stageGroup: job.stageGroup,
         dueDate: job.dueDate,
         owes: job.owes,
+        searchText: job.searchText,
       })
     }
   }
@@ -246,7 +248,31 @@ export async function syncAssignments(ctx: MutationCtx, job: Doc<'jobs'>) {
       stageGroup: job.stageGroup,
       dueDate: job.dueDate,
       owes: job.owes,
+      searchText: job.searchText,
     })
+  }
+}
+
+/**
+ * Gives a job a new search text, and its assignment rows with it (D109). A job
+ * and rows that already hold it aren't written, so a second run wakes no query.
+ */
+export async function setJobSearchText(
+  ctx: MutationCtx,
+  job: Pick<Doc<'jobs'>, '_id' | 'searchText'>,
+  searchText: string,
+) {
+  if (job.searchText !== searchText) {
+    await ctx.db.patch('jobs', job._id, { searchText })
+  }
+  const rows = await ctx.db
+    .query('jobAssignments')
+    .withIndex('by_job', (q) => q.eq('jobId', job._id))
+    .collect()
+  for (const row of rows) {
+    if (row.searchText !== searchText) {
+      await ctx.db.patch('jobAssignments', row._id, { searchText })
+    }
   }
 }
 
