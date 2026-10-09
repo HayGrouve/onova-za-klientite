@@ -2,7 +2,7 @@ import { RepeatIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { ConfirmAction } from '#/components/confirm-action'
@@ -115,7 +115,7 @@ export function RepeatSection({
                 disabled={busy}
                 onClick={() => {
                   const date = nextJobDate(dated, choice)
-                  if (!date) return toast.error(m.repeat_needs_date())
+                  if (!date) return toastError(m.repeat_needs_date())
                   void run(
                     () =>
                       setRepeat({

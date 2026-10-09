@@ -6,6 +6,7 @@ import { expect } from 'vitest'
 import schema from './schema'
 import { api } from './_generated/api'
 import type { Doc, Id, TableNames } from './_generated/dataModel'
+import { patchJob } from './lib/ledger'
 import {
   computeClientCache,
   computeJobCache,
@@ -63,8 +64,107 @@ export async function setupBusiness(t: TestConvex, identity = OWNER) {
 
 export type TestBusiness = Awaited<ReturnType<typeof setupBusiness>>
 
+/**
+ * The stage counts and the Worker assignment rows equal a recount of the jobs
+ * (D105, D106). Empty groups, stages and members count as absent.
+ */
+export async function jobIndexProblems(t: TestConvex) {
+  return await t.run(async (ctx) => {
+    const problems: string[] = []
+    const jobs = await ctx.db.query('jobs').collect()
+    const businessIds = new Set<string>(jobs.map((job) => job.businessId))
+    for (const row of await ctx.db.query('jobCounts').collect()) {
+      businessIds.add(row.businessId)
+    }
+    const groupsOf = () => ({ new: 0, in_progress: 0, done: 0, cancelled: 0 })
+    const ordered = (groups: Record<string, number> = groupsOf()) =>
+      JSON.stringify(Object.entries({ ...groupsOf(), ...groups }).sort())
+    for (const businessId of businessIds) {
+      const mine = jobs.filter((job) => job.businessId === businessId)
+      const groups = groupsOf()
+      const stages: Record<string, number> = {}
+      const members: Record<string, ReturnType<typeof groupsOf>> = {}
+      const assignments = new Set<string>()
+      for (const job of mine) {
+        groups[job.stageGroup]++
+        stages[job.stageId] = (stages[job.stageId] ?? 0) + 1
+        for (const memberId of new Set(job.assigneeIds)) {
+          members[memberId] ??= groupsOf()
+          members[memberId][job.stageGroup]++
+          assignments.add(
+            [
+              job._id,
+              memberId,
+              job.clientId,
+              job.stageGroup,
+              job.dueDate,
+              job.owes,
+            ].join('|'),
+          )
+        }
+      }
+      const rows = (await ctx.db.query('jobCounts').collect()).filter(
+        (row) => row.businessId === businessId,
+      )
+      const business = rows.filter((row) => row.membershipId === undefined)
+      if (business.length > 1) problems.push(`${businessId}: two count rows`)
+      if (ordered(business[0]?.groups) !== ordered(groups)) {
+        problems.push(
+          `${businessId} groups: ${JSON.stringify(business[0]?.groups)} ≠ ${JSON.stringify(groups)}`,
+        )
+      }
+      if (
+        JSON.stringify(Object.entries(business[0]?.stages ?? {}).sort()) !==
+        JSON.stringify(Object.entries(stages).sort())
+      ) {
+        problems.push(`${businessId} stages differ`)
+      }
+      const counted = rows.filter((row) => row.membershipId !== undefined)
+      for (const memberId of new Set([
+        ...Object.keys(members),
+        ...counted.map((row) => row.membershipId as string),
+      ])) {
+        const own = counted.filter((row) => row.membershipId === memberId)
+        if (own.length > 1) problems.push(`${memberId}: two count rows`)
+        if (ordered(own[0]?.groups) !== ordered(members[memberId])) {
+          problems.push(`member ${memberId} groups differ`)
+        }
+      }
+      const stored = (await ctx.db.query('jobAssignments').collect())
+        .filter((row) => row.businessId === businessId)
+        .map((row) =>
+          [
+            row.jobId,
+            row.membershipId,
+            row.clientId,
+            row.stageGroup,
+            row.dueDate,
+            row.owes,
+          ].join('|'),
+        )
+      if (
+        JSON.stringify([...stored].sort()) !==
+        JSON.stringify([...assignments].sort())
+      ) {
+        problems.push(`${businessId}: assignments differ`)
+      }
+    }
+    return problems
+  })
+}
+
+/** Gives a job its assignees, as the ledger does. */
+export async function assignJob(
+  t: TestConvex,
+  jobId: Id<'jobs'>,
+  membershipIds: Array<Id<'memberships'>>,
+) {
+  await t.run((ctx) => patchJob(ctx, jobId, { assigneeIds: membershipIds }))
+}
+
 /** Every cache equals a recomputation from scratch (ADR 0008). */
 export async function expectCachesFresh(t: TestConvex) {
+  expect(await jobIndexProblems(t)).toEqual([])
   const stale = await t.run(async (ctx) => {
     const problems: string[] = []
     for (const job of await ctx.db.query('jobs').collect()) {

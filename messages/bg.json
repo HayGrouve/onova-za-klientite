@@ -265,6 +265,7 @@
   "today_owed_done": "готови: {count}",
   "all_day": "цял ден",
   "jobs_group_empty": "Тук няма нищо.",
+  "jobs_list_capped": "Показани: {shown} от {total}",
   "jobs_view": "Изглед",
   "jobs_view_board": "Табло",
   "jobs_view_table": "Таблица",

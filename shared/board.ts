@@ -18,9 +18,6 @@ export type BoardJob = {
 /** Done and Cancelled keep growing, so the board shows only the latest of them. */
 export const BOARD_CLOSED_LIMIT = 20
 
-/** Done and Cancelled are counted up to this many; past it the column says "N+". */
-export const BOARD_COUNT_CAP = 100
-
 /**
  * One column of the board: the jobs of one stage group in board order, how
  * many there are, and what they still owe. Open work comes soonest due first,
@@ -140,4 +137,22 @@ export function filterJobs<T extends FilterableJob>(
       (!filter.dueThisMonth ||
         (job.dueDate !== undefined && monthOf(job.dueDate) === month)),
   )
+}
+
+/**
+ * How many of a tab's jobs the list holds, when it holds fewer than there
+ * are: the list reads a fixed number of jobs per group, while the counts are
+ * exact. `group` is the open tab, or 'all' for every group. Null when the
+ * list is complete.
+ */
+export function unshownJobs(
+  shown: number,
+  counts: Record<StageGroup, number>,
+  group: StageGroup | 'all',
+) {
+  const total =
+    group === 'all'
+      ? counts.new + counts.in_progress + counts.done + counts.cancelled
+      : counts[group]
+  return shown < total ? { shown, total } : null
 }

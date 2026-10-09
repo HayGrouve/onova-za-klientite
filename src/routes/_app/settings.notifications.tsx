@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
 import { ListSkeleton } from '#/components/list-skeleton'
 import { SettingsPage } from '#/components/settings/settings-page'
@@ -166,7 +167,7 @@ function NotificationSwitches({ publicKey }: { publicKey: string }) {
         const result = await subscribePush(publicKey)
         if (!result.ok) {
           setBlocked(permissionState() === 'denied')
-          if (permissionState() !== 'denied') toast.error(m.push_failed())
+          if (permissionState() !== 'denied') toastError(m.push_failed())
           return
         }
         await subscribe(subscriptionArgs(result.subscription))

@@ -2,7 +2,13 @@ import { v } from 'convex/values'
 import { addDays, isValidDate, sofiaTimeToUtc } from '../shared/dates'
 import { businessQuery } from './lib/auth'
 import { fail } from './lib/errors'
-import { isWorker, seesAppointment, seesJob, workerJobs } from './lib/scope'
+import {
+  isWorker,
+  seesAppointment,
+  workerAssignments,
+  workerJobsIn,
+  workerJobsOwing,
+} from './lib/scope'
 
 const MAX_JOBS = 300
 const MAX_CLIENTS = 2000
@@ -26,30 +32,34 @@ export const snapshot = businessQuery({
       stages.map((stage) => [stage._id as string, stage]),
     )
 
+    // A Worker's jobs come from their assignments, an index on them (D106).
+    const worker = isWorker(ctx.member)
     const jobs = []
     for (const group of ['new', 'in_progress'] as const) {
       jobs.push(
-        ...(await ctx.db
-          .query('jobs')
-          .withIndex('by_business_group_due', (q) =>
-            q.eq('businessId', business._id).eq('stageGroup', group),
-          )
-          .take(MAX_JOBS)),
+        ...(worker
+          ? await workerJobsIn(ctx, ctx.member, group, MAX_JOBS)
+          : await ctx.db
+              .query('jobs')
+              .withIndex('by_business_group_due', (q) =>
+                q.eq('businessId', business._id).eq('stageGroup', group),
+              )
+              .take(MAX_JOBS)),
       )
     }
-    const unpaidDone = await ctx.db
-      .query('jobs')
-      .withIndex('by_business_owes', (q) =>
-        q
-          .eq('businessId', business._id)
-          .eq('owes', true)
-          .eq('stageGroup', 'done'),
-      )
-      .take(MAX_JOBS)
+    const unpaidDone = worker
+      ? await workerJobsOwing(ctx, ctx.member, MAX_JOBS)
+      : await ctx.db
+          .query('jobs')
+          .withIndex('by_business_owes', (q) =>
+            q
+              .eq('businessId', business._id)
+              .eq('owes', true)
+              .eq('stageGroup', 'done'),
+          )
+          .take(MAX_JOBS)
 
-    const visibleJobs = [...jobs, ...unpaidDone].filter((job) =>
-      seesJob(ctx.member, job),
-    )
+    const visibleJobs = [...jobs, ...unpaidDone]
 
     const from = sofiaTimeToUtc(today, 0, 0)
     const to = sofiaTimeToUtc(addDays(today, 8), 0, 0)
@@ -66,8 +76,10 @@ export const snapshot = businessQuery({
       const job = item.jobId ? await ctx.db.get('jobs', item.jobId) : null
       if (seesAppointment(ctx.member, item, job)) visibleAppointments.push(item)
     }
-    const workerClientIds = isWorker(ctx.member)
-      ? new Set<string>((await workerJobs(ctx)).map((job) => job.clientId))
+    const workerClientIds = worker
+      ? new Set<string>(
+          (await workerAssignments(ctx)).map((row) => row.clientId),
+        )
       : null
 
     const clients = (

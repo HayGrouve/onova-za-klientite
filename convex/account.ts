@@ -3,7 +3,7 @@ import { internal } from './_generated/api'
 import { env, internalAction, internalMutation } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { userMutation } from './lib/auth'
-import { BUSINESS_TABLE_NAMES, queryByBusiness } from './lib/businessTables'
+import { DELETED_TABLE_NAMES, queryByBusiness } from './lib/businessTables'
 
 const BATCH = 200
 
@@ -40,7 +40,7 @@ export const deleteAccount = userMutation({
     const jobId = await ctx.db.insert('deletionJobs', {
       userId: ctx.user._id,
       businessIds,
-      table: BUSINESS_TABLE_NAMES[0],
+      table: DELETED_TABLE_NAMES[0],
       status: 'running',
     })
     // From here the user can't sign back into these businesses.
@@ -60,23 +60,23 @@ export const deleteStep = internalMutation({
     const businessId = job.businessIds.at(0)
 
     if (businessId) {
-      const table = job.table as (typeof BUSINESS_TABLE_NAMES)[number]
+      const table = job.table as (typeof DELETED_TABLE_NAMES)[number]
       const rows = await queryByBusiness(ctx, table, businessId).take(BATCH)
       for (const row of rows) {
         if ('storageId' in row) await ctx.storage.delete(row.storageId)
         await ctx.db.delete(table, row._id as never)
       }
       if (rows.length < BATCH) {
-        const next = BUSINESS_TABLE_NAMES[
-          BUSINESS_TABLE_NAMES.indexOf(table) + 1
-        ] as (typeof BUSINESS_TABLE_NAMES)[number] | undefined
+        const next = DELETED_TABLE_NAMES[
+          DELETED_TABLE_NAMES.indexOf(table) + 1
+        ] as (typeof DELETED_TABLE_NAMES)[number] | undefined
         if (next) {
           await ctx.db.patch('deletionJobs', jobId, { table: next })
         } else {
           await ctx.db.delete('businesses', businessId)
           await ctx.db.patch('deletionJobs', jobId, {
             businessIds: job.businessIds.slice(1),
-            table: BUSINESS_TABLE_NAMES[0],
+            table: DELETED_TABLE_NAMES[0],
           })
         }
       }

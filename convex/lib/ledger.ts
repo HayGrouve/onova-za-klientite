@@ -4,6 +4,7 @@ import type { MutationCtx } from '../_generated/server'
 import { creditForJob, jobOwedCents } from '../../shared/allocation'
 import type { BusinessMutationCtx } from './auth'
 import { fail } from './errors'
+import { indexChangedJob, indexInsertedJob, syncAssignments } from './jobIndex'
 import { recomputeClient, recomputeJob, recomputeMoney } from './recompute'
 
 /**
@@ -11,7 +12,20 @@ import { recomputeClient, recomputeJob, recomputeMoney } from './recompute'
  * fields money is computed from, goes through here. Each call refreshes the
  * caches it touched in the same mutation (ADR 0008), so no mutation calls
  * recompute or lists what it touched. ESLint keeps the raw writes in here.
+ *
+ * Inserting and changing a job also keeps what is derived from the jobs
+ * (D105, D106): the stage counts and the Worker assignment rows
+ * (`jobIndex.ts`). The same goes for the ones that rebuild them.
  */
+
+export {
+  clearJobIndex,
+  dropStaleAssignments,
+  isBuiltOrBuilding,
+  rebuildPage,
+  startRebuild,
+  syncAssignments,
+} from './jobIndex'
 
 type CacheField =
   'priceCents' | 'paidCents' | 'costCents' | 'balanceCents' | 'owes'
@@ -42,17 +56,48 @@ export async function insertJob(ctx: MutationCtx, job: JobFields) {
     owes: false,
   })
   await recomputeJob(ctx, jobId)
+  await indexInsertedJob(ctx, (await ctx.db.get('jobs', jobId))!)
   return jobId
 }
 
-/** Changes a job. Lines, typed price, write-off and stage group feed its money. */
+/**
+ * Changes a job. Lines, typed price, write-off and stage group feed its money;
+ * stage, assignees, due date and client feed the counts and assignments.
+ */
 export async function patchJob(
   ctx: MutationCtx,
   jobId: Id<'jobs'>,
   patch: JobPatch,
 ) {
+  const before = await ctx.db.get('jobs', jobId)
+  if (!before) fail('notFound')
   await ctx.db.patch('jobs', jobId, patch)
   await recomputeJob(ctx, jobId)
+  await indexChangedJob(ctx, before, (await ctx.db.get('jobs', jobId))!)
+}
+
+/**
+ * A merge: every job of one client becomes the other's. The client is neither
+ * money nor a count, so nothing is recomputed (the caller moves the client's
+ * payments, which refreshes its credit); only the Worker assignment rows,
+ * which copy the client, follow. Returns the jobs moved.
+ */
+export async function moveJobsToClient(
+  ctx: MutationCtx,
+  fromId: Id<'clients'>,
+  intoId: Id<'clients'>,
+) {
+  const jobs = await ctx.db
+    .query('jobs')
+    .withIndex('by_client', (q) => q.eq('clientId', fromId))
+    .collect()
+  for (const job of jobs) {
+    await ctx.db.patch('jobs', job._id, { clientId: intoId })
+    if (job.assigneeIds.length > 0) {
+      await syncAssignments(ctx, { ...job, clientId: intoId })
+    }
+  }
+  return jobs.map((job) => job._id)
 }
 
 async function insertAllocations(

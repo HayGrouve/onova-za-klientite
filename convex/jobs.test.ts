@@ -1,6 +1,9 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
+import { insertJob } from './lib/ledger'
+import type { JobFields } from './lib/ledger'
+import type { Doc } from './_generated/dataModel'
 import {
   expectCachesFresh,
   getDoc,
@@ -9,6 +12,21 @@ import {
   setupConvex,
   STRANGER,
 } from './test.setup'
+
+/** A job's own fields, without its id and the money the ledger caches. */
+function jobFields(job: Doc<'jobs'>): JobFields {
+  const {
+    _id,
+    _creationTime,
+    priceCents,
+    paidCents,
+    costCents,
+    balanceCents,
+    owes,
+    ...fields
+  } = job
+  return fields
+}
 
 async function withClient() {
   const t = setupConvex()
@@ -408,7 +426,6 @@ describe('jobs board', () => {
       'Без срок',
     ])
     expect(open.total).toBe(3)
-    expect(open.totalCapped).toBe(false)
     expect(open.owedCents).toBe(30000)
     expect(done.jobs.map((job) => job.title)).toEqual(['Готов'])
     expect(board.stages.map((item) => item._id)).toEqual(
@@ -436,9 +453,12 @@ describe('jobs board', () => {
     // More old Done jobs than one read takes, all due before the newest one.
     const oldId = await done('Стар', '2020-01-01')
     await t.run(async (ctx) => {
-      const { _id, _creationTime, ...old } = (await ctx.db.get('jobs', oldId))!
+      const old = (await ctx.db.get('jobs', oldId))!
       for (let index = 0; index < 510; index++) {
-        await ctx.db.insert('jobs', { ...old, doneAt: (old.doneAt ?? 0) - 1 })
+        await insertJob(ctx, {
+          ...jobFields(old),
+          doneAt: (old.doneAt ?? 0) - 1,
+        })
       }
     })
     await done('Най-нов', '2030-01-01')
@@ -447,9 +467,8 @@ describe('jobs board', () => {
     const column = board.columns.find((item) => item.group === 'done')!
     expect(column.jobs).toHaveLength(20)
     expect(column.jobs[0].title).toBe('Най-нов')
-    // Closed work is counted up to a cap and says so.
-    expect(column.total).toBe(100)
-    expect(column.totalCapped).toBe(true)
+    // The count is the ledger's, so a long history is counted in full.
+    expect(column.total).toBe(512)
     expect(column.owedCents).toBe(512 * 1000)
     // The owing filter can still find every Done job that owes.
     expect(column.olderOwing).toHaveLength(512 - 20)

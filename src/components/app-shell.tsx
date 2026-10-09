@@ -130,6 +130,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <nav
           aria-label={m.nav_label()}
+          data-bottom-nav
           className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 shadow-[0_-4px_16px_-6px_rgb(0_0_0/0.08)] backdrop-blur supports-backdrop-filter:bg-background/85 lg:hidden"
         >
           <div className="mx-auto grid max-w-lg grid-cols-5 items-end px-1 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">

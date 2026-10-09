@@ -11,6 +11,7 @@ import type { SavedSnapshot } from '#/lib/offline-store'
 import { ErrorView } from '#/components/error-view'
 import { ServiceWorkerRegister } from '#/components/service-worker-register'
 import { Toaster } from '#/components/ui/sonner'
+import { TOAST_MOBILE_OFFSET, TOAST_OFFSET } from '#/lib/toast-layout'
 import { applyTimingFlag } from '#/lib/timing'
 import { IconContext } from '@phosphor-icons/react'
 import type { IconProps } from '@phosphor-icons/react'
@@ -124,12 +125,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <IconContext.Provider value={ICONS}>{children}</IconContext.Provider>
-        {/* Above the phone's bottom nav, where the thumb is, and never over
-            the header's search and business switcher (--toast-bottom). */}
+        {/* On a phone a toast takes the bottom nav's place while it shows
+            (--toast-bottom), where the thumb is: it covers no page button and
+            never the header's search and business switcher. Errors go to the
+            top instead (toastError). */}
         <Toaster
           position="bottom-center"
-          offset={{ bottom: 'var(--toast-bottom)' }}
-          mobileOffset={{ bottom: 'var(--toast-bottom)' }}
+          offset={TOAST_OFFSET}
+          mobileOffset={TOAST_MOBILE_OFFSET}
         />
         <ServiceWorkerRegister />
         <Scripts />

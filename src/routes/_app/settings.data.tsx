@@ -7,7 +7,7 @@ import {
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvex, useMutation } from 'convex/react'
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
 import { ListCard } from '#/components/list-section'
 import { SettingsPage } from '#/components/settings/settings-page'
@@ -88,7 +88,7 @@ function ExportRow() {
       // Revoking at once can cancel the download in Safari and Firefox.
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (error) {
-      toast.error(errorMessage(error))
+      toastError(errorMessage(error))
     } finally {
       setBusy(false)
     }

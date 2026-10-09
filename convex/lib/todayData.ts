@@ -2,7 +2,13 @@ import { addDays, sofiaTimeToUtc } from '../../shared/dates'
 import { arrangeToday } from '../../shared/today'
 import type { Doc } from '../_generated/dataModel'
 import type { QueryCtx } from '../_generated/server'
-import { isWorker, seesAppointment, seesJob } from './scope'
+import {
+  isWorker,
+  seesAppointment,
+  workerJobsDue,
+  workerJobsLate,
+  workerJobsOwing,
+} from './scope'
 
 export const UPCOMING_DAYS = 7
 export const SOON_DAYS = 3
@@ -66,36 +72,43 @@ export async function collectToday(
   }
 
   // Overdue and due soon: New and In progress jobs by due date (Q17).
-  const sees = (job: Doc<'jobs'>) => seesJob(member, job)
+  // A Worker's jobs come from their assignments, an index on them (D106).
+  const worker = isWorker(member)
   const overdue: Array<Doc<'jobs'>> = []
   const dueSoon: Array<Doc<'jobs'>> = []
   const soonEnd = addDays(today, SOON_DAYS)
   for (const group of ['new', 'in_progress'] as const) {
     if (wanted.overdue) {
-      const late = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_group_due', (q) =>
-          q
-            .eq('businessId', businessId)
-            .eq('stageGroup', group)
-            .gt('dueDate', '')
-            .lt('dueDate', today),
-        )
-        .collect()
-      overdue.push(...late.filter(sees))
+      overdue.push(
+        ...(worker
+          ? await workerJobsLate(ctx, member, group, today)
+          : await ctx.db
+              .query('jobs')
+              .withIndex('by_business_group_due', (q) =>
+                q
+                  .eq('businessId', businessId)
+                  .eq('stageGroup', group)
+                  .gt('dueDate', '')
+                  .lt('dueDate', today),
+              )
+              .collect()),
+      )
     }
     if (wanted.rest) {
-      const soon = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_group_due', (q) =>
-          q
-            .eq('businessId', businessId)
-            .eq('stageGroup', group)
-            .gte('dueDate', today)
-            .lte('dueDate', soonEnd),
-        )
-        .collect()
-      dueSoon.push(...soon.filter(sees))
+      dueSoon.push(
+        ...(worker
+          ? await workerJobsDue(ctx, member, group, today, soonEnd)
+          : await ctx.db
+              .query('jobs')
+              .withIndex('by_business_group_due', (q) =>
+                q
+                  .eq('businessId', businessId)
+                  .eq('stageGroup', group)
+                  .gte('dueDate', today)
+                  .lte('dueDate', soonEnd),
+              )
+              .collect()),
+      )
     }
   }
   const byDue = (a: Doc<'jobs'>, b: Doc<'jobs'>) =>
@@ -105,7 +118,7 @@ export async function collectToday(
 
   // Reminders are a Manager's to act on (D89).
   const reminders =
-    wanted.reminders && business.modules.reminders && !isWorker(member)
+    wanted.reminders && business.modules.reminders && !worker
       ? await ctx.db
           .query('reminders')
           .withIndex('by_business_status_date', (q) =>
@@ -119,19 +132,18 @@ export async function collectToday(
 
   // Q7: Today's "done but unpaid" shows only the Done group.
   const doneUnpaid = wanted.rest
-    ? (
-        await ctx.db
-          .query('jobs')
-          .withIndex('by_business_owes', (q) =>
-            q
-              .eq('businessId', businessId)
-              .eq('owes', true)
-              .eq('stageGroup', 'done'),
-          )
-          .collect()
-      )
-        .filter(sees)
-        .sort((a, b) => (a.doneAt ?? 0) - (b.doneAt ?? 0))
+    ? (worker
+        ? await workerJobsOwing(ctx, member)
+        : await ctx.db
+            .query('jobs')
+            .withIndex('by_business_owes', (q) =>
+              q
+                .eq('businessId', businessId)
+                .eq('owes', true)
+                .eq('stageGroup', 'done'),
+            )
+            .collect()
+      ).sort((a, b) => (a.doneAt ?? 0) - (b.doneAt ?? 0))
     : []
 
   return {
