@@ -2,12 +2,18 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalMutation } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
-import { foldQuery, nameMatches } from '../shared/search'
+import { foldQuery, keysMatch } from '../shared/search'
 import { businessQuery } from './lib/auth'
 import { setJobSearchText } from './lib/ledger'
 import { listExtra, listFieldIds } from './lib/listFields'
 import type { ScopedCtx } from './lib/scope'
-import { isWorker, seesClient, seesJob, workerAssignments } from './lib/scope'
+import {
+  isWorker,
+  seesClient,
+  seesItem,
+  seesJob,
+  workerRecentAssignments,
+} from './lib/scope'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { jobRow, newLookups, vJobRow } from './lib/views'
 import { vExtra } from './validators'
@@ -15,9 +21,9 @@ import { vExtra } from './validators'
 const PER_KIND = 8
 /**
  * A Worker's own jobs are searched in `jobAssignments`, limited to them by the
- * index, so any match is theirs (D109). Their clients are also found in the
- * business-wide clients index, which can't be limited to a member, so more of
- * its matches are read to find theirs.
+ * index, so any match is theirs (D109). Their clients and items are also found
+ * in the business-wide indexes, which can't be limited to a member, so more of
+ * their matches are read to find theirs.
  */
 const WORKER_READ = 64
 
@@ -35,12 +41,69 @@ type ItemHit = {
   listExtra?: Doc<'items'>['extra']
 }
 
+/** Most item links read for one job when looking through a Worker's recent work. */
+const LINKS_PER_JOB = 25
+/** Most of a Worker's recent items read in all. */
+const MAX_RECENT_ITEMS = 500
+
+const clientHit = (client: Doc<'clients'>): ClientHit => ({
+  _id: client._id,
+  name: client.name,
+  phone: client.phones.at(0)?.e164,
+  isNoClient: client.isNoClient,
+})
+
+/**
+ * A Worker's own recent work, read once per search and only as far as asked:
+ * the clients and items of their most recent assignment rows (`WORKER_RECENT`
+ * of them, open jobs first), whatever the business or their history holds.
+ * The index's first hits can't be limited to a member, so this is what finds
+ * their own clients and items when others match more.
+ */
+function workerRecentWork(ctx: ScopedCtx) {
+  let rows: Array<Doc<'jobAssignments'>> | undefined
+  let clients: Array<Doc<'clients'>> | undefined
+  let items: Array<Doc<'items'>> | undefined
+  const recentRows = async () => (rows ??= await workerRecentAssignments(ctx))
+  return {
+    async clients() {
+      if (clients) return clients
+      clients = []
+      for (const clientId of new Set(
+        (await recentRows()).map((row) => row.clientId),
+      )) {
+        const client = await ctx.db.get('clients', clientId)
+        if (client && client.mergedIntoId === undefined) clients.push(client)
+      }
+      return clients
+    },
+    async items() {
+      if (items) return items
+      const itemIds = new Set<Id<'items'>>()
+      for (const jobId of new Set((await recentRows()).map((r) => r.jobId))) {
+        if (itemIds.size >= MAX_RECENT_ITEMS) break
+        const links = await ctx.db
+          .query('jobItems')
+          .withIndex('by_job', (q) => q.eq('jobId', jobId))
+          .take(LINKS_PER_JOB)
+        for (const link of links) itemIds.add(link.itemId)
+      }
+      items = []
+      for (const itemId of [...itemIds].slice(0, MAX_RECENT_ITEMS)) {
+        const item = await ctx.db.get('items', itemId)
+        if (item) items.push(item)
+      }
+      return items
+    },
+  }
+}
+
 /**
  * A Worker's jobs matching a folded query, best first, from the search index
  * of their assignment rows. It also adds to `clients` the clients of the
- * matching jobs whose name matches the query: a name is part of its jobs' keys,
- * so a Worker finds their own client by name however many other clients in the
- * business match.
+ * matching jobs whose own keys match the query: a name is part of its jobs'
+ * keys, so a Worker finds their own client by name however old the job is and
+ * however many other clients in the business match.
  */
 async function workerJobHits(
   ctx: ScopedCtx,
@@ -67,50 +130,23 @@ async function workerJobHits(
       client &&
       client.mergedIntoId === undefined &&
       !clients.has(client._id) &&
-      nameMatches(query, client.name)
+      keysMatch(query, client.searchText)
     ) {
-      clients.set(client._id, {
-        _id: client._id,
-        name: client.name,
-        phone: client.phones.at(0)?.e164,
-        isNoClient: client.isNoClient,
-      })
+      clients.set(client._id, clientHit(client))
     }
   }
   return jobs
 }
 
 /**
- * The items on a Worker's jobs: from their assignment rows and the jobs'
- * item links, so the set is theirs alone and small (D89), whatever the
- * business holds.
- */
-async function workerItems(ctx: ScopedCtx) {
-  const jobIds = new Set((await workerAssignments(ctx)).map((row) => row.jobId))
-  const itemIds = new Set<Id<'items'>>()
-  for (const jobId of jobIds) {
-    const links = await ctx.db
-      .query('jobItems')
-      .withIndex('by_job', (q) => q.eq('jobId', jobId))
-      .collect()
-    for (const link of links) itemIds.add(link.itemId)
-  }
-  const items: Array<Doc<'items'>> = []
-  for (const itemId of itemIds) {
-    const item = await ctx.db.get('items', itemId)
-    if (item) items.push(item)
-  }
-  return items
-}
-
-/**
  * One box over clients, jobs and items (CONTEXT "Search"). Each folded variant
  * of the query is searched and the results merged, best match first. A
  * Worker finds only their jobs and those jobs' clients and items (D89). Their
- * jobs come from the search index of their assignment rows (D109); a client
- * is found through those jobs by name, and by what the clients index returns.
- * Their items are the items on their jobs, matched in memory with the name
- * matcher against each item's keys.
+ * jobs come from the search index of their assignment rows (D109). Their
+ * clients and items are the index's first hits that they see, plus those of
+ * their most recent assignment rows (`WORKER_RECENT`) matched in memory with
+ * `keysMatch`, which reads the keys as the index does (D113); a client is
+ * also found through its matching jobs, however old they are.
  */
 export const all = businessQuery({
   args: { query: v.string() },
@@ -141,10 +177,22 @@ export const all = businessQuery({
     const jobs = new Map<string, Awaited<ReturnType<typeof jobRow>>>()
     const items = new Map<string, ItemHit>()
     let shownItemFields: Set<string> | undefined
-    let ownItems: Array<Doc<'items'>> | undefined
     const lookups = newLookups()
     const worker = isWorker(ctx.member)
     const read = worker ? WORKER_READ : PER_KIND
+
+    const addItem = async (item: Doc<'items'>) => {
+      if (items.has(item._id)) return
+      shownItemFields ??= await listFieldIds(ctx, businessId, 'item')
+      const owner = await ctx.db.get('clients', item.clientId)
+      items.set(item._id, {
+        _id: item._id,
+        name: item.name,
+        clientId: item.clientId,
+        clientName: owner?.name ?? '',
+        listExtra: listExtra(item.extra, shownItemFields),
+      })
+    }
 
     for (const variant of variants) {
       const foundClients = await ctx.db
@@ -157,12 +205,7 @@ export const all = businessQuery({
         if (client.mergedIntoId !== undefined || clients.has(client._id))
           continue
         if (!(await seesClient(ctx, client._id))) continue
-        clients.set(client._id, {
-          _id: client._id,
-          name: client.name,
-          phone: client.phones.at(0)?.e164,
-          isNoClient: client.isNoClient,
-        })
+        clients.set(client._id, clientHit(client))
       }
       const foundJobs = worker
         ? await workerJobHits(ctx, variant, query, clients)
@@ -179,29 +222,29 @@ export const all = businessQuery({
           jobs.set(job._id, await jobRow(ctx, job, lookups))
       }
       if (ctx.business.modules.items) {
-        shownItemFields ??= await listFieldIds(ctx, businessId, 'item')
-        // A Worker's items are few, so they are matched here rather than
-        // taken from the business-wide index's first hits.
-        const foundItems = worker
-          ? (ownItems ??= await workerItems(ctx)).filter((item) =>
-              nameMatches(variant, item.searchText),
-            )
-          : await ctx.db
-              .query('items')
-              .withSearchIndex('search', (q) =>
-                q.search('searchText', variant).eq('businessId', businessId),
-              )
-              .take(read)
+        const foundItems = await ctx.db
+          .query('items')
+          .withSearchIndex('search', (q) =>
+            q.search('searchText', variant).eq('businessId', businessId),
+          )
+          .take(read)
         for (const item of foundItems) {
-          if (items.has(item._id)) continue
-          const owner = await ctx.db.get('clients', item.clientId)
-          items.set(item._id, {
-            _id: item._id,
-            name: item.name,
-            clientId: item.clientId,
-            clientName: owner?.name ?? '',
-            listExtra: listExtra(item.extra, shownItemFields),
-          })
+          if (worker && !(await seesItem(ctx, item._id))) continue
+          await addItem(item)
+        }
+      }
+    }
+    // A Worker's own recent clients and items are matched here as well, on
+    // all their keys: the index's first hits can be filled by others' matches.
+    if (worker && variants.length > 0) {
+      const recent = workerRecentWork(ctx)
+      for (const client of await recent.clients()) {
+        if (!clients.has(client._id) && keysMatch(query, client.searchText))
+          clients.set(client._id, clientHit(client))
+      }
+      if (ctx.business.modules.items) {
+        for (const item of await recent.items()) {
+          if (keysMatch(query, item.searchText)) await addItem(item)
         }
       }
     }

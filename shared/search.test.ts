@@ -5,6 +5,7 @@ import {
   buildSearchText,
   foldName,
   foldQuery,
+  keysMatch,
   nameMatches,
   searchClients,
   similarClients,
@@ -419,5 +420,78 @@ describe('asCandidate', () => {
       phones: ['+359888'],
     })
     expect(asCandidate({ _id: 'b', name: 'Ана' }).phones).toEqual([])
+  })
+})
+
+describe('keysMatch', () => {
+  const keys = buildSearchText(['Иван Петров', '+359899314159', 'Ремонт'])
+
+  it('needs whole words but for the last term, which is a prefix', () => {
+    expect(keysMatch('ivan', keys)).toBe(true)
+    expect(keysMatch('iv', keys)).toBe(true)
+    expect(keysMatch('иван пе', keys)).toBe(true)
+    expect(keysMatch('iv petrov', keys)).toBe(false)
+    expect(keysMatch('petrov ivan', keys)).toBe(true)
+    expect(keysMatch('ivan nikolov', keys)).toBe(false)
+  })
+
+  it('folds the query like the index, and the keys not at all', () => {
+    expect(keysMatch('Иван', keys)).toBe(true)
+    expect(keysMatch('  ИВАН   ПЕТРОВ ', keys)).toBe(true)
+    expect(keysMatch('Mariya', buildSearchText(['Мария']))).toBe(true)
+    // Stored keys are taken as they are: an unfolded word isn't a key.
+    expect(keysMatch('iv', 'Иван')).toBe(false)
+  })
+
+  it('finds a phone by the end of its digits, and by digits typed in groups', () => {
+    expect(keysMatch('4159', keys)).toBe(true)
+    expect(keysMatch('99314', keys)).toBe(true)
+    expect(keysMatch('0899 314', keys)).toBe(true)
+    expect(keysMatch('5555', keys)).toBe(false)
+  })
+
+  it('matches nothing for an empty query', () => {
+    expect(keysMatch('', keys)).toBe(false)
+    expect(keysMatch('  ,. ', keys)).toBe(false)
+  })
+
+  it('agrees with whole words but the last, a prefix for the last', () => {
+    // Letters that the spelling fold leaves alone, so words refold to themselves.
+    const word = fc
+      .array(fc.constantFrom(...'abdefgmnopqsv'), {
+        minLength: 1,
+        maxLength: 8,
+      })
+      .map((letters) => letters.join(''))
+    const scenario = fc
+      .array(word, { minLength: 1, maxLength: 6 })
+      .chain((keyWords) =>
+        fc.record({
+          keyWords: fc.constant(keyWords),
+          terms: fc.array(
+            fc.oneof(
+              fc.constantFrom(...keyWords),
+              fc
+                .constantFrom(...keyWords)
+                .chain((w) =>
+                  fc
+                    .integer({ min: 1, max: w.length })
+                    .map((n) => w.slice(0, n)),
+                ),
+              word,
+            ),
+            { minLength: 1, maxLength: 4 },
+          ),
+        }),
+      )
+    fc.assert(
+      fc.property(scenario, ({ keyWords, terms }) => {
+        const expected =
+          terms.slice(0, -1).every((term) => keyWords.includes(term)) &&
+          keyWords.some((key) => key.startsWith(terms.at(-1)!))
+        expect(keysMatch(terms.join(' '), keyWords.join(' '))).toBe(expected)
+      }),
+      { numRuns: 500 },
+    )
   })
 })
