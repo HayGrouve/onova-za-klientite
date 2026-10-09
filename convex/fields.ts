@@ -12,6 +12,7 @@ import {
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
+import { setJobSearchText } from './lib/ledger'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { requiredText } from './lib/validate'
 import { vFieldTarget, vFieldType } from './validators'
@@ -250,9 +251,7 @@ export const rebuildSearch = internalMutation({
         .paginate(opts)
       for (const job of result.page) {
         if (!(field._id in job.extra)) continue
-        await ctx.db.patch('jobs', job._id, {
-          searchText: await jobSearchText(ctx, job),
-        })
+        await setJobSearchText(ctx, job, await jobSearchText(ctx, job))
       }
       page = result
     }

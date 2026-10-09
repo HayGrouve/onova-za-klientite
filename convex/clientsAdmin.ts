@@ -11,7 +11,11 @@ import {
 } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
 import { fail } from './lib/errors'
-import { moveClientMoney, moveJobsToClient } from './lib/ledger'
+import {
+  moveClientMoney,
+  moveJobsToClient,
+  setJobSearchText,
+} from './lib/ledger'
 import { clientSearchText, jobSearchText } from './lib/search'
 
 /** Clients that already have one of these phones: the duplicate warning. */
@@ -136,9 +140,7 @@ export const merge = businessMutation({
 
     for (const jobId of jobIds) {
       const moved = (await ctx.db.get('jobs', jobId))!
-      await ctx.db.patch('jobs', jobId, {
-        searchText: await jobSearchText(ctx, moved),
-      })
+      await setJobSearchText(ctx, moved, await jobSearchText(ctx, moved))
     }
     await logActivity(ctx, {
       type: 'client.merged',
@@ -283,11 +285,11 @@ export const anonymize = businessMutation({
       .query('jobs')
       .withIndex('by_client', (q) => q.eq('clientId', clientId))
       .collect()) {
-      await ctx.db.patch('jobs', job._id, {
-        searchText: await jobSearchText(ctx, job),
-        // A series does not go on for an anonymized client.
-        ...(job.nextRepeatOn !== undefined ? { nextRepeatOn: undefined } : {}),
-      })
+      await setJobSearchText(ctx, job, await jobSearchText(ctx, job))
+      // A series does not go on for an anonymized client.
+      if (job.nextRepeatOn !== undefined) {
+        await ctx.db.patch('jobs', job._id, { nextRepeatOn: undefined })
+      }
     }
     await logActivity(ctx, { type: 'client.anonymized', clientId })
     return null

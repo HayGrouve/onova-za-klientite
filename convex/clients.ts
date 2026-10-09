@@ -19,6 +19,7 @@ import {
 } from './lib/clientWrite'
 import { mergeExtra } from './lib/extra'
 import { listExtra, listFieldIds } from './lib/listFields'
+import { setJobSearchText } from './lib/ledger'
 import { clientSearchText, jobSearchText } from './lib/search'
 import {
   getVisibleFromUrl,
@@ -93,9 +94,7 @@ export const update = businessMutation({
         .withIndex('by_client', (q) => q.eq('clientId', client._id))
         .collect()
       for (const job of jobs) {
-        await ctx.db.patch('jobs', job._id, {
-          searchText: await jobSearchText(ctx, job),
-        })
+        await setJobSearchText(ctx, job, await jobSearchText(ctx, job))
       }
     }
     await logActivity(ctx, {

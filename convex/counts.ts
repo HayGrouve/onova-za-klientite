@@ -14,13 +14,16 @@ const ASSIGNMENTS_PER_PAGE = 500
 
 /**
  * Rebuilds what is derived from the jobs (D105, D106) in every business: the
- * stage counts (`jobCounts`) and the Worker assignment rows (`jobAssignments`).
+ * stage counts (`jobCounts`) and the Worker assignment rows (`jobAssignments`,
+ * with the copy of each job's search text, D109).
  * Every production deploy runs it (scripts/vercel-build.sh), and it can be run
  * by hand:
  *
  *   npx convex run counts:backfill '{}'          (add `--prod` for production)
  *
- * The deploy passes `onlyMissing`, which skips a business already built.
+ * The deploy passes `onlyMissing`, which skips a business already built. A
+ * built business whose assignment rows lack the search text (made before D109)
+ * is filled by `fillAssignmentSearch`, which the deploy runs too.
  *
  * It is safe to run twice and while the app is in use: rows that are already
  * right aren't written, and a job changed during the recount is counted
@@ -101,6 +104,42 @@ export const backfill = internalMutation({
       await ctx.scheduler.runAfter(0, internal.counts.backfill, {
         businessId,
         stale: true,
+      })
+    }
+    return null
+  },
+})
+
+/**
+ * Gives every assignment row the search text of its job (D109), a page of 500
+ * at a time, each page scheduling the next:
+ *
+ *   npx convex run counts:fillAssignmentSearch '{}'   (add `--prod` for production)
+ *
+ * It is what makes a Worker's job search find jobs whose rows were made before
+ * the rows carried the text, in businesses that `backfill` with `onlyMissing`
+ * skips as already built, and every production deploy runs it. A row that
+ * already holds its job's text isn't written, so a second run wakes no query.
+ * Rows of a job that is gone are left for `backfill` to drop.
+ */
+export const fillAssignmentSearch = internalMutation({
+  args: { cursor: v.optional(v.union(v.string(), v.null())) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query('jobAssignments')
+      .paginate({ cursor: args.cursor ?? null, numItems: ASSIGNMENTS_PER_PAGE })
+    for (const row of page.page) {
+      const job = await ctx.db.get('jobs', row.jobId)
+      if (job && row.searchText !== job.searchText) {
+        await ctx.db.patch('jobAssignments', row._id, {
+          searchText: job.searchText,
+        })
+      }
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.counts.fillAssignmentSearch, {
+        cursor: page.continueCursor,
       })
     }
     return null

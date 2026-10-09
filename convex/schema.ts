@@ -241,11 +241,19 @@ export default defineSchema({
     stageGroup: vStageGroup,
     dueDate: v.optional(v.string()),
     owes: v.boolean(),
+    // The job's `searchText`, so a Worker's search is limited to their own
+    // jobs by `membershipId` (D109). Optional only until the backfill has
+    // filled the rows made before it.
+    searchText: v.optional(v.string()),
   })
     .index('by_member_group_due', ['membershipId', 'stageGroup', 'dueDate'])
     .index('by_member_owes_group', ['membershipId', 'owes', 'stageGroup'])
     .index('by_job', ['jobId'])
-    .index('by_business', ['businessId']),
+    .index('by_business', ['businessId'])
+    .searchIndex('search', {
+      searchField: 'searchText',
+      filterFields: ['membershipId'],
+    }),
 
   jobItems: defineTable({
     businessId: v.id('businesses'),

@@ -206,9 +206,9 @@ describe('lateJobCount', () => {
     dueDate: string | undefined,
     stageGroup: StageGroup = 'in_progress',
   ) => ({ _id: id, stageGroup, dueDate })
-  const visitOf = (id: string, job: ReturnType<typeof dated>) => ({
+  const visitOf = (id: string, booked: ReturnType<typeof dated>) => ({
     id,
-    job,
+    job: booked,
   })
   const none = { appointments: [], upcoming: [], overdue: [] }
 
@@ -263,7 +263,7 @@ describe('lateJobCount', () => {
             visitOf('a2', dated('undated', undefined)),
             visitOf('a3', dated('done', '2026-10-01', 'done')),
             visitOf('a4', dated('cancelled', '2026-10-01', 'cancelled')),
-            { id: 'a5' },
+            {},
           ],
         },
         TODAY,
