@@ -509,7 +509,8 @@ const BoardCard = memo(function BoardCard({
       inert={dragged}
       className={cn(
         'group/card relative overflow-hidden surface transition-[opacity,box-shadow] duration-150 row-lazy hover:shadow-md',
-        canMove && 'cursor-grab touch-manipulation select-none',
+        canMove &&
+          'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none]',
         dragged && 'opacity-40',
         late && 'shadow-[inset_3px_0_0_var(--destructive)]',
       )}

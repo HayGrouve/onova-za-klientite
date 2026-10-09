@@ -36,14 +36,19 @@ function Harness() {
   )
 }
 
-function pointer(type: string, init: { x: number; y: number }, pointerId = 1) {
+function pointer(
+  type: string,
+  init: { x: number; y: number },
+  pointerId = 1,
+  pointerType = 'mouse',
+) {
   const event = new MouseEvent(type, {
     bubbles: true,
     button: 0,
     clientX: init.x,
     clientY: init.y,
   })
-  Object.assign(event, { pointerId, pointerType: 'mouse' })
+  Object.assign(event, { pointerId, pointerType })
   return event
 }
 
@@ -193,5 +198,33 @@ describe('useCardDrag', () => {
     })
     expect(container.querySelector('#float')).toBeNull()
     expect(html.classList.contains('dragging-card')).toBe(false)
+  })
+  it('keeps the long-press menu away while a finger holds a card, and only then', () => {
+    const card = container.querySelector('#card') as HTMLElement
+    const menu = () => {
+      const event = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+      })
+      card.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    // A mouse's right click still opens the browser's menu (open in a new tab).
+    act(() => {
+      card.dispatchEvent(pointer('pointerdown', { x: 10, y: 10 }))
+    })
+    expect(menu()).toBe(false)
+    act(() => {
+      window.dispatchEvent(pointer('pointerup', { x: 10, y: 10 }))
+    })
+    // A finger held on a card: the phone's long-press menu would end the drag.
+    act(() => {
+      card.dispatchEvent(pointer('pointerdown', { x: 10, y: 10 }, 3, 'touch'))
+    })
+    expect(menu()).toBe(true)
+    act(() => {
+      window.dispatchEvent(pointer('pointerup', { x: 10, y: 10 }, 3, 'touch'))
+    })
+    expect(menu()).toBe(false)
   })
 })

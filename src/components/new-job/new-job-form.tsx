@@ -401,6 +401,9 @@ export function NewJobForm({
             autoFocus
             rows={3}
             maxLength={500}
+            // Enter saves the line (Shift+Enter is a new line): say so on the
+            // phone's keyboard.
+            enterKeyHint="done"
             className="min-h-24 rounded-xl text-lg"
             value={text}
             onChange={(event) => onText(event.target.value)}

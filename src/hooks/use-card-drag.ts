@@ -138,6 +138,10 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
       // While dragging, a finger moves the card instead of the page.
       const onTouchMove = (moved: TouchEvent) =>
         active && moved.preventDefault()
+      // A finger held on a card would also open the phone's long-press menu
+      // (or iOS's link preview), which cancels the drag. A mouse's right
+      // click keeps its menu.
+      const onMenu = (opened: Event) => touch && opened.preventDefault()
       const onCancel = (cancelled: PointerEvent) =>
         cancelled.pointerId === pointerId && end()
       const end = () => {
@@ -147,6 +151,7 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
         window.removeEventListener('pointerup', onUp)
         window.removeEventListener('pointercancel', onCancel)
         window.removeEventListener('keydown', onKey)
+        window.removeEventListener('contextmenu', onMenu)
         document.removeEventListener('touchmove', onTouchMove)
         document.body.style.userSelect = ''
         document.documentElement.classList.remove('dragging-card')
@@ -158,6 +163,7 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
       window.addEventListener('pointerup', onUp)
       window.addEventListener('pointercancel', onCancel)
       window.addEventListener('keydown', onKey)
+      window.addEventListener('contextmenu', onMenu)
       document.addEventListener('touchmove', onTouchMove, { passive: false })
       cleanupRef.current = { end }
     },
