@@ -138,3 +138,21 @@ export function filterJobs<T extends FilterableJob>(
         (job.dueDate !== undefined && monthOf(job.dueDate) === month)),
   )
 }
+
+/**
+ * How many of a tab's jobs the list holds, when it holds fewer than there
+ * are: the list reads a fixed number of jobs per group, while the counts are
+ * exact. `group` is the open tab, or 'all' for every group. Null when the
+ * list is complete.
+ */
+export function unshownJobs(
+  shown: number,
+  counts: Record<StageGroup, number>,
+  group: StageGroup | 'all',
+) {
+  const total =
+    group === 'all'
+      ? counts.new + counts.in_progress + counts.done + counts.cancelled
+      : counts[group]
+  return shown < total ? { shown, total } : null
+}
