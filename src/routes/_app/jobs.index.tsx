@@ -6,7 +6,6 @@ import {
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { FilterChips } from '#/components/jobs/filter-chips'
@@ -23,6 +22,8 @@ import {
   InputGroupInput,
 } from '#/components/ui/input-group'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
+import { useNow } from '#/hooks/use-now'
+import { useQueryKeepPrevious } from '#/hooks/use-query-keep-previous'
 import { useToday } from '#/hooks/use-today'
 import { useUrlText } from '#/hooks/use-url-text'
 import { useViewer } from '#/hooks/use-viewer'
@@ -199,18 +200,27 @@ function JobsList({
     search.group === 'all' && !table ? 'new' : (search.group ?? 'new')
   const setSearch = useListSearch()
   const today = useToday()
+  const now = useNow()
   // A filter counts what it finds in every tab, so it reads all of them.
   const filtering = table && isFiltering(filter)
-  const data = useQuery(
+  const data = useQueryKeepPrevious(
     api.jobs.list,
     group === 'all' || filtering
-      ? { businessId: business._id }
-      : { businessId: business._id, group },
+      ? { businessId: business._id, now }
+      : { businessId: business._id, group, now },
   )
   // The counts don't depend on the open tab, so they stay while another loads.
   const counts = useLatest(data?.counts)
   const { words } = business
   const sort = sortFromSearch(search)
+  // Every tab empty: the business has no jobs yet, which says more than "nothing here".
+  const noJobsAtAll =
+    data !== undefined &&
+    data.counts.new +
+      data.counts.in_progress +
+      data.counts.done +
+      data.counts.cancelled ===
+      0
   const found = data && filterJobs(data.jobs, filter, today)
   const jobs =
     found &&
@@ -239,7 +249,7 @@ function JobsList({
               <TabsTrigger
                 key={key}
                 value={key}
-                className="h-full gap-1 rounded-full px-1 text-[0.8125rem]"
+                className="h-full gap-1 rounded-full px-1 text-[0.8125rem] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
               >
                 {GROUP_LABEL[key]()}
                 {counts && counts[key] > 0 && (
@@ -252,7 +262,7 @@ function JobsList({
             {table && (
               <TabsTrigger
                 value="all"
-                className="h-full gap-1 rounded-full px-3 text-[0.8125rem]"
+                className="h-full gap-1 rounded-full px-3 text-[0.8125rem] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
               >
                 {m.jobs_group_all()}
                 {counts && (
@@ -283,13 +293,21 @@ function JobsList({
       {!jobs ? (
         <ListSkeleton />
       ) : jobs.length === 0 ? (
-        <EmptyState
-          icon={ClipboardTextIcon}
-          title={group === 'all' ? m.jobs_group_all() : GROUP_LABEL[group]()}
-          body={
-            data.jobs.length > 0 ? m.jobs_filter_none() : m.jobs_group_empty()
-          }
-        />
+        noJobsAtAll ? (
+          <EmptyState
+            icon={ClipboardTextIcon}
+            title={m.jobs_empty_title()}
+            body={m.jobs_empty_body()}
+          />
+        ) : (
+          <EmptyState
+            icon={ClipboardTextIcon}
+            title={group === 'all' ? m.jobs_group_all() : GROUP_LABEL[group]()}
+            body={
+              data.jobs.length > 0 ? m.jobs_filter_none() : m.jobs_group_empty()
+            }
+          />
+        )
       ) : table ? (
         <JobsTable
           jobs={jobs}

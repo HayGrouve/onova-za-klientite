@@ -13,7 +13,8 @@ import type { FunctionReturnType } from 'convex/server'
 import type { api } from '../../convex/_generated/api'
 import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
-import { formatDay } from '#/i18n/dates'
+import { useViewer } from '#/hooks/use-viewer'
+import { formatDay, formatDayShort } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../shared/dates'
 import { formatMoney } from '../../shared/money'
@@ -29,8 +30,15 @@ const TIME = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'Europe/Sofia',
 })
 
-export function formatMoment(ms: number, allDay: boolean, today: string) {
-  const day = formatDay(dateInSofia(ms), today)
+/** `short` is for a narrow table cell: the short day form, never a long date. */
+export function formatMoment(
+  ms: number,
+  allDay: boolean,
+  today: string,
+  short = false,
+) {
+  const date = dateInSofia(ms)
+  const day = short ? formatDayShort(date, today) : formatDay(date, today)
   return allDay ? day : `${day}, ${TIME.format(ms)}`
 }
 
@@ -48,13 +56,17 @@ export type JobRowLead =
 
 type Timing = { icon: Icon; text: string; late?: boolean }
 
-/** A row's timing: what it leads with, shown before the client, then the rest. */
+/**
+ * A row's timing: what it leads with, shown before the client, then the rest.
+ * `visit` is the next appointment when the row's one date is the job's due
+ * date: it sits on its own line, labelled, so two dates never run together.
+ */
 function timingsOf(
   job: JobRowData,
   today: string,
   lead?: JobRowLead,
   showDone = false,
-): { first?: Timing; rest: Timing[] } {
+): { first?: Timing; rest: Timing[]; visit?: string } {
   const late: Timing | undefined =
     isJobLate(job, today) && job.dueDate
       ? {
@@ -101,7 +113,10 @@ function timingsOf(
       }
     }
     case 'due':
-      return { rest: compact([late ?? due, next]) }
+      return {
+        rest: compact([late ?? due]),
+        visit: next?.text,
+      }
     case 'none':
       return { rest: [] }
     default:
@@ -131,6 +146,7 @@ export function JobRow({
   /** A done job shows when it was done, as a history list needs. */
   showDone?: boolean
 }) {
+  const { words } = useViewer().business
   const timing = timingsOf(job, today, lead, showDone)
   const owes = job.owes && job.priceCents > 0
   const client = showClient && job.clientName
@@ -146,12 +162,10 @@ export function JobRow({
           <span className="min-w-0 text-base leading-snug font-medium break-words">
             {job.title}
           </span>
-          {/* Pulled over the row's padding onto its top and right edges. */}
           <StageBadge
             name={job.stageName}
             group={job.stageGroup}
-            corner
-            className="-mt-3 -mr-4"
+            className="mt-0.5"
           />
         </div>
         {(client || timing.first || timing.rest.length > 0 || owes) && (
@@ -183,6 +197,18 @@ export function JobRow({
                 {m.balance_short({ amount: formatMoney(job.balanceCents) })}
               </Meta>
             )}
+          </div>
+        )}
+        {timing.visit && (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <CalendarBlankIcon
+              aria-hidden
+              className="size-4 shrink-0 opacity-80"
+            />
+            {m.job_next_appointment({
+              appointment: words.appointment.singular,
+              when: timing.visit,
+            })}
           </div>
         )}
         <ListExtras target="job" values={job.listExtra} />

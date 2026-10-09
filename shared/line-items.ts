@@ -39,8 +39,9 @@ function edgeTrimmed(token: string) {
 /**
  * The client's item the title names, and the title without the words that
  * name it. Nothing is picked when no word fits, or when two items fit equally
- * well. The words come out only when that is clearly right: they close the
- * title, and something is left. Otherwise the title is returned as written.
+ * well. The words that name it come out of the title wherever they sit, with
+ * a preposition left dangling at either end; when nothing would be left the
+ * title is returned as written.
  */
 export function matchItem(
   title: string,
@@ -70,18 +71,14 @@ export function matchItem(
   }
   if (!best || tie) return null
 
-  let end = tokens.length
-  while (end > 0 && best.matched[end - 1]) end--
-  const rest = tokens.slice(0, end)
-  while (
-    rest.length > 0 &&
-    DANGLING.has(edgeTrimmed(rest[rest.length - 1]).toLocaleLowerCase('bg'))
-  ) {
-    rest.pop()
-  }
-  const kept = rest.join(' ').replace(/[\s,;:-]+$/, '')
-  return {
-    id: best.id,
-    title: end < tokens.length && kept ? kept : title,
-  }
+  // The words that name the item come out wherever they sit, then any
+  // preposition left dangling at either end.
+  const rest = tokens.filter((_, index) => !best.matched[index])
+  const dangling = (token: string) =>
+    DANGLING.has(edgeTrimmed(token).toLocaleLowerCase('bg'))
+  while (rest.length > 0 && dangling(rest[rest.length - 1])) rest.pop()
+  while (rest.length > 0 && dangling(rest[0])) rest.shift()
+  const kept = rest.join(' ').replace(/^[\s,;:-]+|[\s,;:-]+$/g, '')
+  // Left with nothing: the title stays as written.
+  return { id: best.id, title: kept || title }
 }

@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 // Convex skips files with more than one dot, so this never deploys.
+import rateLimiterTest from '@convex-dev/rate-limiter/test'
 import { convexTest } from 'convex-test'
 import { expect } from 'vitest'
 import schema from './schema'
@@ -19,7 +20,9 @@ export const modules = import.meta.glob([
 ])
 
 export function setupConvex() {
-  return convexTest(schema, modules)
+  const t = convexTest(schema, modules)
+  rateLimiterTest.register(t, 'rateLimiter')
+  return t
 }
 
 export type TestConvex = ReturnType<typeof setupConvex>

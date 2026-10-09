@@ -48,24 +48,21 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
   // Level 2: a Worker sees no totals, so the money tiles stay out.
   const seesMoney = hasRole(business.role, 'manager')
   const money = useQuery(
-    api.money.summary,
+    api.money.headline,
     seesMoney ? { businessId: business._id, month: monthOf(today) } : 'skip',
   )
 
   // The figure is every unpaid balance, so say how many jobs it covers and how
   // many of them are done, not only the done ones.
-  const owed = money?.whoOwesMe.reduce(
-    (sum, row) => ({
-      jobs: sum.jobs + row.jobs,
-      done: sum.done + row.doneJobs,
-    }),
-    { jobs: 0, done: 0 },
-  )
   const owedDetail =
-    owed && owed.jobs > 0
+    money && money.owingJobs > 0
       ? [
-          m.money_jobs_count({ jobs: words.job.plural, count: owed.jobs }),
-          owed.done > 0 && m.today_owed_done({ count: owed.done }),
+          m.money_jobs_count({
+            jobs: words.job.plural,
+            count: money.owingJobs,
+          }),
+          money.doneOwingJobs > 0 &&
+            m.today_owed_done({ count: money.doneOwingJobs }),
         ]
           .filter(Boolean)
           .join(' · ')

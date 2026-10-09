@@ -212,15 +212,10 @@ export function summaryTree(
       box({ height: 2, backgroundColor: '#cfd6e4' }),
       moneyRow(m.job_balance(), formatMoney(input.balanceCents), true),
     ),
+    // A footnote, not a frame: a bordered box reads as a button on a phone.
     box(
-      {
-        justifyContent: 'center',
-        padding: 28,
-        borderRadius: 24,
-        border: `4px solid ${MUTED}`,
-        color: MUTED,
-      },
-      label(m.summary_not_invoice(), { fontSize: 44, fontWeight: 700 }),
+      { justifyContent: 'center', color: MUTED },
+      label(m.summary_not_invoice(), { fontSize: 34 }),
     ),
   )
 }

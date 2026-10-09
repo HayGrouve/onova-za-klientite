@@ -1,0 +1,91 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from 'vitest'
+import { dropPushOnSignOut } from './push'
+
+const device = () => ({
+  endpoint: 'https://fcm.googleapis.com/fcm/send/1',
+  unsubscribe: vi.fn().mockResolvedValue(true),
+})
+
+describe('dropPushOnSignOut', () => {
+  it('starts the server removal first, then unsubscribes the browser', async () => {
+    const subscription = device()
+    const order: string[] = []
+    const removeOnServer = vi.fn(async () => {
+      order.push('server')
+    })
+    subscription.unsubscribe.mockImplementation(async () => {
+      order.push('browser')
+      return true
+    })
+    await dropPushOnSignOut(removeOnServer, async () => subscription)
+    expect(removeOnServer).toHaveBeenCalledWith(subscription.endpoint)
+    expect(order).toEqual(['server', 'browser'])
+  })
+
+  it('does nothing when the device has no subscription', async () => {
+    const removeOnServer = vi.fn()
+    await dropPushOnSignOut(removeOnServer, async () => null)
+    expect(removeOnServer).not.toHaveBeenCalled()
+  })
+
+  it('still unsubscribes the browser when the server call fails', async () => {
+    const subscription = device()
+    await dropPushOnSignOut(
+      () => Promise.reject(new Error('offline')),
+      async () => subscription,
+    )
+    expect(subscription.unsubscribe).toHaveBeenCalled()
+  })
+
+  it('never throws, even when looking up the subscription fails', async () => {
+    await expect(
+      dropPushOnSignOut(vi.fn(), () => Promise.reject(new Error('no sw'))),
+    ).resolves.toBeUndefined()
+  })
+
+  it('unsubscribes the browser at once while the server call is still pending', async () => {
+    const subscription = device()
+    await dropPushOnSignOut(
+      () => new Promise(() => undefined),
+      async () => subscription,
+      20,
+    )
+    expect(subscription.unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not wait for the server before calling unsubscribe', async () => {
+    const subscription = device()
+    let release: () => void = () => undefined
+    const removeOnServer = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const done = dropPushOnSignOut(removeOnServer, async () => subscription)
+    await vi.waitFor(() => expect(subscription.unsubscribe).toHaveBeenCalled())
+    release()
+    await done
+  })
+
+  it('still lets sign-out proceed when the browser unsubscribe rejects', async () => {
+    const subscription = device()
+    subscription.unsubscribe.mockRejectedValue(new Error('gone'))
+    await expect(
+      dropPushOnSignOut(
+        vi.fn().mockResolvedValue(undefined),
+        async () => subscription,
+      ),
+    ).resolves.toBeUndefined()
+  })
+
+  it('gives up after the timeout when the server never answers', async () => {
+    const subscription = device()
+    const started = Date.now()
+    await dropPushOnSignOut(
+      () => new Promise(() => undefined),
+      async () => subscription,
+      50,
+    )
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
+})

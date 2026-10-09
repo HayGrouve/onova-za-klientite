@@ -1,5 +1,9 @@
 const CURRENCY = /€|евро|eur/gi
 const SPACES = /\s/g
+/** Whole euros: "0", or digits that don't start with a zero ("012" is ambiguous). */
+const WHOLE = /^(0|[1-9]\d*)$/
+/** Euros with thousands separators: the first group never starts with a zero. */
+const THOUSANDS = /^[1-9]\d{0,2}([.,]\d{3})+$/
 
 const formatter = new Intl.NumberFormat('bg-BG', {
   style: 'currency',
@@ -28,16 +32,16 @@ export function parseMoney(input: string): number | null {
   if (decimal) {
     intPart = decimal[1]
     fraction = decimal[3]
-    if (/^\d{1,3}([.,]\d{3})+$/.test(intPart)) {
+    if (THOUSANDS.test(intPart)) {
       // Thousands separators must differ from the decimal separator
       if (intPart.includes(decimal[2])) return null
-    } else if (!/^\d+$/.test(intPart)) {
+    } else if (!WHOLE.test(intPart)) {
       return null
     }
   } else if (
-    !/^\d+$/.test(text) &&
-    !/^\d{1,3}(\.\d{3})+$/.test(text) &&
-    !/^\d{1,3}(,\d{3})+$/.test(text)
+    !WHOLE.test(text) &&
+    !/^[1-9]\d{0,2}(\.\d{3})+$/.test(text) &&
+    !/^[1-9]\d{0,2}(,\d{3})+$/.test(text)
   ) {
     return null
   }

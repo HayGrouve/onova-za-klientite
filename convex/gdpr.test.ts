@@ -152,6 +152,105 @@ describe('anonymize (Q11)', () => {
   })
 })
 
+describe('anonymize leaves no name behind (M1)', () => {
+  /** Every row of these tables, as text, to look for a name in. */
+  async function dump(t: Awaited<ReturnType<typeof twoIvans>>['t']) {
+    return await t.run(async (ctx) =>
+      JSON.stringify({
+        clients: await ctx.db.query('clients').collect(),
+        phones: await ctx.db.query('clientPhones').collect(),
+        activity: await ctx.db.query('activity').collect(),
+      }),
+    )
+  }
+
+  it("blanks the name in the client's own activity events and keeps the rows", async () => {
+    const { t, owner, businessId, second } = await twoIvans()
+    await owner.mutation(api.clients.update, {
+      businessId,
+      clientId: second,
+      name: 'Иван Петров-Стоянов',
+    })
+    const eventsOf = () =>
+      t.run((ctx) =>
+        ctx.db
+          .query('activity')
+          .withIndex('by_client', (q) => q.eq('clientId', second))
+          .collect(),
+      )
+    const before = await eventsOf()
+    expect(before.some((event) => event.type === 'client.edited')).toBe(true)
+    expect(JSON.stringify(before)).toContain('Иван П.')
+
+    await owner.mutation(api.clientsAdmin.anonymize, {
+      businessId,
+      clientId: second,
+    })
+
+    const after = await eventsOf()
+    // Every row stays (and the anonymize event is new).
+    expect(after).toHaveLength(before.length + 1)
+    expect(JSON.stringify(after)).not.toContain('Иван')
+    for (const event of after.filter((e) => e.type.startsWith('client.'))) {
+      expect(JSON.stringify(event.data)).not.toMatch(/Иван/)
+    }
+    // Events that are not about the person keep their values.
+    const payment = after.find((event) => event.type === 'payment.added')
+    expect(payment?.data.amountCents).toBe(40000)
+    expect(
+      after.find((event) => event.type === 'client.created')?.data,
+    ).toEqual({ name: ANONYMOUS_CLIENT_NAME })
+  })
+
+  it('blanks the clients that were merged into it, and their phones and events', async () => {
+    const { t, owner, businessId, first, second } = await twoIvans()
+    // `second` goes into `first`; anonymizing `first` must take both names.
+    await owner.mutation(api.clientsAdmin.merge, {
+      businessId,
+      fromId: second,
+      intoId: first,
+    })
+    await owner.mutation(api.clientsAdmin.anonymize, {
+      businessId,
+      clientId: first,
+    })
+
+    const absorbed = await getDoc(t, 'clients', second)
+    expect(absorbed.name).toBe(ANONYMOUS_CLIENT_NAME)
+    expect(absorbed.phones).toEqual([])
+    expect(absorbed.address).toBeUndefined()
+    expect(absorbed.anonymizedAt).toBeDefined()
+    expect(absorbed.mergedIntoId).toBe(first)
+    expect(absorbed.searchText).not.toMatch(/иван|софия|0899/i)
+    const text = await dump(t)
+    expect(text).not.toMatch(/Иван|ivan@example|София|0899111222|359899/)
+    await expectCachesFresh(t)
+  })
+
+  it('follows a chain of merges', async () => {
+    const { t, owner, businessId, first, second } = await twoIvans()
+    const third = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Йоан Петров',
+    })
+    await owner.mutation(api.clientsAdmin.merge, {
+      businessId,
+      fromId: second,
+      intoId: first,
+    })
+    await owner.mutation(api.clientsAdmin.merge, {
+      businessId,
+      fromId: first,
+      intoId: third,
+    })
+    await owner.mutation(api.clientsAdmin.anonymize, {
+      businessId,
+      clientId: third,
+    })
+    expect(await dump(t)).not.toMatch(/Иван|Йоан|ivan@example/)
+  })
+})
+
 describe('export', () => {
   it('re-reading the export finds every record', async () => {
     const { t, owner, businessId } = await twoIvans()

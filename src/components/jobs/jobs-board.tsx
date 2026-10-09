@@ -10,10 +10,9 @@ import {
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
@@ -39,10 +38,15 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Skeleton } from '#/components/ui/skeleton'
+import { useCardDrag } from '#/hooks/use-card-drag'
 import { useMoveJob } from '#/hooks/use-move-job'
+import { useNow } from '#/hooks/use-now'
+import { useQueryKeepPrevious } from '#/hooks/use-query-keep-previous'
+import { useStableCallback } from '#/hooks/use-stable-callback'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { GROUP_LABEL } from '#/i18n/groups'
+import { planMove } from '#/lib/move-plan'
 import { m } from '#/paraglide/messages.js'
 import { jobOwedCents } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
@@ -78,68 +82,116 @@ const GROUP_DOT: Record<StageGroup, string> = {
  * several), or from its "move" menu, which also serves the keyboard.
  */
 export function JobsBoard({
-  filter,
+  filter: incoming,
   today,
 }: {
   filter: JobFilter
   today: string
 }) {
   const { business } = useViewer()
+  // The page builds a new filter object on every render, but only its three
+  // fields matter. A steady object keeps the memoized columns from rendering.
+  const { text, owing, dueThisMonth } = incoming
+  const filter = useMemo<JobFilter>(
+    () => ({ text, owing, dueThisMonth }),
+    [text, owing, dueThisMonth],
+  )
   // Level 2: a Worker cannot change stages, so their cards don't move.
   const canMove = hasRole(business.role, 'manager')
-  const board = useQuery(api.jobs.board, { businessId: business._id })
-  const { move, announce } = useMoveJob()
-  const [ruleFor, setRuleFor] = useState<Card | null>(null)
-  // The move's toast waits while the reminder rule's offer covers the board.
-  const afterRuleOffer = useRef<(() => void) | null>(null)
-  // A move into Cancelled waits here for a yes. It stays set while the
-  // question closes, so the dialog keeps its words through the animation.
-  const [asking, setAsking] = useState<{ card: Card; target: Target } | null>(
-    null,
-  )
+  const now = useNow()
+  const board = useQueryKeepPrevious(api.jobs.board, {
+    businessId: business._id,
+    now,
+  })
+  const { moveAndAnnounce, ruleOffer, closeRuleOffer } = useMoveJob()
+  // A move into Cancelled waits here for a yes. It keeps the job's id, not
+  // the card: the card is read again when the answer comes. It stays set while
+  // the question closes, so the dialog keeps its words through the animation.
+  const [asking, setAsking] = useState<{
+    jobId: Card['_id']
+    title: string
+    target: Target
+  } | null>(null)
   const [askOpen, setAskOpen] = useState(false)
 
-  const stagesOf = (group: StageGroup) =>
-    board?.stages.filter((stage) => stage.group === group) ?? []
-  const moveNow = (card: Card, target: Target) => {
-    const previous = board?.stages.find((stage) => stage._id === card.stageId)
-    void move(card, target).then(({ moved, offerRule }) => {
-      if (!moved) return
-      const say = () => announce(card, target, previous)
-      if (offerRule) {
-        afterRuleOffer.current = say
-        setRuleFor(card)
-      } else {
-        say()
-      }
-    })
+  const stagesByGroup = useMemo(() => {
+    const byGroup: Record<StageGroup, Stage[]> = {
+      new: [],
+      in_progress: [],
+      done: [],
+      cancelled: [],
+    }
+    for (const stage of board?.stages ?? []) byGroup[stage.group].push(stage)
+    return byGroup
+  }, [board?.stages])
+  // What each column shows, worked out once per change of data or filter.
+  const shown = useMemo(
+    () =>
+      board?.columns.map((column) =>
+        filterJobs(
+          // The owing filter finds every Done job that owes, not only the latest.
+          filter.owing ? [...column.jobs, ...column.olderOwing] : column.jobs,
+          filter,
+          today,
+        ),
+      ),
+    [board?.columns, filter, today],
+  )
+  // The card as the board has it now, or nothing once it is gone.
+  const currentCard = (jobId: Card['_id']) => {
+    for (const column of board?.columns ?? []) {
+      const found =
+        column.jobs.find((job) => job._id === jobId) ??
+        column.olderOwing.find((job) => job._id === jobId)
+      if (found) return found
+    }
+    return undefined
   }
-  const closeRuleOffer = () => {
-    setRuleFor(null)
-    afterRuleOffer.current?.()
-    afterRuleOffer.current = null
-  }
-  const moveTo = (card: Card, target: Target) => {
-    if (target !== 'cancelled' && target._id === card.stageId) return
-    const toCancelled = target === 'cancelled' || target.group === 'cancelled'
+  const moveNow = (card: Card, target: Target) =>
+    void moveAndAnnounce(
+      card,
+      target,
+      board?.stages.find((stage) => stage._id === card.stageId),
+    )
+  // Steady for the memoized cards and columns; it reads the latest board.
+  const moveTo = useStableCallback((pressed: Card, target: Target) => {
+    // The card may have moved since it was pressed or its menu was drawn.
+    const card = currentCard(pressed._id)
+    const plan = planMove(card, target)
+    if (!card || plan === 'skip') return
     // Cancelled jobs stop counting as owed, so ask before a job goes there.
-    if (toCancelled && card.stageGroup !== 'cancelled') {
-      setAsking({ card, target })
+    if (plan === 'ask') {
+      setAsking({ jobId: card._id, title: card.title, target })
       setAskOpen(true)
       return
     }
     moveNow(card, target)
-  }
-  const { drag, press, wasDragged } = useCardDrag((card, key) => {
-    const [kind, id] = key.split(':')
-    if (kind === 'zone') {
-      const stage = board?.stages.find((item) => item._id === id)
-      if (stage) moveTo(card, stage)
-      return
-    }
-    const target = columnTarget(id as StageGroup, stagesOf(id as StageGroup))
-    if (target && id !== card.stageGroup) moveTo(card, target)
   })
+  // The answer: the job may have moved while the question was open, so it
+  // is looked up again and only moved if it still needs to go there.
+  const confirmAsked = () => {
+    setAskOpen(false)
+    if (!asking) return
+    const card = currentCard(asking.jobId)
+    if (card && planMove(card, asking.target) === 'ask') {
+      moveNow(card, asking.target)
+    }
+  }
+  const { drag, floatRef, press, wasDragged } = useCardDrag<Card>(
+    (card, key) => {
+      const [kind, id] = key.split(':')
+      if (kind === 'zone') {
+        const stage = board?.stages.find((item) => item._id === id)
+        if (stage) moveTo(card, stage)
+        return
+      }
+      const target = columnTarget(
+        id as StageGroup,
+        stagesByGroup[id as StageGroup],
+      )
+      if (target && id !== card.stageGroup) moveTo(card, target)
+    },
+  )
 
   if (!board) return <BoardSkeleton />
 
@@ -148,24 +200,22 @@ export function JobsBoard({
   return (
     <>
       <div className="grid min-h-[60dvh] grid-cols-4 items-start gap-3 px-4">
-        {board.columns.map((column) => (
+        {board.columns.map((column, index) => (
           <Column
             key={column.group}
             column={column}
-            cards={filterJobs(
-              // The owing filter finds every Done job that owes, not only the latest.
-              filter.owing
-                ? [...column.jobs, ...column.olderOwing]
-                : column.jobs,
-              filter,
-              today,
-            )}
+            cards={shown?.[index] ?? []}
             filter={filter}
             filtering={filtering}
-            stages={stagesOf(column.group)}
+            stages={stagesByGroup[column.group]}
             allStages={board.stages}
             canMove={canMove}
-            drag={drag}
+            dragging={drag?.item ?? null}
+            over={overIn(
+              drag?.over ?? null,
+              column.group,
+              stagesByGroup[column.group],
+            )}
             today={today}
             onPress={press}
             wasDragged={wasDragged}
@@ -176,24 +226,27 @@ export function JobsBoard({
       {/* The card under the pointer while it is dragged. */}
       {drag && (
         <div
+          ref={floatRef}
           aria-hidden
-          className="pointer-events-none fixed z-50 animate-lift overflow-hidden surface shadow-xl ring-2 ring-primary/40"
+          className="pointer-events-none fixed top-0 left-0 z-50 will-change-transform"
           style={{
-            left: drag.x - drag.offsetX,
-            top: drag.y - drag.offsetY,
+            transform: `translate3d(${drag.left}px, ${drag.top}px, 0)`,
             width: drag.width,
           }}
         >
-          <CardFace card={drag.card} today={today} />
+          {/* The lift animation owns its own transform, so it sits inside. */}
+          <div className="animate-lift overflow-hidden surface shadow-xl ring-2 ring-primary/40">
+            <CardFace card={drag.item} today={today} />
+          </div>
         </div>
       )}
-      <RuleReminderSheet job={ruleFor} onClose={closeRuleOffer} />
+      <RuleReminderSheet job={ruleOffer} onClose={closeRuleOffer} />
       <AlertDialog open={askOpen} onOpenChange={setAskOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {m.stage_cancel_question({
-                title: asking?.card.title ?? '',
+                title: asking?.title ?? '',
                 stage:
                   asking?.target === 'cancelled'
                     ? GROUP_LABEL.cancelled()
@@ -204,13 +257,7 @@ export function JobsBoard({
           <AlertDialogFooter>
             {/* First in the page order, so focus lands on it, as in ConfirmAction. */}
             <AlertDialogCancel>{m.back()}</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                if (asking) moveNow(asking.card, asking.target)
-                setAskOpen(false)
-              }}
-            >
+            <AlertDialogAction variant="destructive" onClick={confirmAsked}>
               {m.stage_cancel_confirm()}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -228,141 +275,18 @@ function columnTarget(group: StageGroup, stages: Stage[]): Target | null {
   return stages.at(0) ?? (group === 'cancelled' ? 'cancelled' : null)
 }
 
-type Drag = {
-  card: Card
-  /** The pointer, and where on the card it took hold. */
-  x: number
-  y: number
-  offsetX: number
-  offsetY: number
-  width: number
-  /** The drop target under the pointer: `column:<group>` or `zone:<stageId>`. */
-  over: string | null
-}
-
-// How far a mouse moves before a press becomes a drag, and how long a finger
-// holds still first, so a swipe still scrolls the page.
-const DRAG_DISTANCE = 5
-const TOUCH_HOLD_MS = 300
-const EDGE = 64
-
 /**
- * Dragging cards with pointer events, so it works the same with a mouse, a
- * pen or a finger, and in any browser. Drop targets are elements with a
- * `data-drop` key. Near the top or bottom of the window the page scrolls.
+ * The drop target under the pointer, if it is in this column: the column
+ * itself or one of its stages. Other columns get null, so a drag moving
+ * between targets renders only the columns it leaves and enters.
  */
-function useCardDrag(onDrop: (card: Card, key: string) => void) {
-  const [drag, setDrag] = useState<Drag | null>(null)
-  const dropRef = useRef(onDrop)
-  dropRef.current = onDrop
-  const dragged = useRef(false)
-  const cleanupRef = useRef<() => void>(undefined)
-  useEffect(() => () => cleanupRef.current?.(), [])
-
-  const press = (event: React.PointerEvent<HTMLElement>, card: Card) => {
-    if (event.button !== 0) return
-    if ((event.target as HTMLElement).closest('[data-no-drag]')) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    const { pointerId } = event
-    const start = { x: event.clientX, y: event.clientY }
-    const touch = event.pointerType === 'touch'
-    let pointer = start
-    let held = !touch
-    let active = false
-    let current: Drag | null = null
-    let frame = 0
-
-    const update = () => {
-      const target = document
-        .elementFromPoint(pointer.x, pointer.y)
-        ?.closest<HTMLElement>('[data-drop]')
-      current = {
-        card,
-        x: pointer.x,
-        y: pointer.y,
-        offsetX: start.x - rect.left,
-        offsetY: start.y - rect.top,
-        width: rect.width,
-        over: target?.dataset.drop ?? null,
-      }
-      setDrag(current)
-    }
-    const scroll = () => {
-      const step =
-        pointer.y < EDGE ? -12 : pointer.y > window.innerHeight - EDGE ? 12 : 0
-      if (step) {
-        window.scrollBy(0, step)
-        update()
-      }
-      frame = requestAnimationFrame(scroll)
-    }
-    const begin = () => {
-      active = true
-      document.body.style.userSelect = 'none'
-      // The whole page shows the grabbing hand while a card is held.
-      document.documentElement.classList.add('dragging-card')
-      update()
-      frame = requestAnimationFrame(scroll)
-    }
-    const hold = touch
-      ? window.setTimeout(() => {
-          held = true
-          begin()
-        }, TOUCH_HOLD_MS)
-      : 0
-
-    const onMove = (moved: PointerEvent) => {
-      if (moved.pointerId !== pointerId) return
-      pointer = { x: moved.clientX, y: moved.clientY }
-      const distance = Math.hypot(pointer.x - start.x, pointer.y - start.y)
-      if (!active) {
-        // A finger that moves before the hold is scrolling, not dragging.
-        if (!held) {
-          if (distance > DRAG_DISTANCE * 2) end()
-        } else if (distance > DRAG_DISTANCE) begin()
-        return
-      }
-      update()
-    }
-    const onUp = (released: PointerEvent) => {
-      if (released.pointerId !== pointerId) return
-      if (active) {
-        // The click that follows a drag must not open the job.
-        dragged.current = true
-        window.setTimeout(() => (dragged.current = false))
-        if (current?.over) dropRef.current(card, current.over)
-      }
-      end()
-    }
-    const onKey = (key: KeyboardEvent) => key.key === 'Escape' && end()
-    // While dragging, a finger moves the card instead of the page.
-    const onTouchMove = (moved: TouchEvent) => active && moved.preventDefault()
-    const end = () => {
-      window.clearTimeout(hold)
-      cancelAnimationFrame(frame)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', end)
-      window.removeEventListener('keydown', onKey)
-      document.removeEventListener('touchmove', onTouchMove)
-      document.body.style.userSelect = ''
-      document.documentElement.classList.remove('dragging-card')
-      active = false
-      cleanupRef.current = undefined
-      setDrag(null)
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', end)
-    window.addEventListener('keydown', onKey)
-    document.addEventListener('touchmove', onTouchMove, { passive: false })
-    cleanupRef.current = end
-  }
-
-  return { drag, press, wasDragged: () => dragged.current }
+function overIn(over: string | null, group: StageGroup, stages: Stage[]) {
+  if (over === null) return null
+  if (over === `column:${group}`) return over
+  return stages.some((stage) => over === `zone:${stage._id}`) ? over : null
 }
 
-function Column({
+const Column = memo(function Column({
   column,
   cards,
   filter,
@@ -370,7 +294,8 @@ function Column({
   stages,
   allStages,
   canMove,
-  drag,
+  dragging,
+  over: overKey,
   today,
   onPress,
   wasDragged,
@@ -383,7 +308,9 @@ function Column({
   stages: Stage[]
   allStages: Stage[]
   canMove: boolean
-  drag: Drag | null
+  /** The card being dragged, and the drop target under it if it is here. */
+  dragging: Card | null
+  over: string | null
   today: string
   onPress: (event: React.PointerEvent<HTMLElement>, card: Card) => void
   wasDragged: () => boolean
@@ -391,7 +318,6 @@ function Column({
 }) {
   const { words } = useViewer().business
   const { group } = column
-  const dragging = drag?.card ?? null
   // In its own column a card can only move to another of the column's stages.
   const accepts =
     dragging !== null &&
@@ -401,8 +327,10 @@ function Column({
     dragging !== null &&
     stages.length > 1 &&
     stages.some((stage) => stage._id !== dragging.stageId)
-  const over = drag?.over === `column:${group}`
+  const over = overKey === `column:${group}`
   const hidden = column.total - column.jobs.length
+  // Done and Cancelled are counted up to a cap: "100+".
+  const total = column.totalCapped ? `${column.total}+` : column.total
   // The header counts what is shown: with a filter on, the cards that pass it.
   const owed = filtering ? owedCents(cards) : column.owedCents
 
@@ -426,7 +354,7 @@ function Column({
             {GROUP_LABEL[group]()}
           </h2>
           <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
-            {filtering ? `${cards.length}/${column.total}` : column.total}
+            {filtering ? `${cards.length}/${total}` : total}
           </span>
           {group === 'new' && (
             <Tip label={m.new_job_label({ job: words.job.singular })}>
@@ -460,9 +388,9 @@ function Column({
               canMove={canMove}
               today={today}
               dragged={dragging?._id === card._id}
-              onPress={(event) => onPress(event, card)}
+              onPress={onPress}
               wasDragged={wasDragged}
-              onMove={(target) => onMove(card, target)}
+              onMove={onMove}
             />
           ))}
         </ul>
@@ -496,7 +424,7 @@ function Column({
                       <DropTarget
                         key={stage._id}
                         drop={`zone:${stage._id}`}
-                        over={drag?.over === `zone:${stage._id}`}
+                        over={overKey === `zone:${stage._id}`}
                       >
                         {m.board_drop_stage({ stage: stage.name })}
                       </DropTarget>
@@ -513,7 +441,7 @@ function Column({
         <p className="flex items-center justify-between gap-2 px-2 py-1 text-xs text-muted-foreground">
           {m.board_closed_shown({
             count: column.jobs.length,
-            total: column.total,
+            total,
           })}
           <Link
             to="/jobs"
@@ -530,7 +458,7 @@ function Column({
       )}
     </section>
   )
-}
+})
 
 /** A dashed place to drop a dragged card, lit while the card is over it. */
 function DropTarget({
@@ -556,7 +484,7 @@ function DropTarget({
 }
 
 /** One job on the board: the card face, a link to the job, and a move menu. */
-function BoardCard({
+const BoardCard = memo(function BoardCard({
   card,
   stages,
   canMove,
@@ -571,14 +499,14 @@ function BoardCard({
   canMove: boolean
   today: string
   dragged: boolean
-  onPress: (event: React.PointerEvent<HTMLElement>) => void
+  onPress: (event: React.PointerEvent<HTMLElement>, card: Card) => void
   wasDragged: () => boolean
-  onMove: (target: Target) => void
+  onMove: (card: Card, target: Target) => void
 }) {
   const late = isJobLate(card, today)
   return (
     <li
-      onPointerDown={canMove ? onPress : undefined}
+      onPointerDown={canMove ? (event) => onPress(event, card) : undefined}
       inert={dragged}
       className={cn(
         'group/card relative overflow-hidden surface transition-[opacity,box-shadow] duration-150 row-lazy hover:shadow-md',
@@ -599,10 +527,16 @@ function BoardCard({
       >
         <CardFace card={card} today={today} />
       </Link>
-      {canMove && <MoveMenu card={card} stages={stages} onMove={onMove} />}
+      {canMove && (
+        <MoveMenu
+          card={card}
+          stages={stages}
+          onMove={(target) => onMove(card, target)}
+        />
+      )}
     </li>
   )
-}
+})
 
 /**
  * What a card shows: the title with its stage joined to the top-right corner

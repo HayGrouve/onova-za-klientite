@@ -19,7 +19,7 @@ import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { cn } from 'cn'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
@@ -84,6 +84,7 @@ import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { telHref } from '../../../shared/phone-format'
 import { hasRole } from '../../../shared/roles'
 import { isJobLate } from '../../../shared/stages'
+import type { MorePart } from '../../../shared/more-summary'
 
 export const Route = createFileRoute('/_app/jobs/$jobId')({
   staticData: { layout: 'wide' },
@@ -133,19 +134,11 @@ function JobPage() {
   })
   usePageTitle(data?.job.title)
   const services = useQuery(api.services.list, { businessId: business._id })
-  const { move, announce } = useMoveJob()
+  const { moveAndAnnounce, ruleOffer, closeRuleOffer } = useMoveJob()
   const applyCredit = useMutation(api.payments.useCredit)
   const removeWriteOff = useMutation(api.jobs.removeWriteOff)
   // The edit, lines, appointment and cost forms ask before dropping what was typed.
   const sheet = useDetailSheet<OpenSheet>()
-  // The reminder rule's offer after reaching Done (Q5), and the stage toast
-  // that waits while it is open (see moveTo).
-  const [ruleOffer, setRuleOffer] = useState<{
-    _id: Id<'jobs'>
-    title: string
-    itemId?: Id<'items'>
-  } | null>(null)
-  const afterRuleOffer = useRef<(() => void) | null>(null)
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const [usingCredit, setUsingCredit] = useState(false)
   const [undoingWriteOff, setUndoingWriteOff] = useState(false)
@@ -172,51 +165,42 @@ function JobPage() {
   const canRefund = job.paidCents > 0
   const canWriteOff = jobOwedCents(job) > 0 && job.paidCents < job.priceCents
   // The folded parts, by name, with how many each holds.
-  const counted = (title: string, count: number) =>
-    count > 0 ? `${title}: ${count}` : title
-  const moreSummary = [
+  const moreSummary: MorePart[] = [
     ...(modules.appointments
-      ? [counted(words.appointment.plural, data.appointments.length)]
+      ? [{ name: words.appointment.plural, count: data.appointments.length }]
       : []),
-    counted(m.job_lines(), job.lines.length),
-    ...(modules.costs ? [counted(m.job_costs(), data.costs.length)] : []),
+    { name: m.job_lines(), count: job.lines.length },
+    ...(modules.costs
+      ? [{ name: m.job_costs(), count: data.costs.length }]
+      : []),
     ...(modules.items && client && !client.isNoClient
-      ? [counted(words.item.plural, data.items.length)]
+      ? [{ name: words.item.plural, count: data.items.length }]
       : []),
-    m.repeat_title(),
+    { name: m.repeat_title() },
     ...(modules.reminders && client && !client.isNoClient
-      ? [counted(m.reminder_list(), data.reminders.length)]
+      ? [{ name: m.reminder_list(), count: data.reminders.length }]
       : []),
-    m.job_files(),
-    counted(m.job_history(), data.timeline.length),
+    { name: m.job_files() },
+    { name: m.job_history(), count: data.timeline.length },
   ]
 
   const moveTo = async (stageId: Id<'stages'>) => {
     const target = data.stages.find((stage) => stage._id === stageId)
     const previous = data.stages.find((stage) => stage._id === job.stageId)
     if (!target) return
-    const moving = {
-      _id: job._id,
-      stageGroup: job.stageGroup,
-      isNoClient: client?.isNoClient ?? false,
-      balanceCents: job.balanceCents,
-    }
-    const { moved, offerRule } = await move(moving, target)
-    if (!moved) return
-    const say = () =>
-      announce(moving, target, previous, () => sheet.open({ kind: 'payment' }))
-    // Q5: reaching Done offers the reminder rule's reminder, pre-filled. Its
-    // sheet covers the page, so the toast comes once the sheet is closed.
-    if (offerRule) {
-      afterRuleOffer.current = say
-      setRuleOffer({
+    await moveAndAnnounce(
+      {
         _id: job._id,
         title: job.title,
+        stageGroup: job.stageGroup,
+        isNoClient: client?.isNoClient ?? false,
+        balanceCents: job.balanceCents,
         itemId: job.itemIds.at(0),
-      })
-    } else {
-      say()
-    }
+      },
+      target,
+      previous,
+      () => sheet.open({ kind: 'payment' }),
+    )
   }
   const spendCredit = async () => {
     setUsingCredit(true)
@@ -234,11 +218,6 @@ function JobPage() {
       removeWriteOff({ businessId: business._id, jobId: job._id }),
     )
     setUndoingWriteOff(false)
-  }
-  const closeRuleOffer = () => {
-    setRuleOffer(null)
-    afterRuleOffer.current?.()
-    afterRuleOffer.current = null
   }
   const editButton = (
     onClick: () => void,
@@ -392,9 +371,12 @@ function JobPage() {
                 icon={WalletIcon}
                 footer={
                   <>
+                    {/* Solid only while something is owed; "Next" stays the one
+                        main action otherwise. A wide screen doesn't stretch it. */}
                     <Button
                       size="xl"
-                      className="flex-1"
+                      variant={jobOwedCents(job) > 0 ? 'default' : 'secondary'}
+                      className="flex-1 lg:max-w-60"
                       onClick={() => sheet.open({ kind: 'payment' })}
                     >
                       <PlusIcon data-icon="inline-start" />
@@ -787,7 +769,7 @@ function JobPage() {
         title={
           sheet.panel
             ? {
-                edit: job.title,
+                edit: m.job_edit_title(),
                 lines: m.job_lines(),
                 appointment: words.appointment.singular,
                 items: words.item.plural,

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { cn } from 'cn'
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { m } from '#/paraglide/messages.js'
@@ -21,21 +22,28 @@ export function useReview(snapshot: string) {
 }
 
 /**
- * The submit button of a form that records money. Before the review it is the
- * plain button; the form's submit handler calls `review.start()` once it is
- * valid. Then it shows what will be recorded and asks once more, in place.
+ * The submit button of a form that records money. Before the review it reads
+ * as a step ("Review"); the form's submit handler calls `review.start()` once
+ * it is valid. Then the same button, in the same place, becomes the commit
+ * with what it records ("Record 100 €"), and the box above it opens to show
+ * the details, so the page changes as little as it can.
  */
 export function ReviewSubmit({
   review,
   label,
+  confirmLabel,
   summary,
   busy,
   onConfirm,
   tone = 'default',
   disabled = false,
+  aside,
 }: {
   review: ReturnType<typeof useReview>
+  /** The first step's button: it reviews, it doesn't record. */
   label: React.ReactNode
+  /** The commit, with the amount: "Record 100 €". */
+  confirmLabel: React.ReactNode
   /** What will be recorded, as the lines of the highlighted box. */
   summary: React.ReactNode
   busy: boolean
@@ -43,15 +51,18 @@ export function ReviewSubmit({
   /** Red for money that leaves, like a refund. */
   tone?: 'default' | 'destructive'
   disabled?: boolean
+  /** Next to the first button before the review, like a Cancel. "Back" takes its place after. */
+  aside?: React.ReactNode
 }) {
   const summaryId = useId()
   const back = useRef<HTMLButtonElement>(null)
   const [armed, setArmed] = useState(false)
-  // Focus lands on "Back", so a second Enter can't record twice. A bottom
-  // sheet keeps its last button where the submit button was, so a double tap
-  // would land on the confirm: it is enabled only after a short moment.
+  const { reviewing } = review
+  // Focus lands on "Back", so a second Enter can't record twice. The confirm
+  // sits where the first button was, so a double tap would land on it: it is
+  // enabled only after a short moment.
   useEffect(() => {
-    if (!review.reviewing) return
+    if (!reviewing) return
     back.current?.focus()
     const timer = window.setTimeout(() => setArmed(true), ARM_MS)
     // Disarmed on the way out, so the next review starts disabled too.
@@ -59,55 +70,55 @@ export function ReviewSubmit({
       window.clearTimeout(timer)
       setArmed(false)
     }
-  }, [review.reviewing])
+  }, [reviewing])
 
-  if (!review.reviewing) {
-    return (
-      <Button
-        type="submit"
-        size="xl"
-        variant={tone}
-        disabled={disabled || busy}
-      >
-        {busy && <Spinner data-icon="inline-start" />}
-        {label}
-      </Button>
-    )
-  }
   return (
     <div
-      role="group"
-      aria-labelledby={summaryId}
-      className="flex flex-col gap-3"
+      role={reviewing ? 'group' : undefined}
+      aria-labelledby={reviewing ? summaryId : undefined}
+      className="flex flex-col"
     >
+      {/* Opens in place, so the sheet grows smoothly instead of jumping. */}
       <div
-        id={summaryId}
-        className="flex flex-col gap-1 rounded-xl bg-muted/60 p-3 text-sm"
+        className={cn(
+          'grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none',
+          reviewing ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+        )}
       >
-        {summary}
+        <div className="min-h-0 overflow-hidden" inert={!reviewing}>
+          <div
+            id={summaryId}
+            className="mb-3 flex flex-col gap-1 rounded-xl bg-muted/60 p-3 text-sm"
+          >
+            {summary}
+          </div>
+        </div>
       </div>
       <div className="flex gap-2">
         <Button
-          type="button"
+          type={reviewing ? 'button' : 'submit'}
           size="xl"
           variant={tone}
           className="flex-1"
-          disabled={busy || !armed}
-          onClick={onConfirm}
+          disabled={reviewing ? busy || !armed : disabled || busy}
+          onClick={reviewing ? onConfirm : undefined}
         >
           {busy && <Spinner data-icon="inline-start" />}
-          {label}
+          {reviewing ? confirmLabel : label}
         </Button>
-        <Button
-          ref={back}
-          type="button"
-          size="xl"
-          variant="outline"
-          disabled={busy}
-          onClick={review.back}
-        >
-          {m.back()}
-        </Button>
+        {!reviewing && aside}
+        {reviewing && (
+          <Button
+            ref={back}
+            type="button"
+            size="xl"
+            variant="outline"
+            disabled={busy}
+            onClick={review.back}
+          >
+            {m.back()}
+          </Button>
+        )}
       </div>
     </div>
   )

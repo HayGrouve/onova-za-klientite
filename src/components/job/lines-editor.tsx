@@ -16,7 +16,7 @@ import {
   moneyInputText,
   parseMoney,
 } from '../../../shared/money'
-import { formatQuantity } from '../../../shared/quantity'
+import { formatQuantity, parseQuantity } from '../../../shared/quantity'
 
 type Line = Doc<'jobs'>['lines'][number]
 type Row = {
@@ -35,11 +35,6 @@ function toRow(line: Line): Row {
     price: moneyInputText(line.unitPriceCents),
     serviceId: line.serviceId,
   }
-}
-
-function parseQuantity(text: string) {
-  const value = Number(text.replace(/\s/g, '').replace(',', '.'))
-  return Number.isFinite(value) && value > 0 ? value : null
 }
 
 /** What a row comes to, or a dash while its numbers aren't readable yet. */
@@ -237,7 +232,7 @@ export function LinesEditor({
                   aria-invalid={tried && problems[index].quantity}
                   aria-describedby={
                     tried && problems[index].quantity
-                      ? `line-error-${row.id}`
+                      ? `line-quantity-error-${row.id}`
                       : undefined
                   }
                   inputMode="decimal"
@@ -266,7 +261,7 @@ export function LinesEditor({
                   aria-invalid={tried && problems[index].price}
                   aria-describedby={
                     tried && problems[index].price
-                      ? `line-error-${row.id}`
+                      ? `line-price-error-${row.id}`
                       : undefined
                   }
                   inputMode="decimal"
@@ -285,14 +280,14 @@ export function LinesEditor({
                 </span>
               </div>
             </div>
-            {tried && (problems[index].quantity || problems[index].price) && (
-              <FieldError id={`line-error-${row.id}`}>
-                {problems[index].quantity && (
-                  <span className="block">{m.line_quantity_invalid()}</span>
-                )}
-                {problems[index].price && (
-                  <span className="block">{m.field_money_invalid()}</span>
-                )}
+            {tried && problems[index].quantity && (
+              <FieldError id={`line-quantity-error-${row.id}`}>
+                {m.line_quantity_invalid()}
+              </FieldError>
+            )}
+            {tried && problems[index].price && (
+              <FieldError id={`line-price-error-${row.id}`}>
+                {m.field_money_invalid()}
               </FieldError>
             )}
           </div>

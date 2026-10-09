@@ -115,6 +115,7 @@ function PaymentSheetBody({
           <PaymentEditForm
             businessId={businessId}
             payment={payment}
+            today={today}
             onDone={onClose}
             onCancel={() => setMode('view')}
           />
@@ -151,24 +152,33 @@ function PaymentSheetBody({
               <Split payment={payment} />
             </section>
             {hasRole(business.role, 'manager') && (
-              <div className="flex gap-2">
-                <Button
-                  size="xl"
-                  className="flex-1"
-                  onClick={() => setMode('edit')}
-                >
-                  {m.edit()}
-                </Button>
-                <Button
-                  size="xl"
-                  variant="destructive"
-                  onClick={() => {
-                    setKept(payment)
-                    setMode('remove')
-                  }}
-                >
-                  {refund ? m.refund_remove() : m.pay_remove()}
-                </Button>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <Button
+                    size="xl"
+                    className="flex-1"
+                    onClick={() => setMode('edit')}
+                  >
+                    {m.edit()}
+                  </Button>
+                  {payment.removable && (
+                    <Button
+                      size="xl"
+                      variant="destructive"
+                      onClick={() => {
+                        setKept(payment)
+                        setMode('remove')
+                      }}
+                    >
+                      {refund ? m.refund_remove() : m.pay_remove()}
+                    </Button>
+                  )}
+                </div>
+                {!payment.removable && (
+                  <p className="text-sm text-muted-foreground">
+                    {m.pay_remove_blocked()}
+                  </p>
+                )}
               </div>
             )}
           </div>

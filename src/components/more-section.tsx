@@ -7,6 +7,8 @@ import {
   CollapsibleTrigger,
 } from '#/components/ui/collapsible'
 import { m } from '#/paraglide/messages.js'
+import { summarizeMore } from '../../shared/more-summary'
+import type { MorePart } from '../../shared/more-summary'
 
 const KEY = 'more-open:'
 
@@ -16,6 +18,15 @@ function readOpen(page: string) {
   } catch {
     return false
   }
+}
+
+/** The closed card's line: "Lines: 2 · History: 5 · Repeat and 4 more". */
+function text(parts: MorePart[]) {
+  const { shown, hidden } = summarizeMore(parts)
+  const named = shown
+    .map((part) => (part.count ? `${part.name}: ${part.count}` : part.name))
+    .join(' · ')
+  return hidden > 0 ? `${named} · ${m.more_rest({ count: hidden })}` : named
 }
 
 /**
@@ -32,7 +43,7 @@ export function MoreSection({
   /** Which kind of page, so a job and a client remember apart. */
   page: 'job' | 'client' | 'item'
   /** The parts inside, by name, shown on the card while it is closed. */
-  summary: string[]
+  summary: MorePart[]
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(() => readOpen(page))
@@ -58,15 +69,16 @@ export function MoreSection({
           className="size-5 shrink-0 text-muted-foreground"
         />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="font-semibold">
-            {open ? m.more_hide() : m.more_show()}
-          </span>
+          <span className="font-semibold">{m.more_show()}</span>
           {!open && summary.length > 0 && (
-            <span className="line-clamp-2 text-sm text-muted-foreground">
-              {summary.join(' · ')}
+            <span className="text-sm text-balance break-words text-muted-foreground">
+              {text(summary)}
             </span>
           )}
         </span>
+        {open && (
+          <span className="text-sm text-muted-foreground">{m.more_hide()}</span>
+        )}
         <CaretDownIcon
           aria-hidden
           className={cn(

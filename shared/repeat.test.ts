@@ -6,6 +6,7 @@ import {
   nextJobDate,
   nextRepeatDate,
   pickJobDate,
+  repeatAnchorDay,
 } from './repeat'
 
 const at = (date: string, hour = 9, minute = 0) =>
@@ -74,6 +75,103 @@ describe('nextRepeatDate', () => {
             .toISOString()
             .slice(0, 10)
           expect(nextRepeatDate(date, choice) > date).toBe(true)
+        },
+      ),
+    )
+  })
+})
+
+describe('a monthly series keeps its day of the month', () => {
+  /** The dates of a series, each next one made from the one before it, as the server does. */
+  function series(first: string, every: number, count: number) {
+    const dates = [first]
+    let anchorDay: number | undefined
+    for (let step = 0; step < count; step += 1) {
+      const repeat = { every, unit: 'month' as const, anchorDay }
+      const date = dates[dates.length - 1]
+      dates.push(nextRepeatDate(date, repeat))
+      anchorDay = repeatAnchorDay(date, repeat)
+    }
+    return dates
+  }
+
+  it('31 January goes back to the 31st after a short month', () => {
+    expect(series('2026-01-31', 1, 13)).toEqual([
+      '2026-01-31',
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+      '2026-05-31',
+      '2026-06-30',
+      '2026-07-31',
+      '2026-08-31',
+      '2026-09-30',
+      '2026-10-31',
+      '2026-11-30',
+      '2026-12-31',
+      '2027-01-31',
+      '2027-02-28',
+    ])
+  })
+
+  it('a leap year gets its 29th, then the 31st again', () => {
+    expect(series('2028-01-31', 1, 3)).toEqual([
+      '2028-01-31',
+      '2028-02-29',
+      '2028-03-31',
+      '2028-04-30',
+    ])
+  })
+
+  it('every three months and every year keep the day too', () => {
+    expect(series('2026-01-31', 3, 4)).toEqual([
+      '2026-01-31',
+      '2026-04-30',
+      '2026-07-31',
+      '2026-10-31',
+      '2027-01-31',
+    ])
+    expect(series('2028-02-29', 12, 4)).toEqual([
+      '2028-02-29',
+      '2029-02-28',
+      '2030-02-28',
+      '2031-02-28',
+      // The next leap day is the 29th again.
+      '2032-02-29',
+    ])
+  })
+
+  it('a job that was moved to another day starts a new day, not the old one', () => {
+    const moved = { every: 1, unit: 'month' as const, anchorDay: 31 }
+    // The series was on the 31st, but this job now sits on the 15th.
+    expect(nextRepeatDate('2026-03-15', moved)).toBe('2026-04-15')
+    expect(repeatAnchorDay('2026-03-15', moved)).toBe(15)
+    // On the clamped day of a short month it is still on the series.
+    expect(nextRepeatDate('2026-02-28', moved)).toBe('2026-03-31')
+    expect(repeatAnchorDay('2026-02-28', moved)).toBe(31)
+  })
+
+  it('weeks have no day of the month to keep', () => {
+    expect(repeatAnchorDay('2026-01-31', { every: 1, unit: 'week' })).toBe(
+      undefined,
+    )
+    expect(
+      nextRepeatDate('2026-02-28', { every: 1, unit: 'week', anchorDay: 31 }),
+    ).toBe('2026-03-07')
+  })
+
+  it('never goes backwards, for any start and anchor', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 20_000 }),
+        fc.integer({ min: 1, max: 31 }),
+        fc.integer({ min: 1, max: 52 }),
+        (days, anchorDay, every) => {
+          const date = new Date(Date.UTC(2000, 0, 1) + days * 86_400_000)
+            .toISOString()
+            .slice(0, 10)
+          const repeat = { every, unit: 'month' as const, anchorDay }
+          expect(nextRepeatDate(date, repeat) > date).toBe(true)
         },
       ),
     )

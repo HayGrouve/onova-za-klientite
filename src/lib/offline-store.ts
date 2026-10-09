@@ -9,8 +9,13 @@ export type SavedSnapshot = { savedAt: number; data: Snapshot }
 const LAST_USER = 'offline:lastUser'
 const key = (userId: string) => `offline:snapshot:${userId}`
 
-/** Keeps the latest snapshot per signed-in user (ADR 0010). */
+/**
+ * Keeps the latest snapshot per signed-in user (ADR 0010). When a different
+ * user signs in on this phone, the previous user's copy goes first.
+ */
 export async function saveSnapshot(userId: string, data: Snapshot) {
+  const last = await get<string>(LAST_USER)
+  if (last !== undefined && last !== userId) await clear()
   await set(key(userId), { savedAt: Date.now(), data } satisfies SavedSnapshot)
   await set(LAST_USER, userId)
 }

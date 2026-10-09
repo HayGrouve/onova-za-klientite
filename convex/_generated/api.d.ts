@@ -25,6 +25,7 @@ import type * as lib_activity from "../lib/activity.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_businessTables from "../lib/businessTables.js";
 import type * as lib_clientWrite from "../lib/clientWrite.js";
+import type * as lib_clock from "../lib/clock.js";
 import type * as lib_createBusiness from "../lib/createBusiness.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_extra from "../lib/extra.js";
@@ -34,12 +35,14 @@ import type * as lib_ledger from "../lib/ledger.js";
 import type * as lib_listFields from "../lib/listFields.js";
 import type * as lib_moveJob from "../lib/moveJob.js";
 import type * as lib_pushText from "../lib/pushText.js";
+import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_recompute from "../lib/recompute.js";
 import type * as lib_repeat from "../lib/repeat.js";
 import type * as lib_scope from "../lib/scope.js";
 import type * as lib_search from "../lib/search.js";
 import type * as lib_seedAccess from "../lib/seedAccess.js";
 import type * as lib_summary from "../lib/summary.js";
+import type * as lib_todayData from "../lib/todayData.js";
 import type * as lib_validate from "../lib/validate.js";
 import type * as lib_views from "../lib/views.js";
 import type * as money from "../money.js";
@@ -85,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/businessTables": typeof lib_businessTables;
   "lib/clientWrite": typeof lib_clientWrite;
+  "lib/clock": typeof lib_clock;
   "lib/createBusiness": typeof lib_createBusiness;
   "lib/errors": typeof lib_errors;
   "lib/extra": typeof lib_extra;
@@ -94,12 +98,14 @@ declare const fullApi: ApiFromModules<{
   "lib/listFields": typeof lib_listFields;
   "lib/moveJob": typeof lib_moveJob;
   "lib/pushText": typeof lib_pushText;
+  "lib/rateLimit": typeof lib_rateLimit;
   "lib/recompute": typeof lib_recompute;
   "lib/repeat": typeof lib_repeat;
   "lib/scope": typeof lib_scope;
   "lib/search": typeof lib_search;
   "lib/seedAccess": typeof lib_seedAccess;
   "lib/summary": typeof lib_summary;
+  "lib/todayData": typeof lib_todayData;
   "lib/validate": typeof lib_validate;
   "lib/views": typeof lib_views;
   money: typeof money;
@@ -150,4 +156,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   pushPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"pushPool">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
 };

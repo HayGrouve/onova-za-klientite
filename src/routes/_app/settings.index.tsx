@@ -2,10 +2,7 @@ import { CaretRightIcon, PlusCircleIcon } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import {
-  settingsSections,
-  useAddBusiness,
-} from '#/components/settings/sections'
+import { settingsGroups, useAddBusiness } from '#/components/settings/sections'
 import type { SettingsSection } from '#/components/settings/sections'
 import { Spinner } from '#/components/ui/spinner'
 import { ListCard } from '#/components/list-section'
@@ -67,12 +64,21 @@ function SettingsIndex() {
           {m.settings_owner_only()}
         </p>
       )}
-      <ListCard>
-        {settingsSections().map((section) => (
-          <Row key={String(section.to)} {...section} />
+      <div className="flex flex-col gap-5">
+        {settingsGroups().map((group, index, groups) => (
+          <section key={group.title} className="flex flex-col gap-1.5">
+            <h2 className="px-4 text-sm font-semibold text-muted-foreground">
+              {group.title}
+            </h2>
+            <ListCard>
+              {group.sections.map((section) => (
+                <Row key={String(section.to)} {...section} />
+              ))}
+              {index === groups.length - 1 && <AddBusinessRow />}
+            </ListCard>
+          </section>
         ))}
-        <AddBusinessRow />
-      </ListCard>
+      </div>
     </>
   )
 }

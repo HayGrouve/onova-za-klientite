@@ -168,3 +168,101 @@ describe('today.list leaves finished and cancelled jobs out of the schedule', ()
     expect(result.upcoming).toEqual([])
   })
 })
+
+describe('today.list takes the time from the device', () => {
+  it('shows a visit under its job until 12 hours after it, by the `now` it is given', async () => {
+    const { owner, businessId, job, visit } = await shop()
+    const id = await job('Монтаж')
+    // 08:00 Sofia on the 8th (UTC+3), all day off.
+    await visit(id, TODAY, { hour: 8, minute: 0 })
+    const rowAt = async (now: number) => {
+      const data = await owner.query(api.today.list, {
+        businessId,
+        today: TODAY,
+        now,
+      })
+      return data.appointments[0].job?.nextAppointment
+    }
+    const start = Date.parse('2026-10-08T05:00:00Z')
+    expect(await rowAt(start + 11 * 3_600_000)).toBeDefined()
+    expect(await rowAt(start + 13 * 3_600_000)).toBeUndefined()
+  })
+})
+
+describe('the morning summary counts what Today lists', () => {
+  it('has the same appointment, overdue and reminder counts on a busy day', async () => {
+    const { t, owner, businessId, stage, job, visit, today } = await shop()
+    await t.run(async (ctx) => {
+      const business = (await ctx.db.get('businesses', businessId))!
+      await ctx.db.patch('businesses', businessId, {
+        modules: { ...business.modules, reminders: true },
+      })
+    })
+    // Visit today on an overdue job: shown under the visit, once.
+    const lateWithVisit = await job('Късен с посещение', '2026-10-02')
+    await visit(lateWithVisit, TODAY, { hour: 9, minute: 0 })
+    // Overdue without a visit.
+    await job('Късен', '2026-10-03')
+    await job('Друг късен', '2026-10-04')
+    // A Done job with a visit today: not on Today, so not in the summary.
+    const finished = await job('Готов', undefined, 10000)
+    await visit(finished, TODAY, { hour: 10, minute: 0 })
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId: finished,
+      stageId: stage('done'),
+    })
+    // A Cancelled job with a visit today, and a cancelled visit.
+    const dropped = await job('Отказан', '2026-10-01')
+    await visit(dropped, TODAY, { hour: 11, minute: 0 })
+    await owner.mutation(api.jobs.changeStage, {
+      businessId,
+      jobId: dropped,
+      stageId: stage('cancelled'),
+    })
+    const cancelledVisit = await visit(await job('Пореден'), TODAY, {
+      hour: 12,
+      minute: 0,
+    })
+    await owner.mutation(api.appointments.cancel, {
+      businessId,
+      appointmentId: cancelledVisit,
+    })
+    // A visit with no job at all, and two open reminders.
+    await t.run(async (ctx) => {
+      await ctx.db.insert('appointments', {
+        businessId,
+        start: new Date('2026-10-08T13:00:00Z').getTime(),
+        allDay: false,
+        assigneeIds: [],
+      })
+      for (const date of ['2026-10-08', '2026-10-01']) {
+        await ctx.db.insert('reminders', {
+          businessId,
+          date,
+          note: 'Обадете се',
+          source: 'manual',
+          status: 'open',
+        })
+      }
+    })
+
+    const shown = (await today()).data
+    const counts = await t.run(async (ctx) => {
+      const { summaryCounts } = await import('./lib/summary')
+      const business = (await ctx.db.get('businesses', businessId))!
+      const member = (await ctx.db.query('memberships').first())!
+      return await summaryCounts(ctx, business, member, TODAY, {
+        overdue: true,
+        reminders: true,
+      })
+    })
+    expect(counts).toEqual({
+      appointments: shown.appointments.length,
+      overdue: shown.overdue.length,
+      reminders: shown.reminders.length,
+    })
+    // And the numbers are the ones Today's own rules give.
+    expect(counts).toEqual({ appointments: 2, overdue: 2, reminders: 2 })
+  })
+})

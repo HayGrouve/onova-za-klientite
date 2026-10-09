@@ -46,6 +46,7 @@ import { TooltipProvider } from '#/components/ui/tooltip'
 import { runChange } from '#/lib/change'
 import { initials } from '#/lib/initials'
 import { wipeSnapshots } from '#/lib/offline-store'
+import { dropPushOnSignOut } from '#/lib/push'
 import { isShortcut, shortcutBlockedAt } from '#/lib/shortcuts'
 import { m } from '#/paraglide/messages.js'
 
@@ -410,6 +411,7 @@ export function BusinessSwitcher() {
 function AccountMenu({ wide = false }: { wide?: boolean }) {
   const { user } = useViewer()
   const { signOut } = useClerk()
+  const removePush = useMutation(api.push.unsubscribe)
   const avatar = (
     <Avatar className="ring-2 ring-background">
       {user.imageUrl && <AvatarImage src={user.imageUrl} alt="" />}
@@ -469,7 +471,11 @@ function AccountMenu({ wide = false }: { wide?: boolean }) {
         </DropdownMenuItem>
         <DropdownMenuItem
           className="min-h-11"
-          onClick={() => void wipeSnapshots().then(() => signOut())}
+          onClick={() =>
+            void dropPushOnSignOut((endpoint) => removePush({ endpoint }))
+              .then(() => wipeSnapshots())
+              .then(() => signOut())
+          }
         >
           <SignOutIcon />
           {m.account_sign_out()}

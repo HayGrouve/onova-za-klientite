@@ -5,10 +5,7 @@ import {
   createFileRoute,
   useLocation,
 } from '@tanstack/react-router'
-import {
-  settingsSections,
-  useAddBusiness,
-} from '#/components/settings/sections'
+import { settingsGroups, useAddBusiness } from '#/components/settings/sections'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { useWide } from '#/hooks/use-wide'
@@ -66,23 +63,30 @@ function SettingsMenu() {
           {m.settings_owner_only()}
         </p>
       )}
-      {settingsSections().map(({ to, icon: IconComponent, title }) => (
-        <Link
-          key={String(to)}
-          to={to}
-          className={`${item} data-[status=active]:bg-primary/10 data-[status=active]:font-medium data-[status=active]:text-primary`}
-        >
-          {({ isActive }) => (
-            <>
-              <IconComponent
-                aria-hidden
-                className="size-5 shrink-0"
-                weight={isActive ? 'fill' : 'regular'}
-              />
-              <span className="truncate">{title}</span>
-            </>
-          )}
-        </Link>
+      {settingsGroups().map((group) => (
+        <div key={group.title} className="flex flex-col gap-0.5 pb-2">
+          <p className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground">
+            {group.title}
+          </p>
+          {group.sections.map(({ to, icon: IconComponent, title }) => (
+            <Link
+              key={String(to)}
+              to={to}
+              className={`${item} data-[status=active]:bg-primary/10 data-[status=active]:font-medium data-[status=active]:text-primary`}
+            >
+              {({ isActive }) => (
+                <>
+                  <IconComponent
+                    aria-hidden
+                    className="size-5 shrink-0"
+                    weight={isActive ? 'fill' : 'regular'}
+                  />
+                  <span className="truncate">{title}</span>
+                </>
+              )}
+            </Link>
+          ))}
+        </div>
       ))}
       <div aria-hidden className="mx-3 my-1.5 h-px bg-border/70" />
       <button

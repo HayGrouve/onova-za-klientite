@@ -122,11 +122,17 @@ function ModulesSettings() {
       }
     >
       <Tabs value={view} onValueChange={(value) => setView(value as View)}>
-        <TabsList className="mb-3 h-9 w-full">
-          <TabsTrigger value="page" className="min-w-0 px-2">
+        <TabsList className="mb-3 w-full group-data-horizontal/tabs:h-11 lg:group-data-horizontal/tabs:h-9">
+          <TabsTrigger
+            value="page"
+            className="min-w-0 px-2 before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
+          >
             <span className="min-w-0 truncate">{words.job.singular}</span>
           </TabsTrigger>
-          <TabsTrigger value="form" className="min-w-0 px-2">
+          <TabsTrigger
+            value="form"
+            className="min-w-0 px-2 before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
+          >
             <span className="min-w-0 truncate">
               {m.new_job({ job: words.job.singular })}
             </span>

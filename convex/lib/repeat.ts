@@ -1,12 +1,17 @@
 import type { MutationCtx } from '../_generated/server'
 import type { Doc, Id } from '../_generated/dataModel'
 import { sofiaOffsetMinutes, sofiaTimeToUtc } from '../../shared/dates'
-import { nextRepeatDate, pickJobDate } from '../../shared/repeat'
+import {
+  nextRepeatDate,
+  pickJobDate,
+  repeatAnchorDay,
+} from '../../shared/repeat'
 import { defaultStage } from '../../shared/stages'
 import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
 import { fail } from './errors'
 import { insertJob } from './ledger'
+import { jobSearchText } from './search'
 
 /**
  * Sets how often a job repeats (Q6), every 1–52 weeks or months, and creates
@@ -64,6 +69,52 @@ function sofiaClock(ms: number) {
 }
 
 /**
+ * Who a series' next job is created as: the job's creator, else the
+ * business's owner when the creator has gone. Null when nobody is left.
+ */
+async function seriesActor(ctx: MutationCtx, job: Doc<'jobs'>) {
+  const creator = await ctx.db.get('memberships', job.createdBy)
+  const creatorUser = creator ? await ctx.db.get('users', creator.userId) : null
+  // A deactivated creator can no longer act: treat them like a missing one.
+  if (creator && creator.deactivatedAt === undefined && creatorUser) {
+    return { member: creator, user: creatorUser }
+  }
+  const members = await ctx.db
+    .query('memberships')
+    .withIndex('by_business_user', (q) => q.eq('businessId', job.businessId))
+    .collect()
+  for (const member of members) {
+    if (member.role !== 'owner' || member.deactivatedAt !== undefined) continue
+    const user = await ctx.db.get('users', member.userId)
+    if (user) return { member, user }
+  }
+  return null
+}
+
+/**
+ * The client a series carries on with: the job's own, or the survivor when it
+ * was merged into another (the chain is followed). Null when that client is
+ * anonymized or gone: a series does not go on for it.
+ */
+async function seriesClient(ctx: MutationCtx, job: Doc<'jobs'>) {
+  let client = await ctx.db.get('clients', job.clientId)
+  const seen = new Set<Id<'clients'>>()
+  while (client?.mergedIntoId !== undefined && !seen.has(client._id)) {
+    seen.add(client._id)
+    client = await ctx.db.get('clients', client.mergedIntoId)
+  }
+  if (
+    !client ||
+    client.mergedIntoId !== undefined ||
+    client.anonymizedAt !== undefined ||
+    client.businessId !== job.businessId
+  ) {
+    return null
+  }
+  return client
+}
+
+/**
  * Creates the next job of a series one interval after this one: same client,
  * title, items, lines or price, address and extra fields, in the first New
  * stage. Idempotent: a job that already has its next job is left alone.
@@ -76,9 +127,21 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     return null
   }
   const business = await ctx.db.get('businesses', job.businessId)
-  const member = await ctx.db.get('memberships', job.createdBy)
-  const user = member ? await ctx.db.get('users', member.userId) : null
-  if (!business || !member || !user) return null
+  const actor = business ? await seriesActor(ctx, job) : null
+  if (!business || !actor) {
+    // Nobody can create it: stop the run from trying again every day.
+    if (job.nextRepeatOn !== undefined)
+      await ctx.db.patch('jobs', job._id, { nextRepeatOn: undefined })
+    return null
+  }
+  const client = await seriesClient(ctx, job)
+  if (!client) {
+    // The client is anonymized (or gone): the series ends here.
+    if (job.nextRepeatOn !== undefined)
+      await ctx.db.patch('jobs', job._id, { nextRepeatOn: undefined })
+    return null
+  }
+  const { member, user } = actor
   const as: BusinessMutationCtx = { ...ctx, business, member, user }
 
   const when = await jobDate(ctx, job)
@@ -97,7 +160,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
   const now = Date.now()
   const nextId = await insertJob(ctx, {
     businessId: business._id,
-    clientId: job.clientId,
+    clientId: client._id,
     title: job.title,
     stageId: stage._id,
     stageGroup: stage.group,
@@ -110,12 +173,20 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     itemIds: job.itemIds,
     assigneeIds: job.assigneeIds,
     source: job.source,
-    repeat: { every: job.repeat.every, unit: job.repeat.unit },
+    repeat: {
+      every: job.repeat.every,
+      unit: job.repeat.unit,
+      anchorDay: repeatAnchorDay(when.date, job.repeat),
+    },
     nextRepeatOn: date,
     seriesId: job.seriesId ?? job._id,
     extra: job.extra,
-    searchText: job.searchText,
-    createdBy: job.createdBy,
+    // Re-keyed: after a merge the series carries on under the survivor.
+    searchText:
+      client._id === job.clientId
+        ? job.searchText
+        : await jobSearchText(ctx, { ...job, clientId: client._id }),
+    createdBy: member._id,
   })
   for (const itemId of job.itemIds) {
     await ctx.db.insert('jobItems', {
@@ -133,7 +204,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     await ctx.db.insert('appointments', {
       businessId: business._id,
       jobId: nextId,
-      clientId: job.clientId,
+      clientId: client._id,
       start,
       end:
         source.end === undefined
@@ -151,7 +222,7 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
   await logActivity(as, {
     type: 'job.created',
     jobId: nextId,
-    clientId: job.clientId,
+    clientId: client._id,
     data: { name: job.title },
   })
   await logActivity(as, {

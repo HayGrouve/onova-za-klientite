@@ -6,10 +6,12 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
+  getLiveClient,
   getOwned,
   requireRole,
 } from './lib/auth'
 import { fail } from './lib/errors'
+import { spend } from './lib/rateLimit'
 import { seesItem, seesJob } from './lib/scope'
 import { optionalText } from './lib/validate'
 
@@ -24,6 +26,8 @@ const IMAGE_TYPES = [
 const PDF_TYPE = 'application/pdf'
 const MAX_IMAGE_BYTES = 10 * MB
 const MAX_PDF_BYTES = 20 * MB
+/** What one business may keep in total. Past it, `save` fails with `storage.full`. */
+const STORAGE_CAP_BYTES = 1024 * MB
 
 /** Uploads no record points to are removed after this long (D14). */
 const ORPHAN_AGE_MS = 24 * 60 * 60 * 1000
@@ -49,7 +53,7 @@ async function resolveTarget(
     return { jobId: job._id, clientId: job.clientId }
   }
   if (target.kind === 'client') {
-    const client = await getOwned(ctx, 'clients', target.clientId)
+    const client = await getLiveClient(ctx, target.clientId)
     return { clientId: client._id }
   }
   if (target.kind === 'logo') return {}
@@ -62,6 +66,7 @@ export const generateUploadUrl = businessMutation({
   returns: v.string(),
   handler: async (ctx) => {
     requireRole(ctx.member, 'manager')
+    await spend(ctx, 'uploadUrl', ctx.member._id)
     return await ctx.storage.generateUploadUrl()
   },
 })
@@ -86,6 +91,13 @@ export const save = businessMutation({
     const links = await resolveTarget(ctx, args.target)
     const meta = await ctx.db.system.get('_storage', args.storageId)
     if (!meta) fail('notFound', { table: '_storage' })
+    // A blob a file already points to (this business's logo included) is
+    // someone's. Refused before anything can delete it.
+    const taken = await ctx.db
+      .query('files')
+      .withIndex('by_storage', (q) => q.eq('storageId', args.storageId))
+      .first()
+    if (taken) fail('invalid', { field: 'storageId' })
     const mimeType = (meta.contentType ?? '').toLowerCase()
     const isImage = IMAGE_TYPES.includes(mimeType)
     if (
@@ -98,6 +110,17 @@ export const save = businessMutation({
     if (meta.size > (isImage ? MAX_IMAGE_BYTES : MAX_PDF_BYTES)) {
       await ctx.storage.delete(args.storageId)
       return { rejected: 'size' as const }
+    }
+    // A new logo replaces the old one, so the old one's bytes are freed.
+    const old =
+      args.target.kind === 'logo' && ctx.business.logoFileId
+        ? await ctx.db.get('files', ctx.business.logoFileId)
+        : null
+    const freed = old?.size ?? 0
+    if (ctx.business.storageBytes - freed + meta.size > STORAGE_CAP_BYTES) {
+      // The blob stays until cleanupOrphans removes it: a delete here would
+      // be rolled back by the throw.
+      fail('storage.full')
     }
     const name = optionalText(args.name, 'name', 200)
     const fileId = await ctx.db.insert('files', {
@@ -113,15 +136,14 @@ export const save = businessMutation({
       visibleToClient: false,
       uploadedBy: ctx.member._id,
     })
-    let storageBytes = ctx.business.storageBytes + meta.size
+    const storageBytes = Math.max(
+      0,
+      ctx.business.storageBytes - freed + meta.size,
+    )
     if (args.target.kind === 'logo') {
-      const old = ctx.business.logoFileId
-        ? await ctx.db.get('files', ctx.business.logoFileId)
-        : null
       if (old) {
         await ctx.storage.delete(old.storageId)
         await ctx.db.delete('files', old._id)
-        storageBytes = Math.max(0, storageBytes - old.size)
       }
       await ctx.db.patch('businesses', ctx.business._id, {
         logoFileId: fileId,

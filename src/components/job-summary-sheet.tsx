@@ -1,5 +1,6 @@
 import { cn } from 'cn'
 import {
+  ChatCircleIcon,
   CopyIcon,
   DownloadSimpleIcon,
   ShareNetworkIcon,
@@ -212,8 +213,16 @@ function SummaryBody({
         </div>
         <a
           href={viberTextHref(summaryText(input))}
-          className={buttonVariants({ variant: 'ghost', className: 'h-11' })}
+          className={cn(
+            buttonVariants({ variant: 'outline', className: 'h-11' }),
+          )}
         >
+          {/* Viber's own purple, as on the client page. */}
+          <ChatCircleIcon
+            data-icon="inline-start"
+            weight="fill"
+            className="text-[#7360f2]"
+          />
           {m.summary_viber()}
         </a>
       </div>
@@ -231,7 +240,11 @@ export function JobSummaryButton({
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button variant="outline" className="h-9" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        className="h-11 lg:h-9"
+        onClick={() => setOpen(true)}
+      >
         {m.summary_button()}
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>

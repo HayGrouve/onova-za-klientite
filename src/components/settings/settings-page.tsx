@@ -16,6 +16,7 @@ export function SettingsPage({
   help,
   preview,
   previewWideOnly = false,
+  previewScrolls = false,
   children,
 }: {
   title: string
@@ -23,6 +24,8 @@ export function SettingsPage({
   preview?: React.ReactNode
   /** The section already shows its effect inline on a phone. */
   previewWideOnly?: boolean
+  /** A tall preview that shows in full scrolls away with the page on a phone, not pinned over the controls. */
+  previewScrolls?: boolean
   children: React.ReactNode
 }) {
   usePageTitle(title)
@@ -34,20 +37,24 @@ export function SettingsPage({
     const element = strip.current
     const root = page.current
     if (!element || !root) return
+    if (previewScrolls) {
+      root.style.setProperty('--preview-h', '0px')
+      return
+    }
     const measure = () =>
       root.style.setProperty('--preview-h', `${element.offsetHeight}px`)
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [preview])
+  }, [preview, previewScrolls])
   return (
     <div
       ref={page}
       className={cn(
         'flex flex-col gap-4 pb-8',
         preview
-          ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:grid-rows-[auto_1fr] xl:items-start xl:gap-x-8'
+          ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:grid-rows-[auto_1fr] xl:items-start xl:gap-x-8 xl:pr-4'
           : 'lg:max-w-3xl',
       )}
     >
@@ -70,7 +77,8 @@ export function SettingsPage({
         <div
           ref={strip}
           className={cn(
-            'sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 bg-canvas/95 px-4 pb-1 backdrop-blur lg:top-0 lg:pt-2 xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:bg-transparent xl:px-0 xl:pt-3.5 xl:backdrop-blur-none',
+            'top-[calc(4rem+env(safe-area-inset-top))] z-20 bg-canvas/95 px-4 pb-1 backdrop-blur lg:top-0 lg:pt-2 xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:bg-transparent xl:px-0 xl:pt-3.5 xl:backdrop-blur-none',
+            previewScrolls ? 'xl:sticky' : 'sticky',
             previewWideOnly && 'max-xl:hidden',
           )}
         >

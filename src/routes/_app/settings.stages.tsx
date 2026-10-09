@@ -35,6 +35,7 @@ import {
   canRemoveStage,
   groupedOrder,
 } from '../../../shared/stages'
+import { hasRole } from '../../../shared/roles'
 import type { StageGroup } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/settings/stages')({
@@ -43,7 +44,10 @@ export const Route = createFileRoute('/_app/settings/stages')({
 
 type Stage = FunctionReturnType<
   typeof api.businesses.settings
->['stages'][number]
+>['stages'][number] & {
+  /** How many jobs the stage holds: 0 for a Worker, who isn't told. */
+  jobCount: number
+}
 
 function Choice<T extends string>({
   label,
@@ -81,6 +85,20 @@ function StagesSettings() {
   const settings = useQuery(api.businesses.settings, {
     businessId: business._id,
   })
+  // The counts have their own query, so no other Settings screen reads jobs.
+  const seesCounts = hasRole(business.role, 'manager')
+  const counts = useQuery(
+    api.businesses.stageJobCounts,
+    seesCounts ? { businessId: business._id } : 'skip',
+  )
+  const stages: Stage[] | undefined =
+    settings && (counts !== undefined || !seesCounts)
+      ? settings.stages.map((stage) => ({
+          ...stage,
+          jobCount:
+            counts?.find((item) => item.stageId === stage._id)?.jobCount ?? 0,
+        }))
+      : undefined
   const reorder = useMutation(api.stages.reorder)
   const [panel, setPanel] = useState<{
     stage?: Stage
@@ -89,8 +107,8 @@ function StagesSettings() {
   const owner = settings?.role === 'owner'
 
   // Stages move only inside their group, so each group stays together.
-  const move = (stages: Stage[], stageId: Stage['_id'], by: -1 | 1) => {
-    const ids = groupedOrder(stages)
+  const move = (ordered: Stage[], stageId: Stage['_id'], by: -1 | 1) => {
+    const ids = groupedOrder(ordered)
     const index = ids.indexOf(stageId)
     ;[ids[index], ids[index + by]] = [ids[index + by], ids[index]]
     void runChange(() => reorder({ businessId: business._id, stageIds: ids }))
@@ -101,24 +119,19 @@ function StagesSettings() {
       title={m.settings_stages()}
       help={m.stages_help()}
       preview={
-        settings && (
+        stages && (
           <SettingsPreview>
-            <StagesPreview
-              stages={settings.stages}
-              job={business.words.job.singular}
-            />
+            <StagesPreview stages={stages} job={business.words.job.singular} />
           </SettingsPreview>
         )
       }
     >
-      {!settings ? (
+      {!settings || !stages ? (
         <ListSkeleton />
       ) : (
         <>
           {STAGE_GROUPS.map((group) => {
-            const inGroup = settings.stages.filter(
-              (stage) => stage.group === group,
-            )
+            const inGroup = stages.filter((stage) => stage.group === group)
             return (
               <section key={group} className="flex flex-col gap-1.5">
                 <div className="flex items-end justify-between gap-3 px-4">
@@ -131,7 +144,7 @@ function StagesSettings() {
                   {owner && (
                     <Button
                       variant="ghost"
-                      className="h-10 shrink-0 text-primary"
+                      className="h-11 shrink-0 text-primary lg:h-10"
                       onClick={() => setPanel({ group })}
                     >
                       <PlusIcon data-icon="inline-start" />
@@ -169,9 +182,7 @@ function StagesSettings() {
                               size="icon-lg"
                               aria-label={m.stages_move_up()}
                               disabled={!owner || index === 0}
-                              onClick={() =>
-                                move(settings.stages, stage._id, -1)
-                              }
+                              onClick={() => move(stages, stage._id, -1)}
                             >
                               <ArrowUpIcon />
                             </Button>
@@ -180,9 +191,7 @@ function StagesSettings() {
                               size="icon-lg"
                               aria-label={m.stages_move_down()}
                               disabled={!owner || index === inGroup.length - 1}
-                              onClick={() =>
-                                move(settings.stages, stage._id, 1)
-                              }
+                              onClick={() => move(stages, stage._id, 1)}
                             >
                               <ArrowDownIcon />
                             </Button>
@@ -205,7 +214,7 @@ function StagesSettings() {
                 <StageForm
                   stage={panel.stage}
                   group={panel.group}
-                  stages={settings.stages}
+                  stages={stages}
                   onDone={() => setPanel(null)}
                 />
               )}

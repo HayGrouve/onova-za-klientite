@@ -21,7 +21,8 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
-import { Spinner } from '#/components/ui/spinner'
+import { formatDay } from '#/i18n/dates'
+import { METHOD_LABEL } from '#/i18n/money'
 import { m } from '#/paraglide/messages.js'
 import { formatMoney, moneyInputText, parseMoney } from '../../../shared/money'
 
@@ -35,11 +36,13 @@ export type PaymentData = FunctionReturnType<typeof api.payments.get>
 export function PaymentEditForm({
   businessId,
   payment,
+  today,
   onDone,
   onCancel,
 }: {
   businessId: Id<'businesses'>
   payment: PaymentData
+  today: string
   onDone: () => void
   onCancel: () => void
 }) {
@@ -52,9 +55,8 @@ export function PaymentEditForm({
   const [date, setDate] = useState(payment.date)
   const [method, setMethod] = useState<PaymentMethod>(payment.method)
   // A payment has a label (a deposit, say); a refund has a note.
-  const [text, setText] = useState(
-    (refund ? payment.note : payment.label) ?? '',
-  )
+  const originalText = (refund ? payment.note : payment.label) ?? ''
+  const [text, setText] = useState(originalText)
 
   const amountCents = parseMoney(amount)
   const { minCents, maxCents, why } = payment.range
@@ -74,16 +76,19 @@ export function PaymentEditForm({
   const review = useReview(JSON.stringify([amount, date, method, text]))
   const save = () => {
     if (amountCents === null) return
-    void run(() =>
-      update({
-        businessId,
-        paymentId: payment._id,
-        amountCents,
-        date,
-        method,
-        label: refund ? payment.label : text || undefined,
-        note: refund ? text || undefined : payment.note,
-      }),
+    const done = refund ? m.toast_refund_edited : m.toast_pay_edited
+    void run(
+      () =>
+        update({
+          businessId,
+          paymentId: payment._id,
+          amountCents,
+          date,
+          method,
+          label: refund ? payment.label : text || undefined,
+          note: refund ? text || undefined : payment.note,
+        }),
+      done({ amount: formatMoney(amountCents) }),
     )
   }
 
@@ -159,43 +164,60 @@ export function PaymentEditForm({
           </Field>
         </div>
       </FieldGroup>
-      {review.reviewing ? (
-        <ReviewSubmit
-          review={review}
-          label={m.save()}
-          tone={refund ? 'destructive' : 'default'}
-          busy={busy}
-          onConfirm={save}
-          summary={
-            <>
-              <p>
-                {m.review_edit_to()}{' '}
-                <ReviewAmount>{formatMoney(amountCents ?? 0)}</ReviewAmount>
-              </p>
-              <p className="text-muted-foreground">
-                {m.review_edit_was({
-                  amount: formatMoney(Math.abs(payment.amountCents)),
-                })}
-              </p>
-            </>
-          }
-        />
-      ) : (
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            size="xl"
-            className="flex-1"
-            disabled={busy || !valid}
-          >
-            {busy && <Spinner data-icon="inline-start" />}
-            {m.save()}
-          </Button>
+      <ReviewSubmit
+        review={review}
+        label={amountChanged ? m.review_next() : m.save()}
+        confirmLabel={m.review_confirm_edit({
+          amount: formatMoney(amountCents ?? 0),
+        })}
+        tone={refund ? 'destructive' : 'default'}
+        busy={busy}
+        disabled={!valid}
+        onConfirm={save}
+        aside={
           <Button type="button" size="xl" variant="outline" onClick={onCancel}>
             {m.cancel()}
           </Button>
-        </div>
-      )}
+        }
+        summary={
+          <>
+            <p>
+              {m.review_edit_to()}{' '}
+              <ReviewAmount>{formatMoney(amountCents ?? 0)}</ReviewAmount>
+            </p>
+            <p className="text-muted-foreground">
+              {m.review_edit_was({
+                amount: formatMoney(Math.abs(payment.amountCents)),
+              })}
+            </p>
+            {/* What else changed, so nothing is saved unseen. */}
+            {date !== payment.date && (
+              <p>
+                {m.review_edit_date({
+                  from: formatDay(payment.date, today),
+                  to: formatDay(date, today),
+                })}
+              </p>
+            )}
+            {method !== payment.method && (
+              <p>
+                {m.review_edit_method({
+                  from: METHOD_LABEL[payment.method](),
+                  to: METHOD_LABEL[method](),
+                })}
+              </p>
+            )}
+            {text !== originalText && (
+              <p className="break-words">
+                {m.review_edit_text({
+                  from: originalText || m.fields_choice_none(),
+                  to: text || m.fields_choice_none(),
+                })}
+              </p>
+            )}
+          </>
+        }
+      />
     </form>
   )
 }

@@ -26,6 +26,7 @@ const modules = import.meta.glob<Record<string, unknown>>(
  */
 const WORKER_READS: Record<string, string> = {
   'businesses:settings': 'settings, read-only (D38)',
+  'businesses:stageJobCounts': 'forbidden',
   'clients:get': 'only through their jobs, without money',
   'clients:list': 'only the clients of their jobs, without money',
   'clientsAdmin:findByPhones': 'forbidden',
@@ -38,6 +39,7 @@ const WORKER_READS: Record<string, string> = {
   'jobs:board': 'their jobs, no totals',
   'jobs:get': 'their jobs, without costs or credit',
   'jobs:list': 'their jobs',
+  'money:headline': 'forbidden',
   'money:summary': 'forbidden',
   'newJob:context': 'forbidden',
   'offline:snapshot': 'their jobs, appointments and clients',
@@ -356,11 +358,25 @@ describe('a Worker sees only their own work (D89)', () => {
     await expect(
       worker.query(api.money.summary, { businessId, month: '2026-10' }),
     ).rejects.toThrow(/auth.forbidden/)
+    await expect(
+      worker.query(api.money.headline, { businessId, month: '2026-10' }),
+    ).rejects.toThrow(/auth.forbidden/)
   })
 
   it('counts only their own work in the morning summary', async () => {
     const t = setupConvex()
-    const { businessId, membershipId } = await workerBusiness(t)
+    const { owner, businessId, membershipId, mine } = await workerBusiness(t)
+    // Their overdue job with a visit today is shown under the visit, once.
+    // This one is overdue with no visit, so it is counted as overdue.
+    const lateId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId: mine.clientId,
+      title: 'Закъсняла',
+      dueDate: '2026-10-02',
+    })
+    await t.run((ctx) =>
+      ctx.db.patch('jobs', lateId, { assigneeIds: [membershipId] }),
+    )
     const counts = await t.run(async (ctx) => {
       const { summaryCounts } = await import('./lib/summary')
       const business = (await ctx.db.get('businesses', businessId))!

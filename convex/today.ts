@@ -1,10 +1,11 @@
 import { v } from 'convex/values'
-import { addDays, isValidDate, sofiaTimeToUtc } from '../shared/dates'
-import { arrangeToday } from '../shared/today'
+import { isValidDate } from '../shared/dates'
 import type { Doc } from './_generated/dataModel'
 import { businessQuery } from './lib/auth'
+import { queryNow } from './lib/clock'
 import { fail } from './lib/errors'
-import { isWorker, seesAppointment, seesJob } from './lib/scope'
+import { collectToday } from './lib/todayData'
+import type { TodayVisit } from './lib/todayData'
 import { jobRow, newLookups, vJobRow } from './lib/views'
 
 const vAppointmentRow = v.object({
@@ -27,16 +28,13 @@ const vReminderRow = v.object({
   itemId: v.optional(v.id('items')),
 })
 
-const UPCOMING_DAYS = 7
-const SOON_DAYS = 3
-
 /**
  * Today: what to act on (CONTEXT "Today"). `today` is the Sofia calendar date
  * from the device, so the list turns over at local midnight. A job is in one
  * section only (`arrangeToday`).
  */
 export const list = businessQuery({
-  args: { today: v.string() },
+  args: { today: v.string(), now: v.optional(v.number()) },
   returns: v.object({
     appointments: v.array(vAppointmentRow),
     upcoming: v.array(vAppointmentRow),
@@ -45,100 +43,38 @@ export const list = businessQuery({
     reminders: v.array(vReminderRow),
     doneUnpaid: v.array(vJobRow),
   }),
-  handler: async (ctx, { today }) => {
+  handler: async (ctx, { today, now: clientNow }) => {
     if (!isValidDate(today)) fail('invalid', { field: 'today' })
-    const businessId = ctx.business._id
     const lookups = newLookups()
-    const now = Date.now()
+    const now = queryNow(clientNow)
+    const arranged = await collectToday(ctx, ctx.business, ctx.member, today, {
+      rest: true,
+      overdue: true,
+      reminders: true,
+    })
 
-    const dayStart = sofiaTimeToUtc(today, 0, 0)
-    const tomorrowStart = sofiaTimeToUtc(addDays(today, 1), 0, 0)
-    const upcomingEnd = sofiaTimeToUtc(addDays(today, UPCOMING_DAYS + 1), 0, 0)
-    const appointments = await ctx.db
-      .query('appointments')
-      .withIndex('by_business_start', (q) =>
-        q
-          .eq('businessId', businessId)
-          .gte('start', dayStart)
-          .lt('start', upcomingEnd),
-      )
-      .collect()
-    const appointmentRow = async (
-      item: (typeof appointments)[number],
-      job: Doc<'jobs'> | null,
-    ) => {
-      return {
-        _id: item._id,
-        start: item.start,
-        end: item.end,
-        allDay: item.allDay,
-        label: item.label,
-        doneAt: item.doneAt,
-        job: job ? await jobRow(ctx, job, lookups, now) : undefined,
-      }
+    const appointmentRow = async ({ appointment, job }: TodayVisit) => ({
+      _id: appointment._id,
+      start: appointment.start,
+      end: appointment.end,
+      allDay: appointment.allDay,
+      label: appointment.label,
+      doneAt: appointment.doneAt,
+      job: job ? await jobRow(ctx, job, lookups, now) : undefined,
+    })
+    const appointmentRows = async (visits: TodayVisit[]) => {
+      const rows = []
+      for (const visit of visits) rows.push(await appointmentRow(visit))
+      return rows
     }
-    const live = appointments.filter((item) => item.cancelledAt === undefined)
-    const todays = []
-    const upcoming = []
-    for (const item of live) {
-      const job = item.jobId ? await ctx.db.get('jobs', item.jobId) : null
-      if (!seesAppointment(ctx.member, item, job)) continue
-      const row = await appointmentRow(item, job)
-      if (item.start < tomorrowStart) todays.push(row)
-      else upcoming.push(row)
+    const jobRows = async (jobs: Array<Doc<'jobs'>>) => {
+      const rows = []
+      for (const job of jobs) rows.push(await jobRow(ctx, job, lookups, now))
+      return rows
     }
 
-    // Overdue and due soon: New and In progress jobs by due date (Q17).
-    const sees = (job: Doc<'jobs'>) => seesJob(ctx.member, job)
-    const overdue = []
-    const dueSoon = []
-    const soonEnd = addDays(today, SOON_DAYS)
-    for (const group of ['new', 'in_progress'] as const) {
-      const late = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_group_due', (q) =>
-          q
-            .eq('businessId', businessId)
-            .eq('stageGroup', group)
-            .gt('dueDate', '')
-            .lt('dueDate', today),
-        )
-        .collect()
-      for (const job of late.filter(sees)) {
-        overdue.push(await jobRow(ctx, job, lookups, now))
-      }
-      const soon = await ctx.db
-        .query('jobs')
-        .withIndex('by_business_group_due', (q) =>
-          q
-            .eq('businessId', businessId)
-            .eq('stageGroup', group)
-            .gte('dueDate', today)
-            .lte('dueDate', soonEnd),
-        )
-        .collect()
-      for (const job of soon.filter(sees)) {
-        dueSoon.push(await jobRow(ctx, job, lookups, now))
-      }
-    }
-    overdue.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
-    dueSoon.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
-
-    // Reminders are a Manager's to act on (D89).
-    const reminders =
-      ctx.business.modules.reminders && !isWorker(ctx.member)
-        ? await ctx.db
-            .query('reminders')
-            .withIndex('by_business_status_date', (q) =>
-              q
-                .eq('businessId', businessId)
-                .eq('status', 'open')
-                .lte('date', today),
-            )
-            .collect()
-        : []
     const reminderRows = []
-    for (const reminder of reminders) {
+    for (const reminder of arranged.reminders) {
       const client = reminder.clientId
         ? await ctx.db.get('clients', reminder.clientId)
         : null
@@ -153,31 +89,12 @@ export const list = businessQuery({
       })
     }
 
-    // Q7: Today's "done but unpaid" shows only the Done group.
-    const unpaid = await ctx.db
-      .query('jobs')
-      .withIndex('by_business_owes', (q) =>
-        q
-          .eq('businessId', businessId)
-          .eq('owes', true)
-          .eq('stageGroup', 'done'),
-      )
-      .collect()
-    const doneUnpaid = []
-    for (const job of unpaid
-      .filter(sees)
-      .sort((a, b) => (a.doneAt ?? 0) - (b.doneAt ?? 0))) {
-      doneUnpaid.push(await jobRow(ctx, job, lookups, now))
-    }
-
     return {
-      ...arrangeToday({
-        appointments: todays,
-        upcoming,
-        overdue,
-        dueSoon,
-        doneUnpaid,
-      }),
+      appointments: await appointmentRows(arranged.appointments),
+      upcoming: await appointmentRows(arranged.upcoming),
+      overdue: await jobRows(arranged.overdue),
+      dueSoon: await jobRows(arranged.dueSoon),
+      doneUnpaid: await jobRows(arranged.doneUnpaid),
       reminders: reminderRows,
     }
   },

@@ -60,6 +60,7 @@ import { refundSources } from '../../../shared/allocation'
 import { formatMoney } from '../../../shared/money'
 import { defaultPaymentMethod } from '../../../shared/payment-method'
 import { formatPhone, telHref, viberHref } from '../../../shared/phone-format'
+import type { MorePart } from '../../../shared/more-summary'
 
 // The payments list opens on the latest few; the rest are one tap away.
 const PAYMENTS_SHOWN = 5
@@ -94,20 +95,18 @@ function ClientPage() {
   const phone = client.phones.at(0)?.e164
 
   // The folded parts, by name, with how many each holds.
-  const counted = (title: string, count: number) =>
-    count > 0 ? `${title}: ${count}` : title
   const { modules } = business
   const real = !client.isNoClient
-  const moreSummary = [
+  const moreSummary: MorePart[] = [
     ...(modules.items && real
-      ? [counted(words.item.plural, data.items.length)]
+      ? [{ name: words.item.plural, count: data.items.length }]
       : []),
     ...(modules.reminders && real
-      ? [counted(m.reminder_list(), data.reminders.length)]
+      ? [{ name: m.reminder_list(), count: data.reminders.length }]
       : []),
-    ...(real ? [m.job_files()] : []),
+    ...(real ? [{ name: m.job_files() }] : []),
     ...(data.timeline.length > 0
-      ? [counted(m.client_history(), data.timeline.length)]
+      ? [{ name: m.client_history(), count: data.timeline.length }]
       : []),
   ]
   const shownPayments = allPayments
@@ -293,7 +292,7 @@ function ClientPage() {
                     aria-label={m.new_job_label({ job: words.job.singular })}
                     className={buttonVariants({
                       variant: 'ghost',
-                      className: 'h-9 text-primary',
+                      className: 'h-11 text-primary lg:h-9',
                     })}
                   >
                     <PlusIcon data-icon="inline-start" />
@@ -328,7 +327,7 @@ function ClientPage() {
                   <>
                     <Button
                       size="xl"
-                      className="flex-1"
+                      className="flex-1 lg:max-w-60"
                       onClick={() => sheet.open({ kind: 'payment' })}
                     >
                       <PlusIcon data-icon="inline-start" />
@@ -427,7 +426,7 @@ function ClientPage() {
                         search={{ clientId: client._id }}
                         className={buttonVariants({
                           variant: 'ghost',
-                          className: 'h-9 text-primary',
+                          className: 'h-11 text-primary lg:h-9',
                         })}
                       >
                         <PlusIcon data-icon="inline-start" />

@@ -111,9 +111,11 @@ export function FieldsSettings({
     <SettingsPage
       title={m.fields_settings_title()}
       help={m.fields_settings_help()}
+      previewScrolls
       preview={
         active && (
           <SettingsPreview
+            fit
             title={m.fields_preview_title({
               name: lower(business.words[target].singular),
             })}
@@ -135,12 +137,12 @@ export function FieldsSettings({
             setShowArchived(false)
           }}
         >
-          <TabsList className="h-11 w-full">
+          <TabsList className="w-full group-data-horizontal/tabs:h-11">
             {visibleTargets.map((item) => (
               <TabsTrigger
                 key={item}
                 value={item}
-                className="min-w-0 px-2 text-base"
+                className="min-w-0 px-2 text-base before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] lg:before:hidden"
               >
                 <span className="min-w-0 truncate">
                   {business.words[item].plural}
@@ -247,9 +249,9 @@ function RecordFormPreview({
     <div className="flex flex-col gap-4 text-sm">
       <div className="flex flex-col gap-3">
         {BASE_FIELDS[target].map((label) => (
-          <div key={label()} className="flex flex-col gap-1.5 opacity-50">
-            <span className="font-medium">{label()}</span>
-            <span className="h-9 rounded-xl border" />
+          <div key={label()} className="flex flex-col gap-1.5">
+            <span className="font-medium text-muted-foreground">{label()}</span>
+            <span className="h-9 rounded-xl border opacity-50" />
           </div>
         ))}
         <Flash

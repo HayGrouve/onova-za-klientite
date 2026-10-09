@@ -27,7 +27,7 @@ function fromDayNumber(day: number): string {
   return `${pad(d.getUTCFullYear(), 4)}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
 }
 
-function daysInMonth(year: number, month: number): number {
+export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate()
 }
 
@@ -46,8 +46,38 @@ export function dateInSofia(ms: number): string {
   return fromDayNumber(Math.floor((ms + sofiaOffsetMinutes(ms) * MINUTE) / DAY))
 }
 
+/** What the Sofia wall clock reads at that moment. */
+export function clockInSofia(ms: number): { hour: number; minute: number } {
+  const local = ms + sofiaOffsetMinutes(ms) * MINUTE
+  const minuteOfDay = Math.floor((((local % DAY) + DAY) % DAY) / MINUTE)
+  return { hour: Math.floor(minuteOfDay / 60), minute: minuteOfDay % 60 }
+}
+
+/**
+ * A moment as Sofia reads it, for places that must say exactly when
+ * ("8.10.2026, 15:01"): day and month as the rest of the app writes them, the
+ * whole year, and a 24-hour clock that always has its minutes.
+ */
+export function formatDateTime(ms: number): string {
+  const [y, m, d] = parts(dateInSofia(ms))
+  const { hour, minute } = clockInSofia(ms)
+  return `${d}.${m}.${y}, ${pad(hour)}:${pad(minute)}`
+}
+
 export function todayInSofia(nowMs: number): string {
   return dateInSofia(nowMs)
+}
+
+/** How coarsely a query that needs "now" is told the time, so it can be cached. */
+export const NOW_STEP_MS = 5 * MINUTE
+
+/**
+ * The time rounded down to a 5-minute step. A query that depends on the clock
+ * (the next appointment window) only recomputes on data changes, so the device
+ * passes this as an argument: it changes every 5 minutes, and the query with it.
+ */
+export function roundedNow(ms: number): number {
+  return Math.floor(ms / NOW_STEP_MS) * NOW_STEP_MS
 }
 
 export function isValidDate(date: string): boolean {

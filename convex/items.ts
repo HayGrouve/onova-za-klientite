@@ -4,6 +4,7 @@ import { logActivity } from './lib/activity'
 import {
   businessMutation,
   businessQuery,
+  getLiveClient,
   getOwned,
   requireRole,
 } from './lib/auth'
@@ -36,7 +37,7 @@ export const create = businessMutation({
   returns: v.id('items'),
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
-    const client = await getOwned(ctx, 'clients', args.clientId)
+    const client = await getLiveClient(ctx, args.clientId)
     if (client.isNoClient) fail('client.noClient')
     const job = args.jobId ? await getOwned(ctx, 'jobs', args.jobId) : null
     if (job && job.clientId !== client._id) fail('job.otherClient')
@@ -101,7 +102,7 @@ export const move = businessMutation({
   handler: async (ctx, args) => {
     requireRole(ctx.member, 'manager')
     const item = await getOwned(ctx, 'items', args.itemId)
-    const to = await getOwned(ctx, 'clients', args.toClientId)
+    const to = await getLiveClient(ctx, args.toClientId)
     if (to.isNoClient) fail('client.noClient')
     if (to._id === item.clientId) return null
     await ctx.db.patch('items', item._id, { clientId: to._id })

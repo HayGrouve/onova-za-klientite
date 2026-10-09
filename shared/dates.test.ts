@@ -1,6 +1,8 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  clockInSofia,
+  formatDateTime,
   addDays,
   addMonths,
   dateInSofia,
@@ -10,6 +12,7 @@ import {
   isValidDate,
   isValidMonth,
   monthOf,
+  roundedNow,
   monthRange,
   nextSofiaTime,
   parseMoment,
@@ -461,5 +464,57 @@ describe('isValidMonth', () => {
     expect(isValidMonth('2026-00')).toBe(false)
     expect(isValidMonth('2026-1')).toBe(false)
     expect(isValidMonth('2026-10-01')).toBe(false)
+  })
+})
+
+describe('roundedNow', () => {
+  it('rounds down to a 5-minute step', () => {
+    const base = Date.UTC(2026, 9, 9, 10, 0, 0)
+    expect(roundedNow(base)).toBe(base)
+    expect(roundedNow(base + 4 * 60_000 + 59_999)).toBe(base)
+    expect(roundedNow(base + 5 * 60_000)).toBe(base + 5 * 60_000)
+  })
+
+  it('never moves forward or more than a step back', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 4_000_000_000_000 }), (ms) => {
+        const rounded = roundedNow(ms)
+        expect(rounded).toBeLessThanOrEqual(ms)
+        expect(ms - rounded).toBeLessThan(5 * 60_000)
+      }),
+    )
+  })
+})
+
+describe('formatDateTime', () => {
+  it('reads a summer moment on the 24-hour clock, with its minutes', () => {
+    expect(formatDateTime(Date.UTC(2026, 9, 8, 0, 1))).toBe('8.10.2026, 03:01')
+    expect(formatDateTime(Date.UTC(2026, 9, 8, 12, 0))).toBe('8.10.2026, 15:00')
+  })
+
+  it('reads a winter moment, and crosses midnight into the next Sofia day', () => {
+    expect(formatDateTime(Date.UTC(2026, 0, 5, 22, 30))).toBe('6.1.2026, 00:30')
+    expect(formatDateTime(Date.UTC(2026, 0, 5, 12, 5))).toBe('5.1.2026, 14:05')
+  })
+
+  it('follows the clock change', () => {
+    // 2026-03-29 01:00 UTC is when summer time starts: 03:00 -> 04:00.
+    expect(formatDateTime(Date.UTC(2026, 2, 29, 0, 59))).toBe(
+      '29.3.2026, 02:59',
+    )
+    expect(formatDateTime(Date.UTC(2026, 2, 29, 1, 0))).toBe('29.3.2026, 04:00')
+  })
+})
+
+describe('clockInSofia', () => {
+  it('reads the Sofia wall clock, summer and winter', () => {
+    expect(clockInSofia(Date.UTC(2026, 9, 8, 0, 1))).toEqual({
+      hour: 3,
+      minute: 1,
+    })
+    expect(clockInSofia(Date.UTC(2026, 0, 5, 22, 30))).toEqual({
+      hour: 0,
+      minute: 30,
+    })
   })
 })

@@ -70,16 +70,18 @@ export function RefundForm({
   )
   const record = () => {
     if (amountCents === null) return
-    void run(() =>
-      refund({
-        businessId,
-        clientId,
-        jobId: source.jobId,
-        amountCents,
-        date,
-        method,
-        note: note || undefined,
-      }),
+    void run(
+      () =>
+        refund({
+          businessId,
+          clientId,
+          jobId: source.jobId,
+          amountCents,
+          date,
+          method,
+          note: note || undefined,
+        }),
+      m.toast_refund_added({ amount: formatMoney(amountCents) }),
     )
   }
 
@@ -188,7 +190,10 @@ export function RefundForm({
       </FieldGroup>
       <ReviewSubmit
         review={review}
-        label={m.refund_save()}
+        label={m.review_next()}
+        confirmLabel={m.review_confirm_refund({
+          amount: formatMoney(amountCents ?? 0),
+        })}
         tone="destructive"
         busy={busy}
         onConfirm={record}

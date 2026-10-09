@@ -94,7 +94,7 @@ export function RepeatSection({
           </span>
           <Button
             variant="ghost"
-            className="h-9 text-primary"
+            className="h-11 text-primary lg:h-9"
             onClick={() => setChoosing(true)}
           >
             <RepeatIcon data-icon="inline-start" />

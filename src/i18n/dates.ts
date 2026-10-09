@@ -33,6 +33,26 @@ export function formatDay(date: string, today: string) {
   )
 }
 
+const SHORT_WEEKDAY = new Intl.DateTimeFormat('bg-BG', {
+  weekday: 'short',
+  timeZone: 'UTC',
+})
+
+/**
+ * A day for a narrow cell: today, tomorrow or yesterday by name, otherwise the
+ * short weekday and date (Fri, 16.10), or the plain date with its year when
+ * it isn't this year (12.10.2025), so it never needs a second line.
+ */
+export function formatDayShort(date: string, today: string) {
+  if (date === today) return m.day_today()
+  if (date === addDays(today, 1)) return m.day_tomorrow()
+  if (date === addDays(today, -1)) return m.day_yesterday()
+  const [year, month, day] = date.split('-').map(Number)
+  if (String(year) !== today.slice(0, 4)) return `${day}.${month}.${year}`
+  const weekday = SHORT_WEEKDAY.format(new Date(`${date}T12:00:00Z`))
+  return `${weekday}, ${day}.${month}`
+}
+
 // A date months away needs its year, so it can't be read as this year's.
 const LONG_DAY = new Intl.DateTimeFormat('bg-BG', {
   day: 'numeric',

@@ -1,12 +1,29 @@
 // @vitest-environment edge-runtime
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import webpush from 'web-push'
 import { api, internal } from './_generated/api'
 import { collectDueSummaries } from './lib/summary'
 import { STRANGER, setupBusiness, setupConvex, getDoc } from './test.setup'
 import type { TestBusiness, TestConvex } from './test.setup'
 
+const enqueueAction = vi.hoisted(() => vi.fn())
+vi.mock('@convex-dev/workpool', () => ({
+  Workpool: class {
+    enqueueAction = enqueueAction
+  },
+}))
+vi.mock('web-push', () => ({
+  default: { sendNotification: vi.fn() },
+}))
+
+beforeEach(() => {
+  enqueueAction.mockReset()
+  vi.mocked(webpush.sendNotification).mockReset()
+})
+
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllEnvs()
 })
 
 function at(iso: string) {
@@ -184,15 +201,22 @@ async function seedDay(t: TestConvex, b: TestBusiness) {
     businessId: b.businessId,
     name: 'Иван',
   })
-  const jobId = await b.owner.mutation(api.jobs.create, {
+  await b.owner.mutation(api.jobs.create, {
     businessId: b.businessId,
     clientId,
     title: 'Гардероб',
     dueDate: '2026-10-20',
   })
+  // The visit is on another job: an overdue job with a visit today is shown
+  // under the visit, not counted twice.
+  const visitJobId = await b.owner.mutation(api.jobs.create, {
+    businessId: b.businessId,
+    clientId,
+    title: 'Маса',
+  })
   await b.owner.mutation(api.appointments.add, {
     businessId: b.businessId,
-    jobId,
+    jobId: visitJobId,
     date: '2026-10-26',
   })
   await t.run((ctx) =>
@@ -306,5 +330,171 @@ describe('recordSendResults', () => {
       gone: [first],
     })
     expect(await nextSummaryAt(t, b)).toBeUndefined()
+  })
+})
+
+describe('subscribe limits', () => {
+  it('refuses keys and endpoints that are too long or empty', async () => {
+    const { b } = await subscribedBusiness()
+    const base = sub(5)
+    for (const bad of [
+      { ...base, keys: { ...base.keys, p256dh: 'p'.repeat(201) } },
+      { ...base, keys: { ...base.keys, auth: 'a'.repeat(101) } },
+      { ...base, keys: { ...base.keys, auth: '' } },
+      {
+        ...base,
+        endpoint: `https://fcm.googleapis.com/fcm/send/${'x'.repeat(1000)}`,
+      },
+    ]) {
+      await expect(b.owner.mutation(api.push.subscribe, bad)).rejects.toThrow(
+        /invalid/,
+      )
+    }
+  })
+
+  it('allows 10 new devices an hour, then says rate.limited', async () => {
+    at('2026-10-25T10:00:00Z')
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    for (let n = 1; n <= 10; n++) {
+      await b.owner.mutation(api.push.subscribe, sub(n))
+    }
+    await expect(b.owner.mutation(api.push.subscribe, sub(11))).rejects.toThrow(
+      /rate.limited/,
+    )
+    // The app repeats an unchanged subscription on every open: that is free.
+    await b.owner.mutation(api.push.subscribe, sub(10))
+    at('2026-10-25T11:01:00Z')
+    await b.owner.mutation(api.push.subscribe, sub(11))
+  })
+
+  it('keeps at most 10 devices per person and drops the oldest', async () => {
+    const { t, b } = await subscribedBusiness()
+    const userId = await t.run(
+      async (ctx) => (await ctx.db.query('users').first())!._id,
+    )
+    await t.run(async (ctx) => {
+      for (let n = 2; n <= 10; n++) {
+        await ctx.db.insert('pushSubscriptions', {
+          userId,
+          ...sub(n),
+        })
+      }
+    })
+    const count = () =>
+      t.run(async (ctx) => await ctx.db.query('pushSubscriptions').collect())
+    expect(await count()).toHaveLength(10)
+    await b.owner.mutation(api.push.subscribe, sub(11))
+    const rows = await count()
+    expect(rows).toHaveLength(10)
+    const endpoints = rows.map((row) => row.endpoint)
+    expect(endpoints).toContain(sub(11).endpoint)
+    expect(endpoints).not.toContain(sub(1).endpoint)
+    expect(endpoints).toContain(sub(2).endpoint)
+  })
+})
+
+describe('pushNode.send', () => {
+  const message = { title: 'Днес', body: 'Срещи: 1', url: '/' }
+
+  async function twoDevices() {
+    const { t, b } = await subscribedBusiness()
+    await b.owner.mutation(api.push.subscribe, sub(2))
+    vi.stubEnv('VAPID_PUBLIC_KEY', 'public')
+    vi.stubEnv('VAPID_PRIVATE_KEY', 'private')
+    vi.stubEnv('VAPID_SUBJECT', 'mailto:test@example.com')
+    const rows = await t.run((ctx) =>
+      ctx.db.query('pushSubscriptions').collect(),
+    )
+    return { t, rows }
+  }
+
+  it('sends to the one device it is given and records it', async () => {
+    const { t, rows } = await twoDevices()
+    vi.mocked(webpush.sendNotification).mockResolvedValue({} as never)
+    await t.action(internal.pushNode.send, {
+      subscriptionId: rows[0]._id,
+      ...message,
+    })
+    expect(webpush.sendNotification).toHaveBeenCalledTimes(1)
+    const after = await t.run((ctx) =>
+      ctx.db.query('pushSubscriptions').collect(),
+    )
+    expect(
+      after.find((row) => row._id === rows[0]._id)?.lastSuccessAt,
+    ).toBeDefined()
+    expect(
+      after.find((row) => row._id === rows[1]._id)?.lastSuccessAt,
+    ).toBeUndefined()
+  })
+
+  it('throws on 429 and 5xx so the pool retries just this device', async () => {
+    const { t, rows } = await twoDevices()
+    for (const statusCode of [429, 503]) {
+      vi.mocked(webpush.sendNotification).mockRejectedValueOnce({ statusCode })
+      await expect(
+        t.action(internal.pushNode.send, {
+          subscriptionId: rows[0]._id,
+          ...message,
+        }),
+      ).rejects.toThrow(String(statusCode))
+    }
+    // Nothing was sent to the other device by those calls.
+    expect(webpush.sendNotification).toHaveBeenCalledTimes(2)
+    expect(
+      vi
+        .mocked(webpush.sendNotification)
+        .mock.calls.every(([target]) => target.endpoint === sub(1).endpoint),
+    ).toBe(true)
+  })
+
+  it('deletes a device the service says is gone and does not retry', async () => {
+    const { t, rows } = await twoDevices()
+    vi.mocked(webpush.sendNotification).mockRejectedValueOnce({
+      statusCode: 410,
+    })
+    await t.action(internal.pushNode.send, {
+      subscriptionId: rows[0]._id,
+      ...message,
+    })
+    const after = await t.run((ctx) =>
+      ctx.db.query('pushSubscriptions').collect(),
+    )
+    expect(after.map((row) => row._id)).toEqual([rows[1]._id])
+  })
+
+  it('ignores a bad request (400) without retrying', async () => {
+    const { t, rows } = await twoDevices()
+    vi.mocked(webpush.sendNotification).mockRejectedValueOnce({
+      statusCode: 400,
+    })
+    await t.action(internal.pushNode.send, {
+      subscriptionId: rows[0]._id,
+      ...message,
+    })
+    expect(
+      await t.run((ctx) => ctx.db.query('pushSubscriptions').collect()),
+    ).toHaveLength(2)
+  })
+})
+
+describe('runDueSummaries', () => {
+  it('enqueues one send per device, so a retry repeats only one', async () => {
+    const { t, b } = await subscribedBusiness()
+    await b.owner.mutation(api.push.subscribe, sub(2))
+    await seedDay(t, b)
+    at('2026-10-26T05:31:00Z')
+    await t.mutation(internal.push.runDueSummaries, {})
+    const rows = await t.run((ctx) =>
+      ctx.db.query('pushSubscriptions').collect(),
+    )
+    expect(enqueueAction).toHaveBeenCalledTimes(2)
+    const targets = enqueueAction.mock.calls.map(
+      ([, , args]) => args.subscriptionId,
+    )
+    expect(targets.sort()).toEqual(rows.map((row) => row._id).sort())
+    expect(enqueueAction.mock.calls[0][2].body).toBe(
+      'Срещи: 1 · Закъснели: 1 · Напомняния: 1',
+    )
   })
 })

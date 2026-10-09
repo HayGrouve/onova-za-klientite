@@ -40,9 +40,14 @@ export type ParsedLine = {
   date: ParsedDate | null
 }
 
+/** The Sofia wall clock, to tell whether a bare time is still ahead today. */
+export type ClockTime = { hour: number; minute: number }
+
 export type ParseContext = {
   /** "YYYY-MM-DD" in Sofia. */
   today: string
+  /** The time now in Sofia. Without it a bare time is always today. */
+  now?: ClockTime
   clients: ClientCandidate[]
   services: ServiceRef[]
   /** The built-in walk-in client's name, typed to pick it. */
@@ -132,9 +137,34 @@ const DAY_MONTH_NAME = new RegExp(
   String.raw`^(\d{1,2})(?:-(?:ви|ри|ти))?\s+(${MONTH_NAMES})\.?(?:\s+(\d{4}))?$`,
 )
 
-export function parseDate(segment: string, today: string): ParsedDate | null {
+// A time with nothing else around it: "11:00", "от 9:30 ч", "в 11". "от 5" alone is not
+// one: it is too often part of a title or a price.
+const BARE_TIME =
+  /^(?:в\s*(\d{1,2})(?::(\d{2}))?|(?:от\s*)?(\d{1,2}):(\d{2}))\s*(?:ч\.?)?$/
+
+export function parseDate(
+  segment: string,
+  today: string,
+  now?: ClockTime,
+): ParsedDate | null {
   let base = segment.toLocaleLowerCase('bg').trim()
   let time: ParsedDate['time']
+
+  // A time alone is the next time the clock reads it: today, or tomorrow once it has passed.
+  const bare = BARE_TIME.exec(base)
+  if (bare) {
+    // Which alternative matched decides which groups are there.
+    const groups: Array<string | undefined> = bare
+    const hour = Number(groups[1] ?? groups[3])
+    const minute = Number(groups[2] ?? groups[4] ?? 0)
+    if (hour > 23 || minute > 59) return null
+    const passed =
+      now !== undefined && hour * 60 + minute <= now.hour * 60 + now.minute
+    return {
+      date: passed ? addDays(today, 1) : today,
+      time: { hour, minute },
+    }
+  }
 
   const timeMatch =
     base.match(/\s+(?:в|от)?\s*(\d{1,2}):(\d{2})\s*(?:ч\.?)?$/) ??
@@ -162,7 +192,9 @@ export function parseDate(segment: string, today: string): ParsedDate | null {
       const nextMonday = addDays(today, (8 - weekdayOf(today)) % 7 || 7)
       date = addDays(nextMonday, (weekdayIndex(nextWeek[1]) + 6) % 7)
     }
-    const dayMonth = text.match(/^(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?$/)
+    const dayMonth = text.match(
+      /^(\d{1,2})[./](\d{1,2})(?:[./](\d{2}|\d{4}))?$/,
+    )
     const dayName = text.match(DAY_MONTH_NAME)
     if (dayMonth) {
       date = dayMonthDate(dayMonth[1], Number(dayMonth[2]), dayMonth[3], today)
@@ -336,7 +368,7 @@ export function parseLine(text: string, ctx: ParseContext): ParsedLine {
       index--
       continue
     }
-    const parsedDate = parseDate(segment, ctx.today)
+    const parsedDate = parseDate(segment, ctx.today, ctx.now)
     if (parsedDate) {
       date = parsedDate
       continue
@@ -371,7 +403,7 @@ export function parseLine(text: string, ctx: ParseContext): ParsedLine {
         n >= 1 && date === null;
         n--
       ) {
-        const tail = parseDate(tokens.slice(-n).join(' '), ctx.today)
+        const tail = parseDate(tokens.slice(-n).join(' '), ctx.today, ctx.now)
         if (tail) {
           date = tail
           words = tokens.slice(0, -n).join(' ')

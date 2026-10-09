@@ -3,6 +3,7 @@ import { addDays, weekdayOf } from '../../shared/dates'
 import {
   formatActivityMoment,
   formatDay,
+  formatDayShort,
   formatLongDay,
   formatTime,
 } from './dates'
@@ -16,6 +17,20 @@ const WEEKDAYS = [
   'петък',
   'събота',
 ]
+
+describe('formatDayShort', () => {
+  it('names nearby days like formatDay', () => {
+    expect(formatDayShort('2026-10-07', '2026-10-07')).toBe('днес')
+    expect(formatDayShort('2026-10-08', '2026-10-07')).toBe('утре')
+    expect(formatDayShort('2026-10-06', '2026-10-07')).toBe('вчера')
+  })
+
+  it('shortens the weekday, and never grows past a short date with its year', () => {
+    expect(formatDayShort('2026-10-16', '2026-10-07')).toBe('пт, 16.10')
+    expect(formatDayShort('2025-10-12', '2026-10-07')).toBe('12.10.2025')
+    expect(formatDayShort('2027-01-05', '2026-10-07')).toBe('5.1.2027')
+  })
+})
 
 describe('formatDay', () => {
   it('names nearby days, otherwise weekday and date', () => {
