@@ -190,6 +190,9 @@ export default defineSchema({
     searchText: v.string(),
     createdBy: v.id('memberships'),
   })
+    // In creation order, which the recount of the job counts pages through (D105).
+    // eslint-disable-next-line @convex-dev/no-duplicate-indexes
+    .index('by_business', ['businessId'])
     .index('by_business_group_due', ['businessId', 'stageGroup', 'dueDate'])
     .index('by_business_group_done', ['businessId', 'stageGroup', 'doneAt'])
     .index('by_business_stage', ['businessId', 'stageId'])
@@ -212,6 +215,20 @@ export default defineSchema({
     /** The business row only. A stage with no jobs has no entry. */
     stages: v.optional(v.record(v.id('stages'), v.number())),
   }).index('by_business_member', ['businessId', 'membershipId']),
+
+  // The counts of a business being recounted by `counts:backfill` (D105): the
+  // jobs up to `after` (a `_creationTime`) are counted here, and every change
+  // to such a job is added here too, so the recount ends exact however the
+  // jobs changed meanwhile. At most one row per business; gone when it ends.
+  jobCountRebuilds: defineTable({
+    businessId: v.id('businesses'),
+    /** Which run this belongs to: a run that finds another's id stops. */
+    runId: v.string(),
+    after: v.number(),
+    groups: vGroupCounts,
+    stages: v.record(v.id('stages'), v.number()),
+    members: v.record(v.id('memberships'), vGroupCounts),
+  }).index('by_business', ['businessId']),
 
   // Derived from `jobs.assigneeIds` (D106): one row per job and assignee, so a
   // Worker's jobs are an index read instead of a scan of the business's jobs.

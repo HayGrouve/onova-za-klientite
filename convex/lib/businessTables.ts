@@ -24,13 +24,14 @@ export const BUSINESS_TABLES = {
 } as const
 
 /**
- * Tables derived from the ones above (the job counts and the Worker
- * assignments, D105, D106). They go with the business when it is deleted, but
+ * Tables derived from the ones above (the job counts, a recount of them and the
+ * Worker assignments, D105, D106). They go with the business when it is deleted, but
  * the data export leaves them out: they hold nothing the jobs don't.
  */
 export const DERIVED_TABLES = {
   jobCounts: 'by_business_member',
   jobAssignments: 'by_business',
+  jobCountRebuilds: 'by_business',
 } as const
 
 const ALL_TABLES = { ...BUSINESS_TABLES, ...DERIVED_TABLES }

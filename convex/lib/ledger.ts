@@ -20,11 +20,10 @@ import { recomputeClient, recomputeJob, recomputeMoney } from './recompute'
 
 export {
   clearJobIndex,
-  countJob,
   dropStaleAssignments,
-  emptyTotals,
+  rebuildPage,
+  startRebuild,
   syncAssignments,
-  writeTotals,
 } from './jobIndex'
 
 type CacheField =
