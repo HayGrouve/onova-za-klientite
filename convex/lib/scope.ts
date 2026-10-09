@@ -165,6 +165,44 @@ export async function workerAssignments(ctx: ScopedCtx) {
     .take(MAX_ASSIGNED)
 }
 
+/** Most of a Worker's assignment rows read when search looks beyond the index (D113). */
+export const WORKER_RECENT = 200
+
+/** The groups read newest-work first: open ones, then Done and Cancelled. */
+const RECENT_GROUPS = [
+  { group: 'in_progress', order: 'asc' },
+  { group: 'new', order: 'asc' },
+  { group: 'done', order: 'desc' },
+  { group: 'cancelled', order: 'desc' },
+] as const satisfies ReadonlyArray<{ group: StageGroup; order: 'asc' | 'desc' }>
+
+/**
+ * At most `limit` of the Worker's assignment rows, the ones most likely to be
+ * wanted: open jobs first (soonest due first), then Done and Cancelled with
+ * the latest due first. However many old jobs a Worker has, a search reads no
+ * more than this.
+ */
+export async function workerRecentAssignments(
+  ctx: ScopedCtx,
+  limit = WORKER_RECENT,
+) {
+  const rows: Array<Doc<'jobAssignments'>> = []
+  for (const { group, order } of RECENT_GROUPS) {
+    const room = limit - rows.length
+    if (room <= 0) break
+    rows.push(
+      ...(await ctx.db
+        .query('jobAssignments')
+        .withIndex('by_member_group_due', (q) =>
+          q.eq('membershipId', ctx.member._id).eq('stageGroup', group),
+        )
+        .order(order)
+        .take(room)),
+    )
+  }
+  return rows
+}
+
 /** The member's own jobs for a client. Everything for an Owner or Manager. */
 export async function visibleJobsOfClient(
   ctx: ScopedCtx,

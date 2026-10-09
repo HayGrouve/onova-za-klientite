@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { api, internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
+import { WORKER_RECENT, workerRecentAssignments } from './lib/scope'
 import {
   addMember,
   assignJob,
@@ -141,6 +142,163 @@ describe('a Worker’s search (D109)', () => {
     })
     expect(stranger.items.length).toBeGreaterThan(1)
   })
+
+  it('finds their client by the end of the phone when more than 64 other clients match', async () => {
+    const { t, owner, worker, businessId, membershipId } = await setup()
+    for (let index = 0; index < 70; index++) {
+      await owner.mutation(api.clients.create, {
+        businessId,
+        name: `Друг ${index}`,
+        phones: [{ number: `+359 88${String(index).padStart(3, '0')}4159` }],
+      })
+    }
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Мой клиент',
+      phones: [{ number: '+359 887 654 159' }],
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Работа',
+    })
+    await assignJob(t, jobId, [membershipId])
+    const found = await worker.query(api.search.all, {
+      businessId,
+      query: '4159',
+    })
+    expect(found.clients.map((client) => client._id)).toEqual([clientId])
+  })
+
+  it('finds their client by address, and by whole words but the last', async () => {
+    const { t, owner, worker, businessId, membershipId } = await setup()
+    for (let index = 0; index < 70; index++) {
+      await owner.mutation(api.clients.create, {
+        businessId,
+        name: `Друг ${index}`,
+        address: 'ул. Липа 5',
+      })
+    }
+    const clientId = await owner.mutation(api.clients.create, {
+      businessId,
+      name: 'Мой клиент',
+      address: 'ул. Липа 5',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Работа',
+    })
+    await assignJob(t, jobId, [membershipId])
+    const search = async (query: string) =>
+      (await worker.query(api.search.all, { businessId, query })).clients.map(
+        (client) => client._id,
+      )
+    expect(await search('липа')).toEqual([clientId])
+    // A part of the first word is no match, as in the index.
+    expect(await search('ли 5')).toEqual([])
+  })
+
+  it('reads a bounded number of a Worker’s assignment rows, newest groups first', async () => {
+    const { t, owner, membershipId, businessId, clientId } = await setup()
+    const open = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Отворена',
+    })
+    await assignJob(t, open, [membershipId])
+    const [base] = await rowsOf(t, open)
+    await t.run(async (ctx) => {
+      const { _id, _creationTime, ...fields } = base
+      for (let index = 0; index < WORKER_RECENT * 2; index++) {
+        await ctx.db.insert('jobAssignments', {
+          ...fields,
+          stageGroup: 'done',
+          dueDate: `2030-01-${String((index % 28) + 1).padStart(2, '0')}`,
+        })
+      }
+    })
+    const rows = await t.run(async (ctx) => {
+      const member = (await ctx.db.get('memberships', membershipId))!
+      const business = (await ctx.db.get('businesses', businessId))!
+      return await workerRecentAssignments({ ...ctx, member, business })
+    })
+    expect(rows).toHaveLength(WORKER_RECENT)
+    // The open job's row comes before any Done one.
+    expect(rows[0].jobId).toBe(open)
+    expect(rows[0].stageGroup).not.toBe('done')
+  }, 30_000)
+
+  it('reads only their most recent rows: a recent item is found, one on an old Done job is not', async () => {
+    const { t, owner, worker, businessId, membershipId, clientId } =
+      await setup()
+    await owner.mutation(api.businesses.setModules, {
+      businessId,
+      modules: {
+        items: true,
+        appointments: false,
+        costs: false,
+        reminders: false,
+        services: false,
+      },
+    })
+    // Others made first fill the index's first 64 hits.
+    for (let index = 0; index < 70; index++) {
+      await owner.mutation(api.items.create, {
+        businessId,
+        clientId,
+        name: `Ковер ${index}`,
+      })
+    }
+    const itemOn = async (name: string) => {
+      const itemId = await owner.mutation(api.items.create, {
+        businessId,
+        clientId,
+        name,
+      })
+      const jobId = await owner.mutation(api.jobs.create, {
+        businessId,
+        clientId,
+        title: name,
+      })
+      await owner.mutation(api.jobs.setItems, {
+        businessId,
+        jobId,
+        itemIds: [itemId],
+      })
+      await assignJob(t, jobId, [membershipId])
+      return { itemId, jobId }
+    }
+    const old = await itemOn('Ковер стар')
+    const recent = await itemOn('Ковер скорошен')
+    // The old job went Done long ago, behind many newer Done rows.
+    await t.run(async (ctx) => {
+      const [oldRow] = await ctx.db
+        .query('jobAssignments')
+        .withIndex('by_job', (q) => q.eq('jobId', old.jobId))
+        .collect()
+      await ctx.db.patch('jobAssignments', oldRow._id, {
+        stageGroup: 'done',
+        dueDate: '2000-01-01',
+      })
+      const { _id, _creationTime, ...fields } = oldRow
+      for (let index = 0; index < WORKER_RECENT; index++) {
+        await ctx.db.insert('jobAssignments', {
+          ...fields,
+          jobId: recent.jobId,
+          stageGroup: 'done',
+          dueDate: `2030-01-${String((index % 28) + 1).padStart(2, '0')}`,
+        })
+      }
+    })
+    const found = await worker.query(api.search.all, {
+      businessId,
+      query: 'ковер',
+    })
+    const ids = found.items.map((item) => item._id)
+    expect(ids).toContain(recent.itemId)
+    expect(ids).not.toContain(old.itemId)
+  }, 60_000)
 
   it('does not find a job that is not theirs, nor one taken off them', async () => {
     const { t, owner, worker, businessId, membershipId, clientId } =

@@ -221,6 +221,25 @@ export function nameMatches(query: string, name: string): boolean {
     .every((part) => nameWords.some((word) => word.startsWith(part)))
 }
 
+/**
+ * Whether a query finds a record the way Convex search does, in memory: its
+ * folded words against the record's stored keys, which are taken as they are
+ * and never folded again. Every term but the last must be a whole key, the
+ * last one the start of a key. A query with digits also has its compact form,
+ * and matching either variant is a match (search runs each and merges).
+ */
+export function keysMatch(query: string, searchText: string): boolean {
+  const keys = new Set(searchText.split(' ').filter(Boolean))
+  return foldQuery(query).some((variant) => {
+    const terms = variant.split(' ')
+    const last = terms.pop()!
+    return (
+      terms.every((term) => keys.has(term)) &&
+      [...keys].some((key) => key.startsWith(last))
+    )
+  })
+}
+
 export function digitsOf(text: string): string {
   return text.replace(/\D/g, '')
 }
