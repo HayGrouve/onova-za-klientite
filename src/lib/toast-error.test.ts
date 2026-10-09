@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import { toastError } from './toast-error'
+import { PHONE_QUERY } from './toast-layout'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
@@ -15,6 +16,7 @@ describe('toastError', () => {
   it("goes to the top on a phone, clear of a sheet's Save button", () => {
     phone(true)
     toastError('Something went wrong')
+    expect(window.matchMedia).toHaveBeenCalledWith(PHONE_QUERY)
     expect(toast.error).toHaveBeenCalledWith('Something went wrong', {
       position: 'top-center',
     })
