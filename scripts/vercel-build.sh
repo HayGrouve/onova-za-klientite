@@ -14,13 +14,19 @@
 #   and until a business is rebuilt the screens count its jobs from the jobs
 #   themselves.
 #
-# `set -e`: a failed push or backfill call fails the Vercel build.
+# `set -e`: a failed push fails the Vercel build. A failed backfill call does
+# not: the functions are already live by then, the screens recount an unbuilt
+# business themselves, and failing here would leave the new functions behind
+# the old app. It is logged loudly instead; re-run it by hand.
 set -eu
 
 npx convex deploy --cmd 'pnpm build' --preview-run 'seed:preview'
 
 if [ "${VERCEL_ENV:-}" = "production" ]; then
   echo "convex: scheduling counts:backfill on the production deployment"
-  npx convex run counts:backfill '{}' --prod
-  echo "convex: counts:backfill scheduled"
+  if npx convex run counts:backfill '{}' --prod; then
+    echo "convex: counts:backfill scheduled"
+  else
+    echo "convex: WARNING counts:backfill failed; run it by hand: npx convex run counts:backfill '{}' --prod" >&2
+  fi
 fi
