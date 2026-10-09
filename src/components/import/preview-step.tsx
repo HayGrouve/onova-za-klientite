@@ -1,6 +1,6 @@
 import { useConvex, useMutation, useQuery } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
 import type { ColumnFields } from '#/components/import/mapping-step'
 import { PreviewTable } from '#/components/import/preview-table'
@@ -70,7 +70,7 @@ export function PreviewStep({
     }
     lookup().catch((error: unknown) => {
       if (cancelled) return
-      toast.error(errorMessage(error))
+      toastError(errorMessage(error))
       setExistingPhones(new Set())
     })
     return () => {

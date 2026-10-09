@@ -1,6 +1,6 @@
 import { AddressBookIcon, FileXlsIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { Spinner } from '#/components/ui/spinner'
 import { canPickContact, pickContacts } from '#/lib/contacts'
 import { readImportFile } from '#/lib/import-file'
@@ -58,7 +58,7 @@ export function SourceStep({
       if (result.ok) onFile(result.table)
       else setError(ERRORS[result.reason]())
     } catch {
-      toast.error(m.import_error_read())
+      toastError(m.import_error_read())
     } finally {
       setReading(false)
     }

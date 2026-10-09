@@ -8,6 +8,7 @@ import {
 import { useQuery } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { Button, buttonVariants } from '#/components/ui/button'
@@ -160,7 +161,7 @@ function SummaryBody({
     // Straight from the tap: the file is already made.
     navigator.share({ files: [made.file] }).catch((error: unknown) => {
       if (error instanceof DOMException && error.name === 'AbortError') return
-      toast.error(m.summary_failed())
+      toastError(m.summary_failed())
     })
   }
   const copy = () => {
@@ -168,7 +169,7 @@ function SummaryBody({
       .write([new ClipboardItem({ 'image/png': made.blob })])
       .then(
         () => toast.success(m.summary_copied()),
-        () => toast.error(m.summary_copy_failed()),
+        () => toastError(m.summary_copy_failed()),
       )
   }
 

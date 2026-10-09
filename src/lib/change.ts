@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { errorMessage } from '#/lib/errors'
 import { m } from '#/paraglide/messages.js'
 
@@ -14,13 +14,13 @@ export async function runChange<T>(
   action: () => Promise<T>,
 ): Promise<ChangeResult<T>> {
   if (!navigator.onLine) {
-    toast.error(m.offline_edit_blocked())
+    toastError(m.offline_edit_blocked())
     return { done: false }
   }
   try {
     return { done: true, value: await action() }
   } catch (error) {
-    toast.error(errorMessage(error))
+    toastError(errorMessage(error))
     return { done: false }
   }
 }

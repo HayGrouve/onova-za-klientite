@@ -181,9 +181,28 @@
   contain-intrinsic-size: auto 4rem;
 }
 
-/* Toasts sit just above the phone's bottom nav; from lg there is none. */
+/* While a toast holds its place, the phone's bottom nav (and its raised "+")
+   steps aside, so the two never show half over each other. */
+[data-bottom-nav] {
+  transition:
+    opacity 150ms ease,
+    visibility 150ms;
+}
+body:has([data-sonner-toaster][data-y-position='bottom'] [data-sonner-toast])
+  [data-bottom-nav] {
+  opacity: 0;
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-bottom-nav] {
+    transition: none;
+  }
+}
+
+/* Toasts take the phone's bottom nav's place while they show, so they never
+   cover the page's own buttons; from lg there is no nav. */
 :root {
-  --toast-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+  --toast-bottom: calc(0.875rem + env(safe-area-inset-bottom));
 }
 @media (min-width: 64rem) {
   :root {
