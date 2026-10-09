@@ -11,7 +11,7 @@ import {
 } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
 import { fail } from './lib/errors'
-import { moveClientMoney } from './lib/ledger'
+import { moveClientMoney, patchJob } from './lib/ledger'
 import { clientSearchText, jobSearchText } from './lib/search'
 
 /** Clients that already have one of these phones: the duplicate warning. */
@@ -100,7 +100,8 @@ export const merge = businessMutation({
         .collect() as Promise<Array<Doc<T>>>
 
     const jobs = await byClient('jobs')
-    await moveRows(ctx, 'jobs', jobs, intoId)
+    // Through the ledger: a Worker's assignment rows copy the job's client.
+    for (const job of jobs) await patchJob(ctx, job._id, { clientId: intoId })
     await moveClientMoney(ctx, fromId, intoId)
     for (const table of [
       'items',

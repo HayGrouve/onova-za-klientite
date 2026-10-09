@@ -8,6 +8,7 @@ import {
   vExtra,
   vFieldTarget,
   vFieldType,
+  vGroupCounts,
   vJobFlow,
   vJobLine,
   vModules,
@@ -199,6 +200,35 @@ export default defineSchema({
       searchField: 'searchText',
       filterFields: ['businessId', 'stageGroup'],
     }),
+
+  // Derived from `jobs`, written only through convex/lib/ledger.ts (D105): how
+  // many jobs each stage group and each stage holds, so no list reads every job
+  // to count. One row for the business (no `membershipId`) and one per member
+  // with assigned jobs, which is what a Worker is counted by.
+  jobCounts: defineTable({
+    businessId: v.id('businesses'),
+    membershipId: v.optional(v.id('memberships')),
+    groups: vGroupCounts,
+    /** The business row only. A stage with no jobs has no entry. */
+    stages: v.optional(v.record(v.id('stages'), v.number())),
+  }).index('by_business_member', ['businessId', 'membershipId']),
+
+  // Derived from `jobs.assigneeIds` (D106): one row per job and assignee, so a
+  // Worker's jobs are an index read instead of a scan of the business's jobs.
+  // The group, due date, client and `owes` are copies, kept in step by the ledger.
+  jobAssignments: defineTable({
+    businessId: v.id('businesses'),
+    jobId: v.id('jobs'),
+    membershipId: v.id('memberships'),
+    clientId: v.id('clients'),
+    stageGroup: vStageGroup,
+    dueDate: v.optional(v.string()),
+    owes: v.boolean(),
+  })
+    .index('by_member_group_due', ['membershipId', 'stageGroup', 'dueDate'])
+    .index('by_member_owes_group', ['membershipId', 'owes', 'stageGroup'])
+    .index('by_job', ['jobId'])
+    .index('by_business', ['businessId']),
 
   jobItems: defineTable({
     businessId: v.id('businesses'),

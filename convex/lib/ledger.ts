@@ -4,6 +4,7 @@ import type { MutationCtx } from '../_generated/server'
 import { creditForJob, jobOwedCents } from '../../shared/allocation'
 import type { BusinessMutationCtx } from './auth'
 import { fail } from './errors'
+import { indexChangedJob, indexInsertedJob } from './jobIndex'
 import { recomputeClient, recomputeJob, recomputeMoney } from './recompute'
 
 /**
@@ -11,7 +12,20 @@ import { recomputeClient, recomputeJob, recomputeMoney } from './recompute'
  * fields money is computed from, goes through here. Each call refreshes the
  * caches it touched in the same mutation (ADR 0008), so no mutation calls
  * recompute or lists what it touched. ESLint keeps the raw writes in here.
+ *
+ * Inserting and changing a job also keeps what is derived from the jobs
+ * (D105, D106): the stage counts and the Worker assignment rows
+ * (`jobIndex.ts`). The same goes for the ones that rebuild them.
  */
+
+export {
+  clearJobIndex,
+  countJob,
+  dropStaleAssignments,
+  emptyTotals,
+  syncAssignments,
+  writeTotals,
+} from './jobIndex'
 
 type CacheField =
   'priceCents' | 'paidCents' | 'costCents' | 'balanceCents' | 'owes'
@@ -42,17 +56,23 @@ export async function insertJob(ctx: MutationCtx, job: JobFields) {
     owes: false,
   })
   await recomputeJob(ctx, jobId)
+  await indexInsertedJob(ctx, (await ctx.db.get('jobs', jobId))!)
   return jobId
 }
 
-/** Changes a job. Lines, typed price, write-off and stage group feed its money. */
+/**
+ * Changes a job. Lines, typed price, write-off and stage group feed its money;
+ * stage, assignees, due date and client feed the counts and assignments.
+ */
 export async function patchJob(
   ctx: MutationCtx,
   jobId: Id<'jobs'>,
   patch: JobPatch,
 ) {
+  const before = (await ctx.db.get('jobs', jobId))!
   await ctx.db.patch('jobs', jobId, patch)
   await recomputeJob(ctx, jobId)
+  await indexChangedJob(ctx, before, (await ctx.db.get('jobs', jobId))!)
 }
 
 async function insertAllocations(

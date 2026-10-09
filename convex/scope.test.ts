@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { addMember, setupBusiness, setupConvex } from './test.setup'
+import { addMember, assignJob, setupBusiness, setupConvex } from './test.setup'
 import type { TestConvex } from './test.setup'
 
 const TODAY = '2026-10-09'
@@ -129,9 +129,7 @@ async function workerBusiness(t: TestConvex) {
 
   const mine = await work('Мой клиент', 'Моя поръчка')
   const theirs = await work('Чужд клиент', 'Чужда поръчка')
-  await t.run((ctx) =>
-    ctx.db.patch('jobs', mine.jobId, { assigneeIds: [membershipId] }),
-  )
+  await assignJob(t, mine.jobId, [membershipId])
   // One payment split across both jobs, and a credit the client holds.
   const clientId = mine.clientId
   await t.run((ctx) =>
@@ -340,6 +338,48 @@ describe('a Worker sees only their own work (D89)', () => {
     ])
   })
 
+  it('still sees their job when it sits behind thousands of the business’s others (D106)', async () => {
+    const t = setupConvex()
+    const { worker, businessId, mine, theirs } = await workerBusiness(t)
+    // 4,100 other jobs, all due long before theirs: a scan of the first 500
+    // (the list) or the first 4,000 (clients, offline) of the business's jobs
+    // would never reach it.
+    await t.run(async (ctx) => {
+      const { _id, _creationTime, ...other } = (await ctx.db.get(
+        'jobs',
+        theirs.jobId,
+      ))!
+      for (let index = 0; index < 4100; index++) {
+        await ctx.db.insert('jobs', { ...other, dueDate: '2000-01-01' })
+      }
+    })
+
+    const list = await worker.query(api.jobs.list, { businessId })
+    expect(list.jobs.map((job) => job._id)).toEqual([mine.jobId])
+    const board = await worker.query(api.jobs.board, { businessId })
+    expect(
+      board.columns.flatMap((column) => column.jobs.map((job) => job._id)),
+    ).toEqual([mine.jobId])
+    const clients = await worker.query(api.clients.list, { businessId })
+    expect(clients.map((client) => client._id)).toEqual([mine.clientId])
+    const snapshot = await worker.query(api.offline.snapshot, {
+      businessId,
+      today: TODAY,
+    })
+    expect(snapshot.jobs.map((job) => job._id)).toEqual([mine.jobId])
+    expect(snapshot.clients.map((client) => client._id)).toEqual([
+      mine.clientId,
+    ])
+    const today = await worker.query(api.today.list, {
+      businessId,
+      today: TODAY,
+    })
+    // Overdue, with a visit today: listed once, under the visit.
+    expect(today.appointments.map((visit) => visit.job?._id)).toEqual([
+      mine.jobId,
+    ])
+  })
+
   it('reads nothing that only a manager can act on', async () => {
     const t = setupConvex()
     const { worker, businessId, mine } = await workerBusiness(t)
@@ -374,9 +414,7 @@ describe('a Worker sees only their own work (D89)', () => {
       title: 'Закъсняла',
       dueDate: '2026-10-02',
     })
-    await t.run((ctx) =>
-      ctx.db.patch('jobs', lateId, { assigneeIds: [membershipId] }),
-    )
+    await assignJob(t, lateId, [membershipId])
     const counts = await t.run(async (ctx) => {
       const { summaryCounts } = await import('./lib/summary')
       const business = (await ctx.db.get('businesses', businessId))!

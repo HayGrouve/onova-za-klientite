@@ -7,7 +7,13 @@ import { logActivity } from './lib/activity'
 import type { BusinessMutationCtx } from './lib/auth'
 import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
-import { insertCost, insertJob, payJob, recordPayment } from './lib/ledger'
+import {
+  clearJobIndex,
+  insertCost,
+  insertJob,
+  payJob,
+  recordPayment,
+} from './lib/ledger'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { joinSeedBusinesses, seedAllowed } from './lib/seedAccess'
 import { SEED_BUSINESSES } from './seedData'
@@ -50,6 +56,7 @@ async function clearBusinessData(
     )
   }
   await remove('jobs', jobs)
+  await clearJobIndex(ctx, businessId)
   const payments = await ctx.db
     .query('payments')
     .withIndex('by_business_date', (q) => q.eq('businessId', businessId))

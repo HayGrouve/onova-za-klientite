@@ -18,9 +18,6 @@ export type BoardJob = {
 /** Done and Cancelled keep growing, so the board shows only the latest of them. */
 export const BOARD_CLOSED_LIMIT = 20
 
-/** Done and Cancelled are counted up to this many; past it the column says "N+". */
-export const BOARD_COUNT_CAP = 100
-
 /**
  * One column of the board: the jobs of one stage group in board order, how
  * many there are, and what they still owe. Open work comes soonest due first,

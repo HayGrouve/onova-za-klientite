@@ -329,8 +329,7 @@ const Column = memo(function Column({
     stages.some((stage) => stage._id !== dragging.stageId)
   const over = overKey === `column:${group}`
   const hidden = column.total - column.jobs.length
-  // Done and Cancelled are counted up to a cap: "100+".
-  const total = column.totalCapped ? `${column.total}+` : column.total
+  const total = column.total
   // The header counts what is shown: with a filter on, the cards that pass it.
   const owed = filtering ? owedCents(cards) : column.owedCents
 

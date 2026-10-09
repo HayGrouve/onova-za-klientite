@@ -23,14 +23,33 @@ export const BUSINESS_TABLES = {
   memberships: 'by_business_user',
 } as const
 
+/**
+ * Tables derived from the ones above (the job counts and the Worker
+ * assignments, D105, D106). They go with the business when it is deleted, but
+ * the data export leaves them out: they hold nothing the jobs don't.
+ */
+export const DERIVED_TABLES = {
+  jobCounts: 'by_business_member',
+  jobAssignments: 'by_business',
+} as const
+
+const ALL_TABLES = { ...BUSINESS_TABLES, ...DERIVED_TABLES }
+
 export type BusinessTable = keyof typeof BUSINESS_TABLES
+export type DerivedTable = keyof typeof DERIVED_TABLES
 
 export const BUSINESS_TABLE_NAMES = Object.keys(
   BUSINESS_TABLES,
 ) as BusinessTable[]
 
+/** Everything deleted with a business: its tables, then the derived ones. */
+export const DELETED_TABLE_NAMES = [
+  ...BUSINESS_TABLE_NAMES,
+  ...(Object.keys(DERIVED_TABLES) as DerivedTable[]),
+]
+
 /** A query over one table, limited to one business by its index. */
-export function queryByBusiness<T extends BusinessTable>(
+export function queryByBusiness<T extends BusinessTable | DerivedTable>(
   ctx: QueryCtx,
   table: T,
   businessId: Id<'businesses'>,
@@ -47,7 +66,7 @@ export function queryByBusiness<T extends BusinessTable>(
       take: (n: number) => Promise<Array<Doc<T>>>
     }
   }
-  return query.withIndex(BUSINESS_TABLES[table], (q) =>
+  return query.withIndex(ALL_TABLES[table], (q) =>
     q.eq('businessId', businessId),
   )
 }
