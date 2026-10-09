@@ -21,7 +21,7 @@ export function moveOnBoard(
 ): Board | undefined {
   const stage = board.stages.find((item) => item._id === stageId)
   const moving = board.columns
-    .flatMap((column) => column.jobs)
+    .flatMap((column) => [...column.jobs, ...column.olderOwing])
     .find((job) => job._id === jobId)
   if (!stage || !moving) return undefined
   // The same rule the server applies: Cancelled never owes, Done records when
@@ -38,13 +38,16 @@ export function moveOnBoard(
     ...board,
     columns: board.columns.map((column) => {
       const rest = column.jobs.filter((job) => job._id !== jobId)
-      const left = rest.length < column.jobs.length
+      const olderOwing = column.olderOwing.filter((job) => job._id !== jobId)
+      const left =
+        rest.length < column.jobs.length ||
+        olderOwing.length < column.olderOwing.length
       const arrives = column.group === stage.group
       const jobs = arrives ? [...rest, moved] : rest
       return {
         ...column,
         jobs: boardColumn(column.group, jobs, jobs.length).jobs,
-        olderOwing: column.olderOwing.filter((job) => job._id !== jobId),
+        olderOwing,
         total: column.total - (left ? 1 : 0) + (arrives ? 1 : 0),
         owedCents:
           column.owedCents -

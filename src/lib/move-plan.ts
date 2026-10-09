@@ -21,6 +21,8 @@ export function planMove(
 ): 'skip' | 'ask' | 'move' {
   if (!current) return 'skip'
   if (target !== 'cancelled' && target._id === current.stageId) return 'skip'
+  if (target === 'cancelled' && current.stageGroup === 'cancelled')
+    return 'skip'
   if (targetGroup(target) === 'cancelled' && current.stageGroup !== 'cancelled')
     return 'ask'
   return 'move'

@@ -59,6 +59,24 @@ describe('moveOnBoard', () => {
     expect(next.columns[3].owedCents).toBe(0)
   })
 
+  it('moves an older owing job out of its list', () => {
+    const late = job('c', 'done', 3000)
+    const withOlder = {
+      ...board,
+      columns: board.columns.map((item) =>
+        item.group === 'done'
+          ? { ...item, olderOwing: [late], total: 1, owedCents: 3000 }
+          : item,
+      ),
+    } as never as Parameters<typeof moveOnBoard>[0]
+    const next = moveOnBoard(withOlder, 'c' as never, 's1' as never, 99)!
+    const [fresh, , done] = next.columns
+    expect(done.olderOwing).toEqual([])
+    expect(done.total).toBe(0)
+    expect(done.owedCents).toBe(0)
+    expect(fresh.jobs.map((item) => item._id)).toContain('c')
+  })
+
   it('does nothing for an unknown job or stage', () => {
     expect(moveOnBoard(board, 'zz' as never, 's3' as never, 1)).toBeUndefined()
     expect(moveOnBoard(board, 'a' as never, 'zz' as never, 1)).toBeUndefined()

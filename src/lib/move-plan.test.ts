@@ -36,7 +36,8 @@ describe('planMove', () => {
   it('does not ask again once the job is already cancelled', () => {
     // The answer comes after the job moved on another device: no second move.
     expect(planMove(cancelled, stage('s5', 'cancelled'))).toBe('move')
-    expect(planMove(cancelled, 'cancelled')).toBe('move')
+    // The bare target only says "cancel": a cancelled job has nothing to do.
+    expect(planMove(cancelled, 'cancelled')).toBe('skip')
   })
 
   it('moves at once everywhere else', () => {
