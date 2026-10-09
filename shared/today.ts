@@ -72,16 +72,16 @@ type LateCandidate = { _id: string; stageGroup: StageGroup; dueDate?: string }
  * first, then the late jobs found under visits. The wide Today's late section,
  * its tile and the morning push all read this, so they agree (D110).
  */
-export function lateJobs<Job extends LateCandidate>(
+export function lateJobs<TJob extends LateCandidate>(
   arranged: {
-    appointments: Array<{ job?: Job }>
-    upcoming: Array<{ job?: Job }>
-    overdue: Job[]
+    appointments: Array<{ job?: TJob }>
+    upcoming: Array<{ job?: TJob }>
+    overdue: TJob[]
   },
   today: string,
-): Job[] {
+): TJob[] {
   const seen = new Set<string>()
-  const late: Job[] = []
+  const late: TJob[] = []
   const jobs = [
     ...arranged.overdue,
     ...[...arranged.appointments, ...arranged.upcoming].flatMap((visit) =>
