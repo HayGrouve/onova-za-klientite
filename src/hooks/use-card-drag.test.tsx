@@ -138,7 +138,7 @@ describe('useCardDrag', () => {
     expect(container.querySelector('#float')).toBeNull()
   })
 
-  it('ignores a second press while a drag is in flight', () => {
+  it('a new press ends a drag in flight without dropping it, and takes over', () => {
     const card = container.querySelector('#card') as HTMLElement
     const other = container.querySelector('#card2') as HTMLElement
     const html = document.documentElement
@@ -148,29 +148,39 @@ describe('useCardDrag', () => {
     })
     expect(html.classList.contains('dragging-card')).toBe(true)
 
-    // A second finger presses another card and moves: it must not take over.
+    // The first finger's release was lost; another press must not be locked out.
     under = container.querySelector('#zone')
     act(() => {
       other.dispatchEvent(pointer('pointerdown', { x: 200, y: 200 }, 2))
+    })
+    expect(onDrop).not.toHaveBeenCalled()
+    expect(container.querySelector('#float')).toBeNull()
+    act(() => {
       window.dispatchEvent(pointer('pointermove', { x: 230, y: 230 }, 2))
     })
-    const float = container.querySelector('#float') as HTMLElement
-    expect(float.dataset.item).toBe('job-1')
+    expect(
+      (container.querySelector('#float') as HTMLElement).dataset.item,
+    ).toBe('job-2')
     act(() => {
       window.dispatchEvent(pointer('pointerup', { x: 230, y: 230 }, 2))
     })
-    expect(onDrop).not.toHaveBeenCalled()
-    expect(container.querySelector('#float')).not.toBeNull()
-
-    // The first gesture still ends cleanly and takes its own drop.
-    act(() => {
-      window.dispatchEvent(pointer('pointermove', { x: 40, y: 40 }))
-      window.dispatchEvent(pointer('pointerup', { x: 40, y: 40 }))
-    })
     expect(onDrop).toHaveBeenCalledTimes(1)
-    expect(onDrop).toHaveBeenCalledWith('job-1', 'zone:a')
-    expect(container.querySelector('#float')).toBeNull()
+    expect(onDrop).toHaveBeenCalledWith('job-2', 'zone:a')
     expect(html.classList.contains('dragging-card')).toBe(false)
+  })
+
+  it('a cancel from another pointer leaves the drag alone', () => {
+    const card = container.querySelector('#card') as HTMLElement
+    act(() => {
+      card.dispatchEvent(pointer('pointerdown', { x: 10, y: 10 }))
+      window.dispatchEvent(pointer('pointermove', { x: 30, y: 30 }))
+      window.dispatchEvent(pointer('pointercancel', { x: 0, y: 0 }, 2))
+    })
+    expect(container.querySelector('#float')).not.toBeNull()
+    act(() => {
+      window.dispatchEvent(pointer('pointercancel', { x: 30, y: 30 }))
+    })
+    expect(container.querySelector('#float')).toBeNull()
   })
 
   it('ends a press its own pointer never released when it presses again', () => {

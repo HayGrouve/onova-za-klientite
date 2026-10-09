@@ -37,19 +37,18 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
   const dropRef = useRef(onDrop)
   dropRef.current = onDrop
   const dragged = useRef(false)
-  // The gesture in flight, if any: how to end it, and whose finger it is.
-  const cleanupRef = useRef<{ end: () => void; pointerId: number }>(undefined)
+  // How to end the gesture in flight, if any.
+  const cleanupRef = useRef<{ end: () => void }>(undefined)
   useEffect(() => () => cleanupRef.current?.end(), [])
 
   const press = useCallback(
     (event: ReactPointerEvent<HTMLElement>, item: T) => {
       if (event.button !== 0) return
       if ((event.target as HTMLElement).closest('[data-no-drag]')) return
-      const inFlight = cleanupRef.current
-      // A second finger doesn't take over a gesture in flight. The same
-      // pointer pressing again means the last release was missed.
-      if (inFlight && inFlight.pointerId !== event.pointerId) return
-      inFlight?.end()
+      // A new press ends any gesture still in flight, without dropping it: its
+      // release may have been missed (the browser took the touch), and
+      // waiting for it would lock every card out.
+      cleanupRef.current?.end()
       const rect = event.currentTarget.getBoundingClientRect()
       const { pointerId } = event
       const start = { x: event.clientX, y: event.clientY }
@@ -139,12 +138,14 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
       // While dragging, a finger moves the card instead of the page.
       const onTouchMove = (moved: TouchEvent) =>
         active && moved.preventDefault()
+      const onCancel = (cancelled: PointerEvent) =>
+        cancelled.pointerId === pointerId && end()
       const end = () => {
         window.clearTimeout(hold)
         cancelAnimationFrame(frame)
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
-        window.removeEventListener('pointercancel', end)
+        window.removeEventListener('pointercancel', onCancel)
         window.removeEventListener('keydown', onKey)
         document.removeEventListener('touchmove', onTouchMove)
         document.body.style.userSelect = ''
@@ -155,10 +156,10 @@ export function useCardDrag<T>(onDrop: (item: T, key: string) => void) {
       }
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
-      window.addEventListener('pointercancel', end)
+      window.addEventListener('pointercancel', onCancel)
       window.addEventListener('keydown', onKey)
       document.addEventListener('touchmove', onTouchMove, { passive: false })
-      cleanupRef.current = { end, pointerId }
+      cleanupRef.current = { end }
     },
     [],
   )
