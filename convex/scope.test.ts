@@ -406,8 +406,8 @@ describe('a Worker sees only their own work (D89)', () => {
   it('counts only their own work in the morning summary', async () => {
     const t = setupConvex()
     const { owner, businessId, membershipId, mine } = await workerBusiness(t)
-    // Their overdue job with a visit today is shown under the visit, once.
-    // This one is overdue with no visit, so it is counted as overdue.
+    // Their overdue job with a visit today is shown under the visit, once, and
+    // counted as late (D110). This one is overdue with no visit: late too.
     const lateId = await owner.mutation(api.jobs.create, {
       businessId,
       clientId: mine.clientId,
@@ -424,6 +424,6 @@ describe('a Worker sees only their own work (D89)', () => {
         reminders: true,
       })
     })
-    expect(counts).toEqual({ appointments: 1, overdue: 1, reminders: 0 })
+    expect(counts).toEqual({ appointments: 1, overdue: 2, reminders: 0 })
   })
 })

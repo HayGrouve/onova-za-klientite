@@ -1,4 +1,5 @@
 import { nextSofiaTime, todayInSofia } from '../../shared/dates'
+import { lateJobCount } from '../../shared/today'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { summaryBody, summaryTitle } from './pushText'
@@ -19,8 +20,10 @@ export function nextSummaryTime(now: number): number {
 /**
  * What Today would list, as counts: the very lists the Today screen shows
  * (`collectToday`), so the two cannot differ. A Done job's visit and an
- * overdue job already shown under a visit today are not counted twice. A
- * Worker's counts cover only their own work, and no reminders (D89).
+ * overdue job already shown under a visit today are not counted twice. The
+ * overdue count is every late job, also one listed under a visit (`lateJobCount`,
+ * D110), as the Today tile counts it. A Worker's counts cover only their own
+ * work, and no reminders (D89).
  */
 export async function summaryCounts(
   ctx: QueryCtx,
@@ -36,7 +39,7 @@ export async function summaryCounts(
   })
   return {
     appointments: arranged.appointments.length,
-    overdue: arranged.overdue.length,
+    overdue: include.overdue ? lateJobCount(arranged, today) : 0,
     reminders: arranged.reminders.length,
   }
 }
