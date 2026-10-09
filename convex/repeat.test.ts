@@ -319,7 +319,7 @@ describe('repeat (Q6)', () => {
     const { t, owner, businessId, clientId, jobId } = await weeklyJob()
     const survivor = await owner.mutation(api.clients.create, {
       businessId,
-      name: 'Офис ООД',
+      name: 'Склад Груп',
     })
     await t.run((ctx) =>
       ctx.db.patch('clients', clientId, { mergedIntoId: survivor }),
@@ -330,6 +330,7 @@ describe('repeat (Q6)', () => {
     const nextId = (await getDoc(t, 'jobs', jobId)).repeat!.nextJobId!
     const next = await getDoc(t, 'jobs', nextId)
     expect(next.clientId).toBe(survivor)
+    expect(next.searchText).toContain('sklad')
     const appointments = await t.run((ctx) =>
       ctx.db
         .query('appointments')
@@ -344,7 +345,7 @@ describe('repeat (Q6)', () => {
     const { t, owner, businessId, clientId, jobId } = await weeklyJob()
     const survivor = await owner.mutation(api.clients.create, {
       businessId,
-      name: 'Офис ООД',
+      name: 'Склад Груп',
     })
     await t.run(async (ctx) => {
       await ctx.db.patch('clients', clientId, { mergedIntoId: survivor })

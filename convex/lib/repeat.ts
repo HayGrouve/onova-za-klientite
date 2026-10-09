@@ -11,6 +11,7 @@ import { logActivity } from './activity'
 import type { BusinessMutationCtx } from './auth'
 import { fail } from './errors'
 import { insertJob } from './ledger'
+import { jobSearchText } from './search'
 
 /**
  * Sets how often a job repeats (Q6), every 1–52 weeks or months, and creates
@@ -180,7 +181,11 @@ export async function createNextInSeries(ctx: MutationCtx, job: Doc<'jobs'>) {
     nextRepeatOn: date,
     seriesId: job.seriesId ?? job._id,
     extra: job.extra,
-    searchText: job.searchText,
+    // Re-keyed: after a merge the series carries on under the survivor.
+    searchText:
+      client._id === job.clientId
+        ? job.searchText
+        : await jobSearchText(ctx, { ...job, clientId: client._id }),
     createdBy: member._id,
   })
   for (const itemId of job.itemIds) {
