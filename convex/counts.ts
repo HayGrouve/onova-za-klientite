@@ -23,7 +23,7 @@ const ASSIGNMENTS_PER_PAGE = 500
  *
  * The deploy passes `onlyMissing`, which skips a business already built. A
  * built business whose assignment rows lack the search text (made before D109)
- * is filled by `fillAssignmentSearch`, which the deploy runs too.
+ * is filled by `fillAssignmentSearch`, a one-time fill run by hand.
  *
  * It is safe to run twice and while the app is in use: rows that are already
  * right aren't written, and a job changed during the recount is counted
@@ -118,7 +118,8 @@ export const backfill = internalMutation({
  *
  * It is what makes a Worker's job search find jobs whose rows were made before
  * the rows carried the text, in businesses that `backfill` with `onlyMissing`
- * skips as already built, and every production deploy runs it. A row that
+ * skips as already built. It is a one-time fill, not part of the deploy: new
+ * and changed rows get their text from `syncAssignments`. A row that
  * already holds its job's text isn't written, so a second run wakes no query.
  * Rows of a job that is gone are left for `backfill` to drop.
  */

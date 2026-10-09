@@ -14,8 +14,9 @@
 #   key). It is cheap and idempotent: a business that is already right isn't
 #   written. It only schedules the rebuild, so the build doesn't wait for it,
 #   and until a business is rebuilt the screens count its jobs from the jobs
-#   themselves. It then runs `counts:fillAssignmentSearch` (D109), which gives
-#   the assignment rows of an already-built business their job's search text.
+#   themselves. (`counts:fillAssignmentSearch`, D109, is a one-time fill of the
+#   assignment rows' search text, run by hand once; new and changed rows get it
+#   from `syncAssignments`, so a deploy doesn't walk every row.)
 #
 # `set -e`: a failed push fails the Vercel build. A failed backfill call does
 # not: the functions are already live by then, the screens recount an unbuilt
@@ -31,12 +32,5 @@ if [ "${VERCEL_ENV:-}" = "production" ]; then
     echo "convex: counts:backfill scheduled"
   else
     echo "convex: WARNING counts:backfill failed; run it by hand: npx convex run counts:backfill '{}' --prod" >&2
-  fi
-  # A built business is skipped above, but its assignment rows may lack their
-  # job's search text (D109): fill them. A row that has it isn't written.
-  if npx convex run counts:fillAssignmentSearch '{}' --prod; then
-    echo "convex: counts:fillAssignmentSearch started"
-  else
-    echo "convex: WARNING counts:fillAssignmentSearch failed; run it by hand: npx convex run counts:fillAssignmentSearch '{}' --prod" >&2
   fi
 fi
