@@ -15,7 +15,8 @@ const isVitest = Boolean(process.env.VITEST)
  * production instance needs its own (`clerk.<domain>`) at launch (D50).
  * `'wasm-unsafe-eval'` (WebAssembly only, not `eval`) and `data:` in
  * `connect-src` are for satori's layout engine in the job summary, which
- * compiles a wasm module it carries as a data URL.
+ * compiles a wasm module it carries as a data URL. `blob:` lets the page
+ * read back what it made itself (the summary PNG, picked or converted files).
  */
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -23,7 +24,7 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob: https://img.clerk.com https://*.convex.cloud",
-  "connect-src 'self' data: https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://clerk-telemetry.com",
+  "connect-src 'self' data: blob: https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://clerk-telemetry.com",
   'frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev',
   "worker-src 'self' blob:",
   "manifest-src 'self'",
