@@ -93,6 +93,55 @@ describe('a Worker’s search (D109)', () => {
     expect(found.clients.map((client) => client._id)).toEqual([clientId])
   })
 
+  it('finds their item when more than 64 other items match', async () => {
+    const { t, owner, worker, businessId, membershipId, clientId } =
+      await setup()
+    await owner.mutation(api.businesses.setModules, {
+      businessId,
+      modules: {
+        items: true,
+        appointments: false,
+        costs: false,
+        reminders: false,
+        services: false,
+      },
+    })
+    for (let index = 0; index < 70; index++) {
+      await owner.mutation(api.items.create, {
+        businessId,
+        clientId,
+        name: `Перално ${index}`,
+      })
+    }
+    const itemId = await owner.mutation(api.items.create, {
+      businessId,
+      clientId,
+      name: 'Перално на Петър',
+    })
+    const jobId = await owner.mutation(api.jobs.create, {
+      businessId,
+      clientId,
+      title: 'Ремонт',
+    })
+    await owner.mutation(api.jobs.setItems, {
+      businessId,
+      jobId,
+      itemIds: [itemId],
+    })
+    await assignJob(t, jobId, [membershipId])
+    const found = await worker.query(api.search.all, {
+      businessId,
+      query: 'перално',
+    })
+    expect(found.items.map((item) => item._id)).toEqual([itemId])
+    // An item of a job that is not theirs stays hidden.
+    const stranger = await owner.query(api.search.all, {
+      businessId,
+      query: 'перално',
+    })
+    expect(stranger.items.length).toBeGreaterThan(1)
+  })
+
   it('does not find a job that is not theirs, nor one taken off them', async () => {
     const { t, owner, worker, businessId, membershipId, clientId } =
       await setup()

@@ -7,7 +7,7 @@ import { businessQuery } from './lib/auth'
 import { setJobSearchText } from './lib/ledger'
 import { listExtra, listFieldIds } from './lib/listFields'
 import type { ScopedCtx } from './lib/scope'
-import { isWorker, seesClient, seesItem, seesJob } from './lib/scope'
+import { isWorker, seesClient, seesJob, workerAssignments } from './lib/scope'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { jobRow, newLookups, vJobRow } from './lib/views'
 import { vExtra } from './validators'
@@ -15,9 +15,9 @@ import { vExtra } from './validators'
 const PER_KIND = 8
 /**
  * A Worker's own jobs are searched in `jobAssignments`, limited to them by the
- * index, so any match is theirs (D109). Their clients and items are still found
- * in the business-wide indexes, which can't be limited to a member, so more of
- * the matches are read to find theirs.
+ * index, so any match is theirs (D109). Their clients are also found in the
+ * business-wide clients index, which can't be limited to a member, so more of
+ * its matches are read to find theirs.
  */
 const WORKER_READ = 64
 
@@ -81,11 +81,36 @@ async function workerJobHits(
 }
 
 /**
+ * The items on a Worker's jobs: from their assignment rows and the jobs'
+ * item links, so the set is theirs alone and small (D89), whatever the
+ * business holds.
+ */
+async function workerItems(ctx: ScopedCtx) {
+  const jobIds = new Set((await workerAssignments(ctx)).map((row) => row.jobId))
+  const itemIds = new Set<Id<'items'>>()
+  for (const jobId of jobIds) {
+    const links = await ctx.db
+      .query('jobItems')
+      .withIndex('by_job', (q) => q.eq('jobId', jobId))
+      .collect()
+    for (const link of links) itemIds.add(link.itemId)
+  }
+  const items: Array<Doc<'items'>> = []
+  for (const itemId of itemIds) {
+    const item = await ctx.db.get('items', itemId)
+    if (item) items.push(item)
+  }
+  return items
+}
+
+/**
  * One box over clients, jobs and items (CONTEXT "Search"). Each folded variant
  * of the query is searched and the results merged, best match first. A
  * Worker finds only their jobs and those jobs' clients and items (D89). Their
  * jobs come from the search index of their assignment rows (D109); a client
  * is found through those jobs by name, and by what the clients index returns.
+ * Their items are the items on their jobs, matched in memory with the name
+ * matcher against each item's keys.
  */
 export const all = businessQuery({
   args: { query: v.string() },
@@ -116,6 +141,7 @@ export const all = businessQuery({
     const jobs = new Map<string, Awaited<ReturnType<typeof jobRow>>>()
     const items = new Map<string, ItemHit>()
     let shownItemFields: Set<string> | undefined
+    let ownItems: Array<Doc<'items'>> | undefined
     const lookups = newLookups()
     const worker = isWorker(ctx.member)
     const read = worker ? WORKER_READ : PER_KIND
@@ -154,15 +180,20 @@ export const all = businessQuery({
       }
       if (ctx.business.modules.items) {
         shownItemFields ??= await listFieldIds(ctx, businessId, 'item')
-        const foundItems = await ctx.db
-          .query('items')
-          .withSearchIndex('search', (q) =>
-            q.search('searchText', variant).eq('businessId', businessId),
-          )
-          .take(read)
+        // A Worker's items are few, so they are matched here rather than
+        // taken from the business-wide index's first hits.
+        const foundItems = worker
+          ? (ownItems ??= await workerItems(ctx)).filter((item) =>
+              nameMatches(variant, item.searchText),
+            )
+          : await ctx.db
+              .query('items')
+              .withSearchIndex('search', (q) =>
+                q.search('searchText', variant).eq('businessId', businessId),
+              )
+              .take(read)
         for (const item of foundItems) {
           if (items.has(item._id)) continue
-          if (!(await seesItem(ctx, item._id))) continue
           const owner = await ctx.db.get('clients', item.clientId)
           items.set(item._id, {
             _id: item._id,
