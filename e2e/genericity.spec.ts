@@ -195,8 +195,8 @@ async function expectClientPage(page: Page, b: Business) {
   for (const field of b.item.fields) {
     await expect(page.getByLabel(field, { exact: true })).toBeVisible()
   }
-  // Enter saves from the field: the toasts from adding the fields sit just
-  // above the nav, where Save stops when it scrolls into view.
+  // Enter saves from the field, so the toasts from adding the fields, still
+  // showing in the nav's place, are never in the way of a click on Save.
   const name = page.getByLabel('Име', { exact: true })
   await name.fill('Първият')
   await name.press('Enter')

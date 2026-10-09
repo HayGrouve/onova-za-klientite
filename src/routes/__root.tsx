@@ -124,12 +124,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <IconContext.Provider value={ICONS}>{children}</IconContext.Provider>
-        {/* Above the phone's bottom nav, where the thumb is, and never over
-            the header's search and business switcher (--toast-bottom). */}
+        {/* On a phone a toast takes the bottom nav's place while it shows
+            (--toast-bottom), where the thumb is: it covers no page button and
+            never the header's search and business switcher. Errors go to the
+            top instead (toastError). */}
         <Toaster
           position="bottom-center"
-          offset={{ bottom: 'var(--toast-bottom)' }}
-          mobileOffset={{ bottom: 'var(--toast-bottom)' }}
+          offset={{ bottom: 'var(--toast-bottom)', top: 16 }}
+          mobileOffset={{
+            bottom: 'var(--toast-bottom)',
+            top: 'calc(0.75rem + env(safe-area-inset-top))',
+          }}
         />
         <ServiceWorkerRegister />
         <Scripts />

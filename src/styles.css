@@ -181,9 +181,10 @@
   contain-intrinsic-size: auto 4rem;
 }
 
-/* Toasts sit just above the phone's bottom nav; from lg there is none. */
+/* Toasts take the phone's bottom nav's place while they show, so they never
+   cover the page's own buttons; from lg there is no nav. */
 :root {
-  --toast-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+  --toast-bottom: calc(0.875rem + env(safe-area-inset-bottom));
 }
 @media (min-width: 64rem) {
   :root {

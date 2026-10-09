@@ -2,7 +2,7 @@ import { ImageSquareIcon } from '@phosphor-icons/react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { useRef, useState } from 'react'
-import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
 import type { FunctionReturnType } from 'convex/server'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -259,7 +259,7 @@ function Logo({
         storageId: storageId as Id<'_storage'>,
         target: { kind: 'logo' },
       })
-      if ('rejected' in result) toast.error(m.files_rejected())
+      if ('rejected' in result) toastError(m.files_rejected())
     })
     setUploading(false)
   }

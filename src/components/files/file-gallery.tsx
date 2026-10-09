@@ -6,7 +6,7 @@ import {
 } from '@phosphor-icons/react'
 import { useMutation, useQuery } from 'convex/react'
 import { useRef, useState } from 'react'
-import { toast } from 'sonner'
+import { toastError } from '#/lib/toast-error'
 import { Button } from '#/components/ui/button'
 import {
   Sheet,
@@ -77,14 +77,14 @@ export function FileGallery({
         name: file.type === 'application/pdf' ? file.name : undefined,
       })
       if ('rejected' in result) {
-        toast.error(
+        toastError(
           result.rejected === 'size'
             ? m.files_rejected_size()
             : m.files_rejected_type(),
         )
       }
     } catch (error) {
-      toast.error(
+      toastError(
         errorCode(error) ? errorMessage(error) : m.files_upload_failed(),
       )
     } finally {
