@@ -8,6 +8,7 @@ import {
   RELOAD_COOLDOWN_MS,
   RELOAD_GRACE_MS,
   restartStartingUpClock,
+  StartedUp,
   StartingUp,
   STARTING_UP_MS,
 } from './starting-up'
@@ -121,6 +122,19 @@ describe('StartingUp', () => {
     act(() => root.render(<StartingUp />))
     await act(() => vi.advanceTimersByTimeAsync(0))
     expect(find('offline')).not.toBeNull()
+  })
+
+  it('waits the whole time again once the app has started (a later sign-in)', async () => {
+    act(() => root.render(<StartingUp />))
+    await act(() => vi.advanceTimersByTimeAsync(STARTING_UP_MS + 1))
+    // The start finished after all: the app is up.
+    act(() => root.render(<StartedUp />))
+    // Later in the same page load (signed out and in again): a fresh wait,
+    // not the saved copy at once (it may even be another account's).
+    act(() => root.render(<StartingUp />))
+    await act(() => vi.advanceTimersByTimeAsync(STARTING_UP_MS - 1))
+    expect(find('offline')).toBeNull()
+    expect(spinner()).not.toBeNull()
   })
 
   describe('once the saved copy shows', () => {

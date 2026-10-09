@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { AppShell } from '#/components/app-shell'
 import { SnapshotKeeper } from '#/components/offline/snapshot-keeper'
-import { StartingUp } from '#/components/offline/starting-up'
+import { StartedUp, StartingUp } from '#/components/offline/starting-up'
 import { CenteredMessage } from '#/components/centered-message'
 import { PushKeeper } from '#/components/push-keeper'
 import { Button } from '#/components/ui/button'
@@ -86,6 +86,7 @@ function WithViewer() {
   if (!viewer?.business) return <ProfileError />
   return (
     <ViewerProvider value={viewer}>
+      <StartedUp />
       <PushKeeper />
       <SnapshotKeeper />
       <AppShell>

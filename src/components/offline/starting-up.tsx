@@ -58,9 +58,19 @@ function reloadNow() {
  */
 let startedAt: number | undefined
 
-/** For tests: forget when this page load began waiting. */
+/** Forget when this page load began waiting: the next start waits afresh. */
 export function restartStartingUpClock() {
   startedAt = undefined
+}
+
+/**
+ * Rendered once the signed-in app is up: a later start in the same page load
+ * (signed out and in again, a lost profile) waits the whole time again rather
+ * than showing the saved copy at once, which may be another account's.
+ */
+export function StartedUp() {
+  useEffect(() => restartStartingUpClock(), [])
+  return null
 }
 
 /**

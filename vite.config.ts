@@ -5,7 +5,10 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
-import { contentSecurityPolicy } from './build/content-security-policy.ts'
+import {
+  clerkFrontendHost,
+  contentSecurityPolicy,
+} from './build/content-security-policy.ts'
 import { trimClerkBundle } from './build/clerk-localization.ts'
 import { serviceWorker } from './build/service-worker.ts'
 import { vendorGuard } from './build/vendor-guard.ts'
@@ -69,6 +72,14 @@ function isVendor(id: string) {
  */
 export default defineConfig(({ mode }) => {
   const { VITE_CLERK_PUBLISHABLE_KEY } = loadEnv(mode, process.cwd(), 'VITE_')
+  // On Vercel the key is always there (the app can't sign in without it), so
+  // a key the CSP can't read means the policy would fall back to the dev
+  // instance's hosts and block sign-in: fail the build instead.
+  if (process.env.VERCEL && !clerkFrontendHost(VITE_CLERK_PUBLISHABLE_KEY)) {
+    throw new Error(
+      'VITE_CLERK_PUBLISHABLE_KEY is missing or unreadable: the CSP would block Clerk.',
+    )
+  }
   const CONTENT_SECURITY_POLICY = contentSecurityPolicy(
     VITE_CLERK_PUBLISHABLE_KEY,
   )

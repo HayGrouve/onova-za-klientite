@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { arrangeToday, lateJobCount } from './today'
+import { arrangeToday, lateJobCount, lateJobs } from './today'
 import type { TodayAppointment, TodayJob } from './today'
 import type { StageGroup } from './stages'
 
@@ -236,6 +236,12 @@ describe('lateJobCount', () => {
     })
     expect(arranged.overdue.map((row) => row._id)).toEqual(['other'])
     expect(lateJobCount(arranged, TODAY)).toBe(2)
+    // The list behind the count: the overdue list first, then the late jobs
+    // found under visits, each once.
+    expect(lateJobs(arranged, TODAY).map((row) => row._id)).toEqual([
+      'other',
+      'late',
+    ])
   })
 
   it('counts a job with several visits once', () => {

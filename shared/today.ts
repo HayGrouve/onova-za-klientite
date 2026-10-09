@@ -66,26 +66,40 @@ export function arrangeToday<
 type LateCandidate = { _id: string; stageGroup: StageGroup; dueDate?: string }
 
 /**
- * How many jobs are late: open and due before `today` (`isJobLate`), each
- * counted once, whether Today lists it under overdue or under a visit (a late
- * job with a visit today is listed only under the visit, `arrangeToday`).
- * The Today tile and the morning push both count with this, so they agree.
+ * The late jobs: open and due before `today` (`isJobLate`), each once, whether
+ * Today lists it under overdue or under a visit (a late job with a visit today
+ * is listed only under the visit, `arrangeToday`). The overdue list comes
+ * first, then the late jobs found under visits. The wide Today's late section,
+ * its tile and the morning push all read this, so they agree (D110).
  */
-export function lateJobCount(
+export function lateJobs<Job extends LateCandidate>(
   arranged: {
-    appointments: Array<{ job?: LateCandidate }>
-    upcoming: Array<{ job?: LateCandidate }>
-    overdue: LateCandidate[]
+    appointments: Array<{ job?: Job }>
+    upcoming: Array<{ job?: Job }>
+    overdue: Job[]
   },
   today: string,
-): number {
-  const late = new Set<string>()
+): Job[] {
+  const seen = new Set<string>()
+  const late: Job[] = []
   const jobs = [
     ...arranged.overdue,
     ...[...arranged.appointments, ...arranged.upcoming].flatMap((visit) =>
       visit.job ? [visit.job] : [],
     ),
   ]
-  for (const job of jobs) if (isJobLate(job, today)) late.add(job._id)
-  return late.size
+  for (const job of jobs) {
+    if (seen.has(job._id) || !isJobLate(job, today)) continue
+    seen.add(job._id)
+    late.push(job)
+  }
+  return late
+}
+
+/** How many late jobs there are (`lateJobs`). */
+export function lateJobCount(
+  arranged: Parameters<typeof lateJobs>[0],
+  today: string,
+): number {
+  return lateJobs(arranged, today).length
 }
