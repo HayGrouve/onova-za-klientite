@@ -2,16 +2,23 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalMutation } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
-import { foldQuery } from '../shared/search'
+import { foldQuery, nameMatches } from '../shared/search'
 import { businessQuery } from './lib/auth'
+import { setJobSearchText } from './lib/ledger'
 import { listExtra, listFieldIds } from './lib/listFields'
-import { isWorker, seesClient, seesItem, seesJob } from './lib/scope'
+import type { ScopedCtx } from './lib/scope'
+import { isWorker, seesClient, seesJob, workerAssignments } from './lib/scope'
 import { clientSearchText, itemSearchText, jobSearchText } from './lib/search'
 import { jobRow, newLookups, vJobRow } from './lib/views'
 import { vExtra } from './validators'
 
 const PER_KIND = 8
-/** A Worker sees only part of the matches, so more are read to find theirs. */
+/**
+ * A Worker's own jobs are searched in `jobAssignments`, limited to them by the
+ * index, so any match is theirs (D109). Their clients are also found in the
+ * business-wide clients index, which can't be limited to a member, so more of
+ * its matches are read to find theirs.
+ */
 const WORKER_READ = 64
 
 type ClientHit = {
@@ -29,9 +36,81 @@ type ItemHit = {
 }
 
 /**
+ * A Worker's jobs matching a folded query, best first, from the search index
+ * of their assignment rows. It also adds to `clients` the clients of the
+ * matching jobs whose name matches the query: a name is part of its jobs' keys,
+ * so a Worker finds their own client by name however many other clients in the
+ * business match.
+ */
+async function workerJobHits(
+  ctx: ScopedCtx,
+  variant: string,
+  query: string,
+  clients: Map<string, ClientHit>,
+) {
+  const rows = await ctx.db
+    .query('jobAssignments')
+    .withSearchIndex('search', (q) =>
+      q.search('searchText', variant).eq('membershipId', ctx.member._id),
+    )
+    .take(WORKER_READ)
+  const jobs: Array<Doc<'jobs'>> = []
+  const seen = new Set<Id<'clients'>>()
+  for (const row of rows) {
+    const job = await ctx.db.get('jobs', row.jobId)
+    if (!job) continue
+    jobs.push(job)
+    if (seen.has(row.clientId)) continue
+    seen.add(row.clientId)
+    const client = await ctx.db.get('clients', row.clientId)
+    if (
+      client &&
+      client.mergedIntoId === undefined &&
+      !clients.has(client._id) &&
+      nameMatches(query, client.name)
+    ) {
+      clients.set(client._id, {
+        _id: client._id,
+        name: client.name,
+        phone: client.phones.at(0)?.e164,
+        isNoClient: client.isNoClient,
+      })
+    }
+  }
+  return jobs
+}
+
+/**
+ * The items on a Worker's jobs: from their assignment rows and the jobs'
+ * item links, so the set is theirs alone and small (D89), whatever the
+ * business holds.
+ */
+async function workerItems(ctx: ScopedCtx) {
+  const jobIds = new Set((await workerAssignments(ctx)).map((row) => row.jobId))
+  const itemIds = new Set<Id<'items'>>()
+  for (const jobId of jobIds) {
+    const links = await ctx.db
+      .query('jobItems')
+      .withIndex('by_job', (q) => q.eq('jobId', jobId))
+      .collect()
+    for (const link of links) itemIds.add(link.itemId)
+  }
+  const items: Array<Doc<'items'>> = []
+  for (const itemId of itemIds) {
+    const item = await ctx.db.get('items', itemId)
+    if (item) items.push(item)
+  }
+  return items
+}
+
+/**
  * One box over clients, jobs and items (CONTEXT "Search"). Each folded variant
  * of the query is searched and the results merged, best match first. A
- * Worker finds only their jobs and those jobs' clients and items (D89).
+ * Worker finds only their jobs and those jobs' clients and items (D89). Their
+ * jobs come from the search index of their assignment rows (D109); a client
+ * is found through those jobs by name, and by what the clients index returns.
+ * Their items are the items on their jobs, matched in memory with the name
+ * matcher against each item's keys.
  */
 export const all = businessQuery({
   args: { query: v.string() },
@@ -62,8 +141,10 @@ export const all = businessQuery({
     const jobs = new Map<string, Awaited<ReturnType<typeof jobRow>>>()
     const items = new Map<string, ItemHit>()
     let shownItemFields: Set<string> | undefined
+    let ownItems: Array<Doc<'items'>> | undefined
     const lookups = newLookups()
-    const read = isWorker(ctx.member) ? WORKER_READ : PER_KIND
+    const worker = isWorker(ctx.member)
+    const read = worker ? WORKER_READ : PER_KIND
 
     for (const variant of variants) {
       const foundClients = await ctx.db
@@ -83,12 +164,14 @@ export const all = businessQuery({
           isNoClient: client.isNoClient,
         })
       }
-      const foundJobs = await ctx.db
-        .query('jobs')
-        .withSearchIndex('search', (q) =>
-          q.search('searchText', variant).eq('businessId', businessId),
-        )
-        .take(read)
+      const foundJobs = worker
+        ? await workerJobHits(ctx, variant, query, clients)
+        : await ctx.db
+            .query('jobs')
+            .withSearchIndex('search', (q) =>
+              q.search('searchText', variant).eq('businessId', businessId),
+            )
+            .take(read)
       for (const job of foundJobs.filter((found) =>
         seesJob(ctx.member, found),
       )) {
@@ -97,15 +180,20 @@ export const all = businessQuery({
       }
       if (ctx.business.modules.items) {
         shownItemFields ??= await listFieldIds(ctx, businessId, 'item')
-        const foundItems = await ctx.db
-          .query('items')
-          .withSearchIndex('search', (q) =>
-            q.search('searchText', variant).eq('businessId', businessId),
-          )
-          .take(read)
+        // A Worker's items are few, so they are matched here rather than
+        // taken from the business-wide index's first hits.
+        const foundItems = worker
+          ? (ownItems ??= await workerItems(ctx)).filter((item) =>
+              nameMatches(variant, item.searchText),
+            )
+          : await ctx.db
+              .query('items')
+              .withSearchIndex('search', (q) =>
+                q.search('searchText', variant).eq('businessId', businessId),
+              )
+              .take(read)
         for (const item of foundItems) {
           if (items.has(item._id)) continue
-          if (!(await seesItem(ctx, item._id))) continue
           const owner = await ctx.db.get('clients', item.clientId)
           items.set(item._id, {
             _id: item._id,
@@ -162,9 +250,8 @@ export const rebuildAll = internalMutation({
       } else if (table === 'jobs') {
         const job = doc as Doc<'jobs'>
         const searchText = await jobSearchText(ctx, job)
-        if (searchText !== job.searchText) {
-          await ctx.db.patch('jobs', job._id, { searchText })
-        }
+        // Also the job's assignment rows, which copy it (D109).
+        await setJobSearchText(ctx, job, searchText)
       } else {
         const item = doc as Doc<'items'>
         const searchText = await itemSearchText(ctx, item)

@@ -26,6 +26,7 @@ import { dateInSofia, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 import { jobOwedCents } from '../../../shared/allocation'
 import { isJobLate } from '../../../shared/stages'
+import { lateJobCount } from '../../../shared/today'
 import { hasRole } from '../../../shared/roles'
 
 type TodayData = FunctionReturnType<typeof api.today.list>
@@ -68,6 +69,8 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
           .join(' · ')
       : undefined
 
+  // Every late job, also one listed under a visit, as the morning push counts.
+  const lateJobs = lateJobCount(data, today)
   const attention =
     data.overdue.length +
     data.dueSoon.length +
@@ -181,9 +184,9 @@ export function TodayWide({ data, today }: { data: TodayData; today: string }) {
           to="/"
           hash="attention"
           icon={WarningCircleIcon}
-          tone={data.overdue.length > 0 ? 'danger' : 'muted'}
+          tone={lateJobs > 0 ? 'danger' : 'muted'}
           label={m.today_overdue()}
-          value={String(data.overdue.length)}
+          value={String(lateJobs)}
           detail={m.count({
             label: m.today_due_soon(),
             count: data.dueSoon.length,

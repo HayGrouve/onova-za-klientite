@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { arrangeToday } from './today'
+import { arrangeToday, lateJobCount } from './today'
 import type { TodayAppointment, TodayJob } from './today'
 import type { StageGroup } from './stages'
 
@@ -196,5 +196,78 @@ describe('arrangeToday', () => {
     const copy = structuredClone(lists)
     arrangeToday(lists)
     expect(lists).toEqual(copy)
+  })
+})
+
+describe('lateJobCount', () => {
+  const TODAY = '2026-10-08'
+  const dated = (
+    id: string,
+    dueDate: string | undefined,
+    stageGroup: StageGroup = 'in_progress',
+  ) => ({ _id: id, stageGroup, dueDate })
+  const visitOf = (id: string, booked: ReturnType<typeof dated>) => ({
+    id,
+    job: booked,
+  })
+  const none = { appointments: [], upcoming: [], overdue: [] }
+
+  it('is zero when nothing is late', () => {
+    expect(lateJobCount(none, TODAY)).toBe(0)
+    expect(
+      lateJobCount(
+        {
+          ...none,
+          overdue: [],
+          appointments: [visitOf('a', dated('j1', TODAY))],
+        },
+        TODAY,
+      ),
+    ).toBe(0)
+  })
+
+  it('counts a late job listed under a visit, which the overdue list leaves out', () => {
+    const arranged = arrangeToday({
+      appointments: [visitOf('a1', dated('late', '2026-10-02'))],
+      upcoming: [],
+      overdue: [dated('late', '2026-10-02'), dated('other', '2026-10-03')],
+      dueSoon: [],
+      doneUnpaid: [],
+    })
+    expect(arranged.overdue.map((row) => row._id)).toEqual(['other'])
+    expect(lateJobCount(arranged, TODAY)).toBe(2)
+  })
+
+  it('counts a job with several visits once', () => {
+    const late = dated('late', '2026-10-02')
+    expect(
+      lateJobCount(
+        {
+          ...none,
+          appointments: [visitOf('a1', late), visitOf('a2', late)],
+          upcoming: [visitOf('a3', late)],
+          overdue: [late],
+        },
+        TODAY,
+      ),
+    ).toBe(1)
+  })
+
+  it('does not count a job that is due today, undated, Done or Cancelled', () => {
+    expect(
+      lateJobCount(
+        {
+          ...none,
+          appointments: [
+            visitOf('a1', dated('today', TODAY)),
+            visitOf('a2', dated('undated', undefined)),
+            visitOf('a3', dated('done', '2026-10-01', 'done')),
+            visitOf('a4', dated('cancelled', '2026-10-01', 'cancelled')),
+            {},
+          ],
+        },
+        TODAY,
+      ),
+    ).toBe(0)
   })
 })
