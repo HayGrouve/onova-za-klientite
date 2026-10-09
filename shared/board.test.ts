@@ -7,6 +7,7 @@ import {
   filterToSearch,
   isFiltering,
   owedCents,
+  unshownJobs,
   parseFilterSearch,
 } from './board'
 import type { BoardJob, FilterableJob } from './board'
@@ -277,5 +278,23 @@ describe('the filter in the address', () => {
       expect(parseFilterSearch(search)).toEqual(search)
       expect(isFiltering(filterFromSearch(search))).toBe(isFiltering(filter))
     }
+  })
+})
+
+describe('unshownJobs', () => {
+  const counts = { new: 812, in_progress: 3, done: 0, cancelled: 40 }
+
+  it('is the total when a tab has more jobs than rows', () => {
+    expect(unshownJobs(500, counts, 'new')).toEqual({ shown: 500, total: 812 })
+  })
+
+  it('is nothing when every job of the tab is shown', () => {
+    expect(unshownJobs(3, counts, 'in_progress')).toBeNull()
+    expect(unshownJobs(0, counts, 'done')).toBeNull()
+  })
+
+  it('counts every group for "all", and when a filter reads every tab', () => {
+    expect(unshownJobs(500, counts, 'all')).toEqual({ shown: 500, total: 855 })
+    expect(unshownJobs(855, counts, 'all')).toBeNull()
   })
 })

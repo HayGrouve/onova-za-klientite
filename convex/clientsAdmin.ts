@@ -11,7 +11,7 @@ import {
 } from './lib/auth'
 import type { BusinessMutationCtx } from './lib/auth'
 import { fail } from './lib/errors'
-import { moveClientMoney, patchJob } from './lib/ledger'
+import { moveClientMoney, moveJobsToClient } from './lib/ledger'
 import { clientSearchText, jobSearchText } from './lib/search'
 
 /** Clients that already have one of these phones: the duplicate warning. */
@@ -82,7 +82,6 @@ export const merge = businessMutation({
 
     const byClient = <
       T extends
-        | 'jobs'
         | 'payments'
         | 'allocations'
         | 'items'
@@ -99,9 +98,8 @@ export const merge = businessMutation({
         .withIndex('by_client' as never, (q: any) => q.eq('clientId', fromId))
         .collect() as Promise<Array<Doc<T>>>
 
-    const jobs = await byClient('jobs')
     // Through the ledger: a Worker's assignment rows copy the job's client.
-    for (const job of jobs) await patchJob(ctx, job._id, { clientId: intoId })
+    const jobIds = await moveJobsToClient(ctx, fromId, intoId)
     await moveClientMoney(ctx, fromId, intoId)
     for (const table of [
       'items',
@@ -136,9 +134,9 @@ export const merge = businessMutation({
     })
     await ctx.db.patch('clients', fromId, { mergedIntoId: intoId, phones: [] })
 
-    for (const job of jobs) {
-      const moved = (await ctx.db.get('jobs', job._id))!
-      await ctx.db.patch('jobs', job._id, {
+    for (const jobId of jobIds) {
+      const moved = (await ctx.db.get('jobs', jobId))!
+      await ctx.db.patch('jobs', jobId, {
         searchText: await jobSearchText(ctx, moved),
       })
     }

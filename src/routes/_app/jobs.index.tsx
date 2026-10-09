@@ -35,6 +35,7 @@ import {
   filterJobs,
   isFiltering,
   parseFilterSearch,
+  unshownJobs,
 } from '../../../shared/board'
 import type { JobFilter, JobFilterSearch } from '../../../shared/board'
 import {
@@ -221,6 +222,19 @@ function JobsList({
       data.counts.done +
       data.counts.cancelled ===
       0
+  // The list holds a fixed number of rows per group, whatever the exact counts.
+  const capped =
+    data &&
+    unshownJobs(
+      data.jobs.length,
+      data.counts,
+      group === 'all' || filtering ? 'all' : group,
+    )
+  const cappedNote = capped && (
+    <p className="px-4 pt-2 pb-1 text-sm text-muted-foreground">
+      {m.jobs_list_capped(capped)}
+    </p>
+  )
   const found = data && filterJobs(data.jobs, filter, today)
   const jobs =
     found &&
@@ -309,14 +323,17 @@ function JobsList({
           />
         )
       ) : table ? (
-        <JobsTable
-          jobs={jobs}
-          today={today}
-          sort={sort}
-          onSort={(key, numeric) =>
-            setSearch(sortToSearch(nextSort(sort, key, numeric)))
-          }
-        />
+        <>
+          <JobsTable
+            jobs={jobs}
+            today={today}
+            sort={sort}
+            onSort={(key, numeric) =>
+              setSearch(sortToSearch(nextSort(sort, key, numeric)))
+            }
+          />
+          {cappedNote}
+        </>
       ) : (
         <>
           <p className="px-4 pb-1 text-sm text-muted-foreground">
@@ -327,6 +344,7 @@ function JobsList({
               <JobRow key={job._id} job={job} today={today} />
             ))}
           </ListCard>
+          {cappedNote}
         </>
       )}
     </>

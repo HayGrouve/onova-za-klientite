@@ -32,9 +32,11 @@ npx convex dev            # terminal 1: dev deployment (EU), pushes on save
 pnpm dev                  # terminal 2: http://localhost:3000
 npx convex run seed:dev   # two test businesses: Мебели Стоянов, Хладина Сервиз
 npx convex run system:whereAmI   # the deployment's region
-npx convex run counts:backfill '{}'      # rebuild the job counts and Worker assignment rows from the jobs (D105, D106)
+npx convex run counts:backfill '{}'      # rebuild the job counts and Worker assignment rows from the jobs (D105, D106); production deploys run it themselves
 npx convex run search:rebuildAll '{}'   # re-key every record's search text after a change to the search keys (D60)
 ```
+
+Deploys: `vercel.json` runs `scripts/vercel-build.sh` (`npx convex deploy --cmd 'pnpm build' --preview-run 'seed:preview'`, then on production only `npx convex run counts:backfill '{}' --prod`). The backfill is idempotent and rebuilds the job counts and Worker assignment rows (D105, D106); until it has run, a business with no counts row is recounted from its jobs, so lists never show zeros. A dev deployment needs it run by hand once. Check the Vercel build log for `convex: scheduling counts:backfill` and `convex: counts:backfill scheduled`, and `npx convex logs --prod` for the scheduled `counts:backfill` runs.
 
 Env:
 - `.env.local` gets `CONVEX_DEPLOYMENT` and `VITE_CONVEX_URL` from `npx convex deployment select`, and the Clerk keys from `clerk env pull`. Vercel comes after milestone 1 is merged.

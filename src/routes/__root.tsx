@@ -11,6 +11,7 @@ import type { SavedSnapshot } from '#/lib/offline-store'
 import { ErrorView } from '#/components/error-view'
 import { ServiceWorkerRegister } from '#/components/service-worker-register'
 import { Toaster } from '#/components/ui/sonner'
+import { TOAST_MOBILE_OFFSET, TOAST_OFFSET } from '#/lib/toast-layout'
 import { applyTimingFlag } from '#/lib/timing'
 import { IconContext } from '@phosphor-icons/react'
 import type { IconProps } from '@phosphor-icons/react'
@@ -130,11 +131,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             top instead (toastError). */}
         <Toaster
           position="bottom-center"
-          offset={{ bottom: 'var(--toast-bottom)', top: 16 }}
-          mobileOffset={{
-            bottom: 'var(--toast-bottom)',
-            top: 'calc(0.75rem + env(safe-area-inset-top))',
-          }}
+          offset={TOAST_OFFSET}
+          mobileOffset={TOAST_MOBILE_OFFSET}
         />
         <ServiceWorkerRegister />
         <Scripts />
