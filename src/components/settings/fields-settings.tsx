@@ -249,9 +249,9 @@ function RecordFormPreview({
     <div className="flex flex-col gap-4 text-sm">
       <div className="flex flex-col gap-3">
         {BASE_FIELDS[target].map((label) => (
-          <div key={label()} className="flex flex-col gap-1.5 opacity-50">
-            <span className="font-medium">{label()}</span>
-            <span className="h-9 rounded-xl border" />
+          <div key={label()} className="flex flex-col gap-1.5">
+            <span className="font-medium text-muted-foreground">{label()}</span>
+            <span className="h-9 rounded-xl border opacity-50" />
           </div>
         ))}
         <Flash
