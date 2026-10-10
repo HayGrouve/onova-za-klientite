@@ -3,10 +3,11 @@ import { cn } from 'cn'
 import { Hint } from '#/components/hint'
 import { formatMoney } from '../../../shared/money'
 
-// Colour only where it means something: what is owed, and profit or loss.
+// Amounts are calm facts in ink, large and light (D115). Colour only where it
+// warns: a loss. What is owed and a profit stay ink, so nothing shouts.
 const EMPHASIS = {
-  primary: 'text-primary',
-  positive: 'text-green-700 dark:text-green-400',
+  primary: 'font-normal',
+  positive: '',
   negative: 'text-destructive',
 }
 
@@ -48,8 +49,8 @@ export function MoneyFigure({
       </span>
       <div
         className={cn(
-          'font-semibold tracking-tight tabular-nums',
-          small ? 'text-lg' : 'text-2xl',
+          'tracking-[-0.01em] tabular-nums',
+          small ? 'text-lg font-medium' : 'text-[2rem] leading-tight font-light',
           emphasis && EMPHASIS[emphasis],
         )}
       >
