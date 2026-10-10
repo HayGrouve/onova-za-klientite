@@ -16,6 +16,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { ClientPicker } from '#/components/new-job/client-picker'
 import { Slot } from '#/components/new-job/slot'
 import { useFixer } from '#/components/new-job/use-fixer'
+import type { Fixable } from '#/components/new-job/use-fixer'
 import type { ItemRef, PaymentMethod } from '#/components/new-job/types'
 import { StageBadge } from '#/components/stage-badge'
 import { Stopwatch } from '#/components/stopwatch'
@@ -65,6 +66,16 @@ const READ_PAUSE_MS = 300
 
 /** A part just closed by a comma, a semicolon or a new line is read at once. */
 const closesPart = (line: string) => /[,;\n]\s*$/.test(line)
+
+const fixId = (field: Fixable) => `new-fix-${field}`
+
+/** Enter in a fixer's box closes it, like its done button. */
+const doneOnEnter =
+  (close: () => void) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+    event.preventDefault()
+    close()
+  }
 
 /**
  * "+" (prototype 2, variant B, redrawn as "one thing at a time", D118): one
@@ -157,12 +168,24 @@ export function NewJobForm({
   const setDeposit = (value: string) => setFixes(draft.fix.received(value))
   const toggleItem = (itemId: string) => setFixes(draft.fix.item(itemId))
   const setDate = (value: typeof chosenDate) => setFixes(draft.fix.date(value))
-  const toggleFix = (field: NonNullable<typeof fixing>) =>
+  const toggleFix = (field: Fixable) =>
     fixing === field ? fixer.close() : fixer.open(field)
+  // Closing a fixer puts focus back on its slot, not on the page.
+  const closeFixer = () => {
+    if (fixing) document.getElementById(fixId(fixing))?.focus()
+    fixer.close()
+  }
 
+  // Read at once: a cleared line, a part just closed, or more than a letter
+  // at a time (a paste, dictation, a word from the keyboard's suggestions).
   const onText = (value: string) => {
+    if (
+      value.trim() === '' ||
+      closesPart(value) ||
+      value.length - text.length > 1
+    )
+      setReadText(value)
     setText(value)
-    if (value.trim() === '' || closesPart(value)) setReadText(value)
   }
   // Mid-part, the slots wait for a short pause, so they don't flicker
   // through every letter of a name.
@@ -181,12 +204,17 @@ export function NewJobForm({
     m.example_client(),
     m.example_title(),
   )
+  // The whole line comes at once, so it is read at once.
   const tryExample = () => {
-    onText(example)
+    setText(example)
+    setReadText(example)
     const line = lineRef.current
     if (!line) return
     line.focus()
-    line.setSelectionRange(example.length, example.length)
+    // After React has written the line in: the cursor goes to its end.
+    requestAnimationFrame(() =>
+      line.setSelectionRange(example.length, example.length),
+    )
   }
 
   // Once the line itself reads a title, the box a failed save opened has
@@ -339,7 +367,7 @@ export function NewJobForm({
     <Button
       variant="secondary"
       className="h-11 rounded-xl"
-      onClick={() => fixer.close()}
+      onClick={closeFixer}
     >
       {m.new_done_fixing()}
     </Button>
@@ -417,7 +445,7 @@ export function NewJobForm({
         </Field>
 
         <section className="mt-4 flex flex-col gap-2">
-          <h2 className="px-1 text-sm font-medium text-muted-foreground">
+          <h2 className="text-sm font-medium text-muted-foreground">
             {m.new_readback()}
           </h2>
           <div className="flex flex-col divide-y divide-border/70 overflow-hidden surface">
@@ -445,6 +473,7 @@ export function NewJobForm({
                   </>
                 )
               }
+              fixId={fixId('client')}
               fixing={fixing === 'client'}
               onFix={() => toggleFix('client')}
             >
@@ -458,7 +487,7 @@ export function NewJobForm({
                   }
                   onPick={(choice) => {
                     setClient(choice)
-                    fixer.close()
+                    closeFixer()
                   }}
                 />
               ) : (
@@ -507,6 +536,7 @@ export function NewJobForm({
                   {chosenTitle.trim() || '–'}
                 </span>
               }
+              fixId={fixId('title')}
               fixing={fixing === 'title'}
               onFix={() => toggleFix('title')}
               missing={tried && !chosenTitle.trim() && m.new_missing_title()}
@@ -526,8 +556,10 @@ export function NewJobForm({
                         : undefined
                     }
                     maxLength={200}
+                    enterKeyHint="done"
                     value={chosenTitle}
                     onChange={(event) => setTitle(event.target.value)}
+                    onKeyDown={doneOnEnter(closeFixer)}
                   />
                   {done}
                 </div>
@@ -574,6 +606,7 @@ export function NewJobForm({
                   : formatMoney(chosenPrice)
               }
               note={draft.priceFromService && m.new_price_from_service()}
+              fixId={fixId('price')}
               fixing={fixing === 'price'}
               onFix={() => toggleFix('price')}
             >
@@ -584,6 +617,7 @@ export function NewJobForm({
                     label={m.new_price()}
                     value={draft.priceText}
                     onChange={setPrice}
+                    onDone={closeFixer}
                   />
                   {done}
                 </div>
@@ -597,6 +631,7 @@ export function NewJobForm({
                 quiet={!received}
                 value={receivedText}
                 note={received && receivedNote}
+                fixId={fixId('deposit')}
                 fixing={fixing === 'deposit'}
                 onFix={() => toggleFix('deposit')}
               >
@@ -607,6 +642,7 @@ export function NewJobForm({
                       label={isPayment ? m.new_paid() : m.new_deposit()}
                       value={draft.receivedText}
                       onChange={setDeposit}
+                      onDone={closeFixer}
                     />
                     <ToggleGroup
                       aria-label={m.new_deposit_method()}
@@ -650,6 +686,7 @@ export function NewJobForm({
               quiet={!chosenDate}
               value={dateText}
               note={single && chosenDate && !chosenDate.time && m.new_no_time()}
+              fixId={fixId('date')}
               fixing={fixing === 'date'}
               onFix={() => toggleFix('date')}
             >
@@ -812,11 +849,13 @@ function MoneyInput({
   label,
   value,
   onChange,
+  onDone,
 }: {
   name: string
   label: string
   value: string
   onChange: (value: string) => void
+  onDone: () => void
 }) {
   return (
     <InputGroup>
@@ -825,9 +864,11 @@ function MoneyInput({
         autoFocus
         aria-label={label}
         inputMode="decimal"
+        enterKeyHint="done"
         maxLength={12}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={doneOnEnter(onDone)}
       />
       <InputGroupAddon align="inline-end">
         <InputGroupText>€</InputGroupText>

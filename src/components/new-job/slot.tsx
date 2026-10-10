@@ -91,6 +91,7 @@ export function Slot({
   quiet = false,
   note,
   onFix,
+  fixId,
   fixing = false,
   missing,
   errorId,
@@ -106,6 +107,8 @@ export function Slot({
   note?: React.ReactNode
   /** Opens or closes the fixer. Left out for a slot that is changed by tapping what it shows. */
   onFix?: () => void
+  /** The fix button's id, to give focus back to it when the fixer closes. */
+  fixId?: string
   fixing?: boolean
   missing?: string | false
   /** Where the missing message can be found, to move focus to it. */
@@ -146,6 +149,7 @@ export function Slot({
     <div className="flex flex-col">
       {onFix ? (
         <button
+          id={fixId}
           type="button"
           aria-label={`${m.new_fix()}: ${label}`}
           aria-describedby={valueId}
