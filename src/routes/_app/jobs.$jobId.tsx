@@ -12,14 +12,13 @@ import {
   PlusIcon,
   ReceiptIcon,
   StackIcon,
-  WalletIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { cn } from 'cn'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
@@ -29,13 +28,13 @@ import { AddressLink } from '#/components/address-link'
 import { ExtraFieldsView } from '#/components/extra-fields'
 import { FileGallery } from '#/components/files/file-gallery'
 import { AppointmentForm } from '#/components/job/appointment-form'
-import { StagePicker } from '#/components/job/stage-picker'
+import { JobActions } from '#/components/job/job-actions'
+import { StagePicker, nextStage } from '#/components/job/stage-picker'
 import { RepeatSection } from '#/components/job/repeat-section'
 import { ReminderForm } from '#/components/reminders/reminder-form'
 import { RemindersPanel } from '#/components/reminders/reminders-panel'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
 import { CostForm } from '#/components/money/cost-form'
-import { MoneyFigure } from '#/components/money/money-figure'
 import { PaymentForm } from '#/components/money/payment-form'
 import { PaymentSheet } from '#/components/money/payment-sheet'
 import { RefundForm } from '#/components/money/refund-form'
@@ -63,12 +62,14 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { DetailSheet, useDetailSheet } from '#/components/detail-sheet'
 import { usePageTitle } from '#/hooks/use-page-title'
+import { useWide } from '#/hooks/use-wide'
 import { useToday } from '#/hooks/use-today'
 import { STAGE_TOAST, useMoveJob } from '#/hooks/use-move-job'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { runChange } from '#/lib/change'
+import { jobMainAction, paidShare } from '#/lib/job-actions'
 import { m } from '#/paraglide/messages.js'
 import {
   creditForJob,
@@ -142,6 +143,10 @@ function JobPage() {
   const [openPayment, setOpenPayment] = useState<Id<'payments'> | null>(null)
   const [usingCredit, setUsingCredit] = useState(false)
   const [undoingWriteOff, setUndoingWriteOff] = useState(false)
+  // "Next" names the following stage as soon as the job moves, so a second
+  // tap while the first is on its way is ignored rather than moving twice.
+  const moving = useRef(false)
+  const wide = useWide()
   const { words, modules } = business
 
   // A toast's undo and payment buttons belong to this job's page.
@@ -162,6 +167,14 @@ function JobPage() {
         (appointment) => dateInSofia(appointment.start) >= today,
       )
     : undefined
+  const next = canMove ? nextStage(data.stages, job.stageId) : undefined
+  const main = jobMainAction({
+    canMove,
+    hasNext: next !== undefined,
+    owedCents: jobOwedCents(job),
+  })
+  // On a phone the main action waits above the bottom nav, in thumb reach.
+  const pinned = !wide && main !== null
   const canRefund = job.paidCents > 0
   const canWriteOff = jobOwedCents(job) > 0 && job.paidCents < job.priceCents
   // The folded parts, by name, with how many each holds.
@@ -184,6 +197,7 @@ function JobPage() {
     { name: m.job_history(), count: data.timeline.length },
   ]
 
+  const startPayment = () => sheet.open({ kind: 'payment' })
   const moveTo = async (stageId: Id<'stages'>) => {
     const target = data.stages.find((stage) => stage._id === stageId)
     const previous = data.stages.find((stage) => stage._id === job.stageId)
@@ -199,9 +213,23 @@ function JobPage() {
       },
       target,
       previous,
-      () => sheet.open({ kind: 'payment' }),
+      startPayment,
     )
   }
+  const actions = (asPinned: boolean) => (
+    <JobActions
+      main={main}
+      nextName={next?.name}
+      onNext={() => {
+        if (!next || moving.current) return
+        moving.current = true
+        void moveTo(next._id).finally(() => (moving.current = false))
+      }}
+      onPay={startPayment}
+      pinned={asPinned}
+      compact={!wide}
+    />
+  )
   const spendCredit = async () => {
     setUsingCredit(true)
     const used = await runChange(() =>
@@ -366,22 +394,32 @@ function JobPage() {
           {
             key: 'money',
             node: (
-              <Panel
-                title={m.job_money()}
-                icon={WalletIcon}
-                footer={
-                  <>
-                    {/* Solid only while something is owed; "Next" stays the one
-                        main action otherwise. A wide screen doesn't stretch it. */}
-                    <Button
-                      size="xl"
-                      variant={jobOwedCents(job) > 0 ? 'default' : 'secondary'}
-                      className="flex-1 lg:max-w-60"
-                      onClick={() => sheet.open({ kind: 'payment' })}
-                    >
-                      <PlusIcon data-icon="inline-start" />
-                      {m.pay_add()}
-                    </Button>
+              // The money leads with what is still owed, as one calm figure,
+              // and how much of the price is paid (D116).
+              <section
+                aria-label={m.job_money()}
+                className="mx-4 flex flex-col overflow-hidden surface"
+              >
+                <div className="flex flex-col gap-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                        {m.job_balance()}
+                        <Hint term={m.job_balance()}>{m.hint_balance()}</Hint>
+                      </span>
+                      {/* Ink, not a colour; muted once it no longer counts as
+                          owed (a cancelled job). */}
+                      <div
+                        className={cn(
+                          'text-[2.125rem] leading-tight font-light tracking-tight tabular-nums',
+                          !job.owes &&
+                            job.balanceCents > 0 &&
+                            'text-muted-foreground',
+                        )}
+                      >
+                        {formatMoney(job.balanceCents)}
+                      </div>
+                    </div>
                     {/* Refunds and write-offs are rare: one menu holds them. */}
                     {(canRefund || canWriteOff) && (
                       <DropdownMenu>
@@ -389,9 +427,9 @@ function JobPage() {
                           <DropdownMenuTrigger
                             aria-label={m.money_more()}
                             className={buttonVariants({
-                              variant: 'outline',
+                              variant: 'ghost',
                               size: 'icon-xl',
-                              className: 'size-12 aria-expanded:bg-muted',
+                              className: '-mt-1 -mr-2 aria-expanded:bg-muted',
                             })}
                           >
                             <DotsThreeIcon weight="bold" />
@@ -418,29 +456,34 @@ function JobPage() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
-                  </>
-                }
-              >
-                <div className="grid grid-cols-3 divide-x divide-border/70 border-t border-border/70">
-                  <MoneyFigure
-                    size="sm"
-                    label={m.job_price()}
-                    cents={job.priceCents}
-                    hint={m.hint_price()}
-                  />
-                  <MoneyFigure
-                    size="sm"
-                    label={m.job_paid()}
-                    cents={job.paidCents}
-                    hint={m.hint_paid()}
-                  />
-                  <MoneyFigure
-                    size="sm"
-                    label={m.job_balance()}
-                    cents={job.balanceCents}
-                    hint={m.hint_balance()}
-                    emphasis={jobOwedCents(job) > 0 ? 'primary' : undefined}
-                  />
+                  </div>
+                  {/* Grows when a payment lands; the line under it says the same in words. */}
+                  <div
+                    aria-hidden
+                    className="h-1.5 overflow-hidden rounded-full bg-border"
+                  >
+                    <div
+                      className="h-full rounded-full bg-ring transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                      style={{
+                        width: `${paidShare(job.paidCents, job.priceCents) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                    <div className="flex items-baseline gap-1.5">
+                      <span>{m.job_paid()}</span>
+                      <div className="font-medium text-foreground tabular-nums">
+                        {formatMoney(job.paidCents)}
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span>{m.job_price()}</span>
+                      <div className="font-medium text-foreground tabular-nums">
+                        {formatMoney(job.priceCents)}
+                      </div>
+                    </div>
+                  </div>
+                  {!pinned && <div className="pt-1">{actions(false)}</div>}
                 </div>
                 {modules.costs && (
                   <>
@@ -552,7 +595,7 @@ function JobPage() {
                     )
                   })}
                 </PanelList>
-              </Panel>
+              </section>
             ),
           },
           {
@@ -873,6 +916,7 @@ function JobPage() {
           />
         )}
       </DetailSheet>
+      {pinned && actions(true)}
       <RuleReminderSheet job={ruleOffer} onClose={closeRuleOffer} />
       <PaymentSheet
         businessId={business._id}

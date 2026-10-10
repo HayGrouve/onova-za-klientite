@@ -223,6 +223,12 @@ body:has([data-sonner-toaster][data-y-position='bottom'] [data-sonner-toast])
   }
 }
 
+/* The job page's main action sits just above the phone's bottom nav, where
+   the thumb is (D116). From lg it sits in the page instead. */
+:root {
+  --job-bar-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+}
+
 /* Flashes the part of the setup preview an answer just changed. */
 @keyframes flash {
   from {
