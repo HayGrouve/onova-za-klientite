@@ -103,7 +103,10 @@ export function readDraft(
         }
       : parsed.client
   const clientFix = held(fixes.client, parsed.client)
-  const client = clientFix === undefined ? parsedClient : clientFix
+  const picked = clientFix === undefined ? parsedClient : clientFix
+  // A line that names nobody is for the built-in No client (D118): the
+  // read-back shows it as the value it is, and the job saves with it.
+  const client: ClientChoice = picked ?? { kind: 'none' }
 
   const priceFromLine = parsed.priceCents ?? parsed.service?.priceCents ?? null
   const priceFix = held(fixes.price, priceFromLine)
@@ -126,21 +129,19 @@ export function readDraft(
 
   // An item belongs to one client, so fixing the client to another unlinks it.
   const linkedItem =
-    ctx.start &&
-    client?.kind === 'existing' &&
-    client.id === ctx.start.client.id
+    ctx.start && client.kind === 'existing' && client.id === ctx.start.client.id
       ? ctx.start.item
       : undefined
   // The client's items: one a word of the line names is picked, the rest are one tap away.
   const clientItems =
-    client?.kind === 'existing'
+    client.kind === 'existing'
       ? ctx.items.filter((item) => item.clientId === client.id)
       : []
   const itemMatch = clientItems.length
     ? matchItem(parsed.title, clientItems)
     : null
   const itemBasis = [
-    client?.kind === 'existing' ? client.id : null,
+    client.kind === 'existing' ? client.id : null,
     itemMatch?.id ?? null,
   ]
   // Started from an item, that item is picked until the line names another.
@@ -210,18 +211,20 @@ export function readDraft(
 
   return {
     client,
+    /** Nobody was named or picked, so the job is for No client. */
+    clientByDefault: picked === null,
     /** Where the client came from, for its badge. */
     clientSource:
-      client?.kind === 'existing'
+      client.kind === 'existing'
         ? parsed.phoneOwner?.id === client.id
           ? ('phone' as const)
           : ('existing' as const)
-        : (client?.kind ?? null),
+        : client.kind,
     /** The phone under the name: the stored one, or the one typed for a new client. */
     phone:
-      client?.kind === 'existing'
+      client.kind === 'existing'
         ? ctx.clients.find((item) => item.id === client.id)?.phones.at(0)
-        : client?.kind === 'new' || client?.kind === 'contact'
+        : client.kind === 'new' || client.kind === 'contact'
           ? client.phone
           : undefined,
     alternatives,
@@ -253,7 +256,7 @@ export function readDraft(
     linkedItem,
     clientItems,
     itemIds,
-    missing: { client: client === null, title: title.trim() === '' },
+    missing: { title: title.trim() === '' },
     /** The fixes with one more made by hand. */
     fix: {
       client: (value: ClientChoice | null) =>
@@ -277,8 +280,8 @@ export function readDraft(
 export type NewJobDraft = ReturnType<typeof readDraft>
 
 /**
- * The arguments `newJob.save` takes for a draft, or null while the client or
- * the title is missing. The date is an appointment for one-visit work and a
+ * The arguments `newJob.save` takes for a draft, or null while the title is
+ * missing. The date is an appointment for one-visit work and a
  * due date for work in stages; a deposit is labelled, a payment isn't.
  */
 export function saveArgs(
@@ -292,7 +295,7 @@ export function saveArgs(
   },
 ) {
   const { client, date } = draft
-  if (!client || draft.missing.title) return null
+  if (draft.missing.title) return null
   const single = options.flow === 'single'
   return {
     client:
