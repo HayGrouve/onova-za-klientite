@@ -79,7 +79,11 @@ export function JobActions({
     return (
       // A narrow column (1024 px, beside the side rail) stacks the two.
       <div className="@container">
-        <div className="flex gap-2 @max-sm:flex-col">{buttons}</div>
+        <div
+          className={cn('flex gap-2', main === 'next' && '@max-sm:flex-col')}
+        >
+          {buttons}
+        </div>
       </div>
     )
   }
