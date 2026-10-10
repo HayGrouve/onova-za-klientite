@@ -520,7 +520,8 @@ export function PaymentForm({
                       value={label}
                       onChange={(event) => setLabel(event.target.value)}
                     />
-                    {depositsOn && (
+                    {/* Marks the payment as a deposit; a note of its own stays. */}
+                    {depositsOn && (!label || isDeposit) && (
                       <Button
                         type="button"
                         variant="outline"
