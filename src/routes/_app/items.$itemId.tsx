@@ -115,7 +115,7 @@ function ItemPage() {
       <div className="contents lg:flex lg:flex-col lg:gap-4">
         <div className="px-4 empty:hidden">
           {client && (
-            <div className="flex animate-rise items-center gap-3 surface px-4 py-2">
+            <div className="flex items-center gap-3 surface px-4 py-2">
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-sm text-muted-foreground">
                   {m.item_owner()}

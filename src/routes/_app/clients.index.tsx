@@ -138,7 +138,7 @@ function ClientsPage() {
             </p>
           )}
           {shown.length === 0 ? (
-            <p className="animate-rise px-4 py-6 text-center text-muted-foreground">
+            <p className="px-4 py-6 text-center text-muted-foreground">
               {m.clients_no_match()}
             </p>
           ) : wide ? (

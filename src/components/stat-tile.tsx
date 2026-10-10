@@ -40,7 +40,7 @@ export function StatTile({
     <Link
       to={to}
       hash={hash}
-      className="group flex min-w-0 animate-rise items-start gap-3 surface p-3 transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 xl:p-4"
+      className="group flex min-w-0 items-start gap-3 surface p-3 transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 xl:p-4"
     >
       <span
         aria-hidden

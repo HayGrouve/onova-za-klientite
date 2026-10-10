@@ -32,7 +32,7 @@ export function EmptyState({
   action?: React.ReactNode
 }) {
   return (
-    <Empty className="animate-rise px-8">
+    <Empty className="px-8">
       <EmptyHeader>
         <EmptyMedia className="size-16 rounded-3xl bg-primary/10 text-primary">
           <IconComponent className="size-8" weight="duotone" />

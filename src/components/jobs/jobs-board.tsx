@@ -378,7 +378,7 @@ const Column = memo(function Column({
           land. The overlay fades in over the cards instead of pushing them
           down, so nothing on the board jumps when a drag starts. */}
       <div className="relative flex min-h-24 flex-col">
-        <ul className="flex stagger flex-col gap-2">
+        <ul className="flex flex-col gap-2">
           {cards.map((card) => (
             <BoardCard
               key={card._id}
@@ -539,8 +539,8 @@ const BoardCard = memo(function BoardCard({
 })
 
 /**
- * What a card shows: the title with its stage joined to the top-right corner
- * (as on the phone's rows), the client, when, and what is still owed.
+ * What a card shows: the title with its stage, the client, when, and what is
+ * still owed.
  */
 function CardFace({ card, today }: { card: Card; today: string }) {
   const late = isJobLate(card, today)
@@ -575,12 +575,10 @@ function CardFace({ card, today }: { card: Card; today: string }) {
         <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium break-words">
           {card.title}
         </span>
-        {/* Pulled over the card's padding onto its top and right edges. */}
         <StageBadge
           name={card.stageName}
           group={card.stageGroup}
-          corner
-          className="-mt-3 -mr-3 h-6 self-end px-2.5 text-[0.6875rem] xl:self-auto"
+          className="h-5 xl:max-w-[45%]"
         />
       </span>
       <span className="flex flex-col gap-1 pr-7 text-xs text-muted-foreground">

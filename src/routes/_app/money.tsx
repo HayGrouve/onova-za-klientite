@@ -210,7 +210,7 @@ function MoneyPage() {
             <>
               {/* Balances as of today, whatever the month. Each figure sits in
                   the middle of its half when the card is taller than both. */}
-              <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface lg:mx-0 lg:grid-cols-1 lg:grid-rows-2 lg:divide-x-0 lg:divide-y lg:*:justify-center">
+              <section className="mx-4 grid grid-cols-2 divide-x divide-border/70 overflow-hidden surface lg:mx-0 lg:grid-cols-1 lg:grid-rows-2 lg:divide-x-0 lg:divide-y lg:*:justify-center">
                 <MoneyFigure
                   label={m.money_still_owed()}
                   cents={data.stillOwedCents}

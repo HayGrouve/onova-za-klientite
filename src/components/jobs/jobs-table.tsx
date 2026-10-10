@@ -95,7 +95,7 @@ export function JobsTable({
   )
 
   return (
-    <ScrollFade className="mx-4 animate-rise overflow-hidden surface">
+    <ScrollFade className="mx-4 overflow-hidden surface">
       <Table>
         <TableHeader className="bg-foreground/3">
           <TableRow className="hover:bg-transparent">

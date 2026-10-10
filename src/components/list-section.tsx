@@ -49,12 +49,12 @@ export function SectionHeader({
   )
 }
 
-/** Rows in one white card, divided by lines. Rises in row by row; hidden when empty. */
+/** Rows in one white card, divided by lines. Hidden when empty. */
 export function ListCard({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
       className={cn(
-        'mx-4 flex stagger flex-col divide-y divide-border/70 overflow-hidden surface empty:hidden',
+        'mx-4 flex flex-col divide-y divide-border/70 overflow-hidden surface empty:hidden',
         className,
       )}
       {...props}

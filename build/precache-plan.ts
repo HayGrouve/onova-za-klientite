@@ -30,8 +30,7 @@ export const OFFLINE_ROOTS = [
  * Latin subset (digits, punctuation, the euro sign). The other subsets are
  * cached when a page really uses them.
  */
-export const OFFLINE_FONT =
-  /sofia-sans-(cyrillic|latin)-wght-normal-[\w-]+\.woff2$/
+export const OFFLINE_FONT = /onest-(cyrillic|latin)-wght-normal-[\w-]+\.woff2$/
 
 /** The part of Rollup's output that the plan reads. */
 export type BundleFile =

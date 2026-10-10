@@ -263,7 +263,7 @@ function JobPage() {
           {
             key: 'info',
             node: (client || job.address || job.dueDate || nextVisit) && (
-              <div className="mx-4 flex animate-rise flex-col divide-y divide-border/70 overflow-hidden surface">
+              <div className="mx-4 flex flex-col divide-y divide-border/70 overflow-hidden surface">
                 {client && (
                   <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4">
                     <InitialsAvatar

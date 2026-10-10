@@ -98,7 +98,7 @@ function SearchPage() {
         {/* Mounted empty, then filled, so a screen reader announces the answer. */}
         <div role="status">
           {empty && (
-            <p className="animate-rise pt-6 pb-3 text-center text-muted-foreground">
+            <p className="pt-6 pb-3 text-center text-muted-foreground">
               {m.search_none()}
             </p>
           )}
@@ -110,7 +110,7 @@ function SearchPage() {
         </div>
       </div>
       {empty && (
-        <div className="flex animate-rise justify-center px-4">
+        <div className="flex justify-center px-4">
           <Link
             to="/clients/new"
             search={prefillClient(debounced)}
