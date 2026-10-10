@@ -4,7 +4,7 @@ import type { StageGroup } from '../../shared/stages'
 // Colour carries meaning only, and only in the dot: work still open is blue,
 // done is green, cancelled is red. The stage's own name says the rest (D53).
 // The name stays in quiet text, so a list of stages never shouts (D115).
-const GROUP_DOT: Record<StageGroup, string> = {
+export const GROUP_DOT: Record<StageGroup, string> = {
   new: 'bg-[oklch(0.6_0.06_245)]',
   in_progress: 'bg-[oklch(0.6_0.06_245)]',
   done: 'bg-[oklch(0.6_0.09_158)]',

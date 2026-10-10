@@ -17,7 +17,7 @@ import { api } from '../../../convex/_generated/api'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
 import { ListExtras } from '#/components/list-extras'
-import { StageBadge } from '#/components/stage-badge'
+import { GROUP_DOT, StageBadge } from '#/components/stage-badge'
 import { Tip } from '#/components/tip'
 import {
   AlertDialog,
@@ -66,15 +66,6 @@ type Card = Board['columns'][number]['jobs'][number]
 type Stage = Board['stages'][number]
 /** Where a dragged job lands: a stage, or Cancelled when it has no stage left. */
 type Target = Stage | 'cancelled'
-
-// The dot by a column's name carries its group's meaning: open work blue,
-// done green, cancelled red, as on the stage badges (D53).
-const GROUP_DOT: Record<StageGroup, string> = {
-  new: 'bg-blue-300',
-  in_progress: 'bg-blue-600',
-  done: 'bg-green-600',
-  cancelled: 'bg-red-500',
-}
 
 /**
  * The jobs board on a wide screen: four columns, one per stage group. A card
@@ -352,7 +343,7 @@ const Column = memo(function Column({
           <h2 className="truncate text-sm font-semibold">
             {GROUP_LABEL[group]()}
           </h2>
-          <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
+          <span className="text-sm text-muted-foreground tabular-nums">
             {filtering ? `${cards.length}/${total}` : total}
           </span>
           {group === 'new' && (
