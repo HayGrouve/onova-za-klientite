@@ -95,13 +95,17 @@ async function addJobWithOneLine(page: Page, b: Business) {
     .getByRole('link', { name: `Добави: ${b.job.singular}` })
     .click()
   await expect(
-    page.getByRole('heading', { name: `Добави ${lower(b.job.singular)}` }),
+    page.getByRole('heading', { name: 'Какво записваме?' }),
   ).toBeVisible()
 
   await page.getByLabel('Запишете го като в тетрадка').fill(b.line)
   const readBack = page
     .getByRole('heading', { name: 'Разбрах така' })
     .locator('..')
+  // The title's slot is named with the business's own word for a job.
+  await expect(
+    readBack.getByText(b.job.singular, { exact: true }),
+  ).toBeVisible()
   await expect(readBack).toContainText(b.client)
   await expect(readBack).toContainText(lower(b.jobTitle))
 

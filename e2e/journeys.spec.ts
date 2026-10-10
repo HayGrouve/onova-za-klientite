@@ -30,7 +30,7 @@ test('"+" reads one line back and saves a job with its deposit', async ({
 }) => {
   await page.getByRole('link', { name: 'Добави: Поръчка' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Добави поръчка' }),
+    page.getByRole('heading', { name: 'Какво записваме?' }),
   ).toBeVisible()
 
   await page

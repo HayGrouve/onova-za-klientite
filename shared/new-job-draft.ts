@@ -129,9 +129,7 @@ export function readDraft(
 
   // An item belongs to one client, so fixing the client to another unlinks it.
   const linkedItem =
-    ctx.start &&
-    client.kind === 'existing' &&
-    client.id === ctx.start.client.id
+    ctx.start && client.kind === 'existing' && client.id === ctx.start.client.id
       ? ctx.start.item
       : undefined
   // The client's items: one a word of the line names is picked, the rest are one tap away.

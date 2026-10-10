@@ -142,7 +142,7 @@ describe('readDraft: client', () => {
 
   it('a new name a typo from a client asks whether it is them', () => {
     const draft = read('Иван Птров, шкаф')
-    expect(draft.client?.kind).toBe('new')
+    expect(draft.client.kind).toBe('new')
     expect(draft.alternatives.map((item) => item.as)).toEqual([
       'similar',
       'create',

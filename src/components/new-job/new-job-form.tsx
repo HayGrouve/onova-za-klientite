@@ -1,33 +1,26 @@
 import {
-  CalendarBlankIcon,
+  AddressBookIcon,
   CheckCircleIcon,
-  ClipboardTextIcon,
-  CoinsIcon,
-  CubeIcon,
-  FlagIcon,
-  NotePencilIcon,
-  RepeatIcon,
-  StackIcon,
-  TagIcon,
-  UserIcon,
+  CheckIcon,
+  PhoneIcon,
+  PlusIcon,
   XIcon,
 } from '@phosphor-icons/react'
-import type { Icon } from '@phosphor-icons/react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import type { FunctionArgs } from 'convex/server'
-import { cn } from 'cn'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ClientPicker } from '#/components/new-job/client-picker'
+import { Slot } from '#/components/new-job/slot'
 import { useFixer } from '#/components/new-job/use-fixer'
 import type { ItemRef, PaymentMethod } from '#/components/new-job/types'
+import { StageBadge } from '#/components/stage-badge'
 import { Stopwatch } from '#/components/stopwatch'
-import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
-import { Field, FieldDescription, FieldLabel } from '#/components/ui/field'
+import { Field, FieldLabel } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import {
   InputGroup,
@@ -58,6 +51,7 @@ import { exampleLine, parseLine } from '../../../shared/parse-line'
 import type { ServiceRef } from '../../../shared/parse-line'
 import { formatPhone } from '../../../shared/phone-format'
 import type { ClientCandidate } from '../../../shared/search'
+import type { StageGroup } from '../../../shared/stages'
 
 const METHODS = [
   'cash',
@@ -66,97 +60,32 @@ const METHODS = [
   'other',
 ] as const satisfies Array<PaymentMethod>
 
-function ReadRow({
-  label,
-  icon: IconComponent,
-  value,
-  missing,
-  errorId,
-  onFix,
-  fixing = false,
-  children,
-}: {
-  label: string
-  icon: Icon
-  value: React.ReactNode
-  missing?: string | false
-  /** Where the missing message can be found, to move focus to it. */
-  errorId?: string
-  /** Left out for a row that is changed by tapping what it shows. */
-  onFix?: () => void
-  fixing?: boolean
-  children?: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-2 py-2">
-      <div className="flex min-h-11 items-center gap-3">
-        <span className="flex w-24 shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
-          <IconComponent
-            aria-hidden
-            className={cn(
-              'size-4 shrink-0 transition-colors',
-              value && 'text-primary',
-            )}
-          />
-          {label}
-        </span>
-        {/* The one live region: it announces what the line was read as, and
-            nothing of the fields below it. */}
-        <span
-          aria-live="polite"
-          className="min-w-0 flex-1 text-base break-words"
-        >
-          <span
-            // Re-keyed when a value first appears, so it rises in as it's understood.
-            key={value ? 'set' : 'unset'}
-            className={cn(
-              'block',
-              value ? 'animate-rise' : 'text-muted-foreground',
-            )}
-          >
-            {value || '–'}
-          </span>
-        </span>
-        {onFix && !fixing && (
-          <Button
-            variant="link"
-            className="h-11 shrink-0 px-1"
-            aria-label={`${m.new_fix()}: ${label}`}
-            onClick={onFix}
-          >
-            {m.new_fix()}
-          </Button>
-        )}
-      </div>
-      {missing && (
-        <p
-          id={errorId}
-          role="alert"
-          tabIndex={-1}
-          className="ps-27 text-sm text-destructive outline-none"
-        >
-          {missing}
-        </p>
-      )}
-      {children && <div className="ps-27">{children}</div>}
-    </div>
-  )
-}
+/** How long the typing pauses before the slots read the line again. */
+const READ_PAUSE_MS = 300
+
+/** A part just closed by a comma, a semicolon or a new line is read at once. */
+const closesPart = (line: string) => /[,;\n]\s*$/.test(line)
 
 /**
- * "+" (prototype 2, variant B): one notebook-style line, read back as client,
- * title, price, deposit and date. Every field can be fixed before saving.
+ * "+" (prototype 2, variant B, redrawn as "one thing at a time", D118): one
+ * question and one notebook-style line. While it is typed, the slots under it
+ * fill with what it is read as (client, the job, price, deposit, date, stage);
+ * an empty slot shows the default the job saves with. Every slot can be fixed
+ * in place before saving.
  */
 export function NewJobForm({
   business,
   clients,
   services,
+  firstStage,
   start,
   items,
 }: {
   business: ActiveBusiness
   clients: ClientCandidate[]
   services: ServiceRef[]
+  /** Where a new job starts, for the stage slot. */
+  firstStage?: { name: string; group: StageGroup }
   /** Started from an item: its client is chosen already, and the job is linked to the item. */
   start?: {
     client: { id: string; name: string }
@@ -170,8 +99,11 @@ export function NewJobForm({
   const [startedAt] = useState(() => Date.now())
   const [today] = useState(() => todayInSofia(Date.now()))
   const [text, setText] = useState('')
+  // The line as the slots last read it: the typing settles first (D118).
+  const [readText, setReadText] = useState('')
   const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
+  const lineRef = useRef<HTMLTextAreaElement>(null)
   // Which field is being fixed; the title's box may have been opened by a failed save.
   const fixer = useFixer()
   const { fixing, titleOpenedByError } = fixer
@@ -184,20 +116,26 @@ export function NewJobForm({
 
   const single = business.jobFlow === 'single'
   const { words } = business
-  const parsed = parseLine(text, {
-    today,
-    // A bare time ("11:00") means the next time the clock reads it.
-    now: clockInSofia(Date.now()),
-    clients,
-    services,
-    noClientName: m.no_client(),
-  })
-  const draft = readDraft(parsed, fixes, {
-    clients,
-    items,
-    start,
-    depositsOnNewJob: business.depositsOnNewJob,
-  })
+  const read = (line: string) => {
+    const parsed = parseLine(line, {
+      today,
+      // A bare time ("11:00") means the next time the clock reads it.
+      now: clockInSofia(Date.now()),
+      clients,
+      services,
+      noClientName: m.no_client(),
+    })
+    return {
+      parsed,
+      draft: readDraft(parsed, fixes, {
+        clients,
+        items,
+        start,
+        depositsOnNewJob: business.depositsOnNewJob,
+      }),
+    }
+  }
+  const { parsed, draft } = read(readText)
   const {
     client: chosenClient,
     title: chosenTitle,
@@ -219,7 +157,38 @@ export function NewJobForm({
   const setDeposit = (value: string) => setFixes(draft.fix.received(value))
   const toggleItem = (itemId: string) => setFixes(draft.fix.item(itemId))
   const setDate = (value: typeof chosenDate) => setFixes(draft.fix.date(value))
-  const onText = (value: string) => setText(value)
+  const toggleFix = (field: NonNullable<typeof fixing>) =>
+    fixing === field ? fixer.close() : fixer.open(field)
+
+  const onText = (value: string) => {
+    setText(value)
+    if (value.trim() === '' || closesPart(value)) setReadText(value)
+  }
+  // Mid-part, the slots wait for a short pause, so they don't flicker
+  // through every letter of a name.
+  useEffect(() => {
+    if (readText === text) return
+    const id = window.setTimeout(() => setReadText(text), READ_PAUSE_MS)
+    return () => window.clearTimeout(id)
+  }, [text, readText])
+
+  const example = exampleLine(
+    {
+      services,
+      deposits: business.depositsOnNewJob,
+      flow: business.jobFlow,
+    },
+    m.example_client(),
+    m.example_title(),
+  )
+  const tryExample = () => {
+    onText(example)
+    const line = lineRef.current
+    if (!line) return
+    line.focus()
+    line.setSelectionRange(example.length, example.length)
+  }
+
   // Once the line itself reads a title, the box a failed save opened has
   // nothing left to say: the read-out shows it. A hand fix keeps its box.
   if (titleOpenedByError && parsed.title.trim()) fixer.closeIfOpenedByError()
@@ -269,7 +238,10 @@ export function NewJobForm({
   const submit = async (markDone = false) => {
     if (submitting.current) return
     setTried(true)
-    const args = saveArgs(draft, {
+    // Saved straight after typing, the line is read now, not after the pause.
+    setReadText(text)
+    const current = text === readText ? draft : read(text).draft
+    const args = saveArgs(current, {
       flow: business.jobFlow,
       received: { date: depositDate, method: depositMethod },
       depositLabel: m.deposit_label(),
@@ -312,24 +284,28 @@ export function NewJobForm({
       await guard.releaseWhile(leave)
     } catch {
       setText('')
+      setReadText('')
       setTried(false)
       submitting.current = false
       setSaving(false)
     }
   }
 
-  const sourceLabel =
-    draft.clientSource === 'none'
-      ? null
-      : {
-          phone: m.new_source_phone,
-          existing: m.new_source_existing,
-          contact: m.new_source_contact,
-          new: m.new_source_new,
-        }[draft.clientSource]()
   const clientName =
     chosenClient.kind === 'none' ? m.no_client() : chosenClient.name
   const { phone } = draft
+  // A client from the list is marked as known; a new one says it will be added.
+  const source =
+    draft.clientSource === 'none'
+      ? null
+      : {
+          existing: { icon: CheckIcon, label: m.new_source_existing() },
+          phone: { icon: PhoneIcon, label: m.new_source_phone() },
+          contact: { icon: AddressBookIcon, label: m.new_source_contact() },
+          new: { icon: PlusIcon, label: m.new_source_new() },
+        }[draft.clientSource]
+  const known =
+    draft.clientSource === 'existing' || draft.clientSource === 'phone'
   const alternatives = draft.alternatives.map((item) => ({
     choice: item.choice,
     label:
@@ -340,18 +316,25 @@ export function NewJobForm({
           : item.name,
   }))
   const isChosen = (choice: ClientChoice) =>
-    chosenClient?.kind === choice.kind &&
+    chosenClient.kind === choice.kind &&
     (choice.kind !== 'existing' ||
       (chosenClient.kind === 'existing' && chosenClient.id === choice.id))
-  const dateText =
-    chosenDate &&
-    `${formatDay(chosenDate.date, today)}${
-      single
-        ? chosenDate.time
-          ? `, ${formatTime(chosenDate.time)}`
-          : ` (${m.new_no_time()})`
-        : ''
-    }`
+  const dateText = chosenDate
+    ? `${formatDay(chosenDate.date, today)}${
+        single && chosenDate.time ? `, ${formatTime(chosenDate.time)}` : ''
+      }`
+    : single
+      ? m.new_no_date()
+      : m.job_no_due()
+  const received = chosenDeposit !== null && chosenDeposit > 0
+  const receivedText = received
+    ? formatMoney(chosenDeposit)
+    : isPayment
+      ? m.new_not_paid()
+      : m.new_no_deposit()
+  const receivedNote = `${lower(METHOD_LABEL[depositMethod]())}${
+    depositDate === today ? '' : `, ${formatDay(depositDate, today)}`
+  }`
   const done = (
     <Button
       variant="secondary"
@@ -363,39 +346,45 @@ export function NewJobForm({
   )
 
   return (
-    // A wide screen shows the flow as a card in the middle of the page.
-    <main className="flex min-h-dvh flex-col bg-background lg:mx-auto lg:my-8 lg:h-[calc(100dvh-4rem)] lg:min-h-0 lg:w-full lg:max-w-2xl lg:overflow-hidden lg:rounded-3xl lg:border lg:shadow-xl lg:shadow-zinc-900/10">
+    <main className="flex min-h-dvh flex-col bg-canvas">
       <Stopwatch startedAt={startedAt} />
-      <header className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-2">
-        <h1 className="text-xl font-semibold">
-          {m.preview_add({ job: lower(words.job.singular) })}
-        </h1>
-        <Button
-          variant="ghost"
-          size="icon-xl"
-          aria-label={m.new_close()}
-          onClick={() => void leave()}
-        >
-          <XIcon />
-        </Button>
-      </header>
+      {/* One column, phone and desk alike: the question, the line, the slots
+          it fills, then Save. On a wide screen it stays centred and narrow,
+          so the eye goes straight down from a typed part to its slot. */}
+      <div className="mx-auto flex w-full max-w-[40rem] flex-1 flex-col px-4 lg:pt-10 lg:pb-12">
+        <header className="flex items-center justify-between gap-2 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {m.new_question()}
+          </h1>
+          <Button
+            variant="ghost"
+            size="icon-xl"
+            className="-me-2"
+            aria-label={m.new_close()}
+            onClick={() => void leave()}
+          >
+            <XIcon />
+          </Button>
+        </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <Field>
-          <FieldLabel htmlFor="line" className="text-base">
-            <NotePencilIcon className="size-5" />
+        <Field className="gap-2">
+          <FieldLabel
+            htmlFor="line"
+            className="text-sm font-normal text-muted-foreground"
+          >
             {m.new_line_label()}
           </FieldLabel>
           <Textarea
+            ref={lineRef}
             id="line"
             name="line"
             autoFocus
             rows={3}
             maxLength={500}
             // Enter saves the line (Shift+Enter is a new line): say so on the
-            // phone's keyboard.
+            // phone's keyboard, which covers the Save button while it is up.
             enterKeyHint="done"
-            className="min-h-24 rounded-xl text-lg"
+            className="min-h-28 rounded-2xl px-4 py-3 text-lg leading-snug md:text-lg"
             value={text}
             onChange={(event) => onText(event.target.value)}
             onKeyDown={(event) => {
@@ -409,371 +398,409 @@ export function NewJobForm({
               }
             }}
           />
-          <FieldDescription>
-            {m.new_example({
-              line: exampleLine(
-                {
-                  services,
-                  deposits: business.depositsOnNewJob,
-                  flow: business.jobFlow,
-                },
-                m.example_client(),
-                m.example_title(),
-              ),
-            })}
-          </FieldDescription>
+          {/* A sample in the business's own terms. While the line is empty,
+              a tap writes it in, so the slots show what they do. */}
+          <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+            <span>{m.new_example_label()}</span>
+            {text === '' ? (
+              <button
+                type="button"
+                className="min-h-11 text-start text-foreground underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 transition-colors outline-none hover:decoration-foreground focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50"
+                onClick={tryExample}
+              >
+                {example}
+              </button>
+            ) : (
+              <span className="flex min-h-11 items-center">{example}</span>
+            )}
+          </div>
         </Field>
 
-        <section className="mt-4 flex flex-col divide-y">
-          <h2 className="pb-1 text-sm font-semibold">{m.new_readback()}</h2>
-
-          <ReadRow
-            label={words.client.singular}
-            icon={UserIcon}
-            fixing={fixing === 'client'}
-            onFix={() => fixer.open('client')}
-            value={
-              clientName && (
-                <span className="flex flex-col">
-                  <span className="flex flex-wrap items-center gap-2">
-                    {clientName}
-                    {sourceLabel && (
-                      <Badge variant="secondary">{sourceLabel}</Badge>
-                    )}
-                  </span>
-                  {phone && (
-                    <span className="text-sm text-muted-foreground">
-                      {formatPhone(phone)}
-                    </span>
-                  )}
-                </span>
-              )
-            }
-          >
-            {fixing === 'client' ? (
-              <ClientPicker
-                // Only a tap on "Fix" raises the keyboard, never a failed save.
-                autoFocus={wide && fixing === 'client'}
-                clients={clients}
-                initialQuery={
-                  parsed.client?.kind === 'new' ? parsed.client.name : ''
-                }
-                onPick={(choice) => {
-                  setClient(choice)
-                  fixer.close()
-                }}
-              />
-            ) : (
-              alternatives.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  {parsed.phoneOwner && (
-                    <p className="text-sm text-muted-foreground">
-                      {m.duplicate_warning({ name: parsed.phoneOwner.name })}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    {alternatives.map(({ choice, label }) => (
-                      <Button
-                        key={
-                          choice.kind === 'existing' ? choice.id : choice.kind
+        <section className="mt-4 flex flex-col gap-2">
+          <h2 className="px-1 text-sm font-medium text-muted-foreground">
+            {m.new_readback()}
+          </h2>
+          <div className="flex flex-col divide-y divide-border/70 overflow-hidden surface">
+            <Slot
+              label={words.client.singular}
+              show={`${clientName}|${draft.clientSource}|${phone ?? ''}`}
+              quiet={draft.clientByDefault}
+              value={clientName}
+              note={
+                (source || phone) && (
+                  <>
+                    {source && (
+                      <span
+                        className={
+                          known
+                            ? 'flex items-center gap-1 text-primary'
+                            : 'flex items-center gap-1'
                         }
-                        variant={isChosen(choice) ? 'secondary' : 'outline'}
-                        aria-pressed={isChosen(choice)}
-                        className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal"
-                        onClick={() => setClient(choice)}
                       >
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )
-            )}
-          </ReadRow>
-
-          {linkedItem && clientItems.length === 0 && (
-            <ReadRow
-              label={words.item.singular}
-              icon={StackIcon}
-              value={linkedItem.name}
-            />
-          )}
-
-          <ReadRow
-            label={m.new_what()}
-            icon={ClipboardTextIcon}
-            value={chosenTitle}
-            fixing={fixing === 'title'}
-            onFix={() => fixer.open('title')}
-            missing={tried && !chosenTitle.trim() && m.new_missing_title()}
-            errorId="new-error-title"
-          >
-            {fixing === 'title' && (
-              <div className="flex gap-2">
-                <Input
-                  id="new-title"
-                  name="title"
-                  autoFocus
-                  aria-label={m.new_what()}
-                  aria-invalid={tried && !chosenTitle.trim()}
-                  aria-describedby={
-                    tried && !chosenTitle.trim() ? 'new-error-title' : undefined
-                  }
-                  maxLength={200}
-                  value={chosenTitle}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-                {done}
-              </div>
-            )}
-          </ReadRow>
-
-          {clientItems.length > 0 && (
-            <ReadRow
-              label={words.item.singular}
-              icon={CubeIcon}
-              value={clientItems
-                .filter((item) => pickedItems.includes(item.id))
-                .map((item) => item.name)
-                .join(', ')}
-            >
-              <div className="flex flex-wrap gap-2">
-                {clientItems.map((item) => (
-                  <Button
-                    key={item.id}
-                    variant={
-                      pickedItems.includes(item.id) ? 'secondary' : 'outline'
-                    }
-                    aria-pressed={pickedItems.includes(item.id)}
-                    className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal aria-pressed:border-primary"
-                    onClick={() => toggleItem(item.id)}
-                  >
-                    {item.name}
-                  </Button>
-                ))}
-              </div>
-            </ReadRow>
-          )}
-
-          <ReadRow
-            label={m.new_price()}
-            icon={TagIcon}
-            fixing={fixing === 'price'}
-            onFix={() => fixer.open('price')}
-            value={
-              chosenPrice !== null && (
-                <span className="flex flex-wrap items-center gap-2">
-                  {formatMoney(chosenPrice)}
-                  {draft.priceFromService && (
-                    <Badge variant="secondary">
-                      {m.new_price_from_service()}
-                    </Badge>
-                  )}
-                </span>
-              )
-            }
-          >
-            {fixing === 'price' && (
-              <div className="flex gap-2">
-                <MoneyInput
-                  name="price"
-                  label={m.new_price()}
-                  value={draft.priceText}
-                  onChange={setPrice}
-                />
-                {done}
-              </div>
-            )}
-          </ReadRow>
-
-          {draft.showReceived && (
-            <ReadRow
-              label={isPayment ? m.new_paid() : m.new_deposit()}
-              icon={CoinsIcon}
-              fixing={fixing === 'deposit'}
-              onFix={() => fixer.open('deposit')}
-              value={
-                chosenDeposit !== null &&
-                chosenDeposit > 0 &&
-                `${formatMoney(chosenDeposit)}, ${lower(METHOD_LABEL[depositMethod]())}`
+                        <source.icon aria-hidden className="size-3.5" />
+                        {source.label}
+                      </span>
+                    )}
+                    {phone && <span>{formatPhone(phone)}</span>}
+                  </>
+                )
               }
+              fixing={fixing === 'client'}
+              onFix={() => toggleFix('client')}
             >
-              {fixing === 'deposit' && (
-                <div className="flex flex-col gap-3">
-                  <MoneyInput
-                    name="deposit"
-                    label={isPayment ? m.new_paid() : m.new_deposit()}
-                    value={draft.receivedText}
-                    onChange={setDeposit}
+              {fixing === 'client' ? (
+                <ClientPicker
+                  // Only a tap on the slot raises the keyboard, and only at a desk.
+                  autoFocus={wide}
+                  clients={clients}
+                  initialQuery={
+                    parsed.client?.kind === 'new' ? parsed.client.name : ''
+                  }
+                  onPick={(choice) => {
+                    setClient(choice)
+                    fixer.close()
+                  }}
+                />
+              ) : (
+                alternatives.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {parsed.phoneOwner && (
+                      <p className="text-sm text-muted-foreground">
+                        {m.duplicate_warning({ name: parsed.phoneOwner.name })}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {alternatives.map(({ choice, label }) => (
+                        <Button
+                          key={
+                            choice.kind === 'existing' ? choice.id : choice.kind
+                          }
+                          variant={isChosen(choice) ? 'secondary' : 'outline'}
+                          aria-pressed={isChosen(choice)}
+                          className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal"
+                          onClick={() => setClient(choice)}
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
+            </Slot>
+
+            {linkedItem && clientItems.length === 0 && (
+              <Slot
+                label={words.item.singular}
+                show={linkedItem.name}
+                value={linkedItem.name}
+              />
+            )}
+
+            <Slot
+              label={words.job.singular}
+              show={chosenTitle.trim()}
+              quiet={!chosenTitle.trim()}
+              // Saved with a capital first letter, so it reads that way here.
+              value={
+                <span className="block first-letter:uppercase">
+                  {chosenTitle.trim() || '–'}
+                </span>
+              }
+              fixing={fixing === 'title'}
+              onFix={() => toggleFix('title')}
+              missing={tried && !chosenTitle.trim() && m.new_missing_title()}
+              errorId="new-error-title"
+            >
+              {fixing === 'title' && (
+                <div className="flex gap-2">
+                  <Input
+                    id="new-title"
+                    name="title"
+                    autoFocus
+                    aria-label={words.job.singular}
+                    aria-invalid={tried && !chosenTitle.trim()}
+                    aria-describedby={
+                      tried && !chosenTitle.trim()
+                        ? 'new-error-title'
+                        : undefined
+                    }
+                    maxLength={200}
+                    value={chosenTitle}
+                    onChange={(event) => setTitle(event.target.value)}
                   />
-                  <ToggleGroup
-                    aria-label={m.new_deposit_method()}
-                    value={[depositMethod]}
-                    onValueChange={(next: string[]) => {
-                      if (next[0]) setDepositMethod(next[0] as PaymentMethod)
-                    }}
-                    variant="outline"
-                    size="xl"
-                    className="w-full flex-wrap"
-                  >
-                    {METHODS.map((method) => (
-                      <ToggleGroupItem key={method} value={method}>
-                        {METHOD_LABEL[method]()}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                  <Field>
-                    <FieldLabel htmlFor="deposit-date">
-                      {m.new_deposit_date()}
-                    </FieldLabel>
-                    <Input
-                      id="deposit-date"
-                      name="deposit-date"
-                      type="date"
-                      value={depositDate}
-                      onChange={(event) =>
-                        setDepositDate(event.target.value || today)
-                      }
-                    />
-                  </Field>
-                  <div>{done}</div>
+                  {done}
                 </div>
               )}
-            </ReadRow>
-          )}
+            </Slot>
 
-          <ReadRow
-            label={single ? m.new_when() : m.new_due()}
-            icon={single ? CalendarBlankIcon : FlagIcon}
-            value={dateText}
-            fixing={fixing === 'date'}
-            onFix={() => fixer.open('date')}
-          >
-            {fixing === 'date' && (
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-2">
-                  <Field>
-                    <FieldLabel htmlFor="job-date">
-                      {m.new_date_label()}
-                    </FieldLabel>
-                    <Input
-                      id="job-date"
-                      name="date"
-                      type="date"
-                      value={chosenDate?.date ?? ''}
-                      onChange={(event) =>
-                        setDate(
-                          event.target.value
-                            ? {
-                                date: event.target.value,
-                                ...(chosenDate?.time
-                                  ? { time: chosenDate.time }
-                                  : {}),
-                              }
-                            : null,
-                        )
+            {clientItems.length > 0 && (
+              <Slot
+                label={words.item.singular}
+                show={pickedItems.join()}
+                quiet={pickedItems.length === 0}
+                value={
+                  clientItems
+                    .filter((item) => pickedItems.includes(item.id))
+                    .map((item) => item.name)
+                    .join(', ') || '–'
+                }
+              >
+                <div className="flex flex-wrap gap-2">
+                  {clientItems.map((item) => (
+                    <Button
+                      key={item.id}
+                      variant={
+                        pickedItems.includes(item.id) ? 'secondary' : 'outline'
                       }
+                      aria-pressed={pickedItems.includes(item.id)}
+                      className="h-auto min-h-11 max-w-full rounded-xl py-2 whitespace-normal aria-pressed:border-primary"
+                      onClick={() => toggleItem(item.id)}
+                    >
+                      {item.name}
+                    </Button>
+                  ))}
+                </div>
+              </Slot>
+            )}
+
+            <Slot
+              label={m.new_price()}
+              show={`${chosenPrice}|${draft.priceFromService}`}
+              quiet={chosenPrice === null}
+              value={
+                chosenPrice === null
+                  ? m.new_no_price()
+                  : formatMoney(chosenPrice)
+              }
+              note={draft.priceFromService && m.new_price_from_service()}
+              fixing={fixing === 'price'}
+              onFix={() => toggleFix('price')}
+            >
+              {fixing === 'price' && (
+                <div className="flex gap-2">
+                  <MoneyInput
+                    name="price"
+                    label={m.new_price()}
+                    value={draft.priceText}
+                    onChange={setPrice}
+                  />
+                  {done}
+                </div>
+              )}
+            </Slot>
+
+            {draft.showReceived && (
+              <Slot
+                label={isPayment ? m.new_paid() : m.new_deposit()}
+                show={`${receivedText}|${received ? receivedNote : ''}`}
+                quiet={!received}
+                value={receivedText}
+                note={received && receivedNote}
+                fixing={fixing === 'deposit'}
+                onFix={() => toggleFix('deposit')}
+              >
+                {fixing === 'deposit' && (
+                  <div className="flex flex-col gap-3">
+                    <MoneyInput
+                      name="deposit"
+                      label={isPayment ? m.new_paid() : m.new_deposit()}
+                      value={draft.receivedText}
+                      onChange={setDeposit}
                     />
-                  </Field>
-                  {single && (
+                    <ToggleGroup
+                      aria-label={m.new_deposit_method()}
+                      value={[depositMethod]}
+                      onValueChange={(next: string[]) => {
+                        if (next[0]) setDepositMethod(next[0] as PaymentMethod)
+                      }}
+                      variant="outline"
+                      size="xl"
+                      className="w-full flex-wrap"
+                    >
+                      {METHODS.map((method) => (
+                        <ToggleGroupItem key={method} value={method}>
+                          {METHOD_LABEL[method]()}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
                     <Field>
-                      <FieldLabel htmlFor="job-time">
-                        {m.new_time_label()}
+                      <FieldLabel htmlFor="deposit-date">
+                        {m.new_deposit_date()}
                       </FieldLabel>
                       <Input
-                        id="job-time"
-                        name="time"
-                        type="time"
-                        disabled={!chosenDate}
-                        value={
-                          chosenDate?.time
-                            ? formatTime(chosenDate.time).padStart(5, '0')
-                            : ''
+                        id="deposit-date"
+                        name="deposit-date"
+                        type="date"
+                        value={depositDate}
+                        onChange={(event) =>
+                          setDepositDate(event.target.value || today)
                         }
-                        onChange={(event) => {
-                          if (!chosenDate) return
-                          const [hour, minute] = event.target.value
-                            .split(':')
-                            .map(Number)
+                      />
+                    </Field>
+                    <div>{done}</div>
+                  </div>
+                )}
+              </Slot>
+            )}
+
+            <Slot
+              label={single ? m.new_when() : m.new_due()}
+              show={dateText}
+              quiet={!chosenDate}
+              value={dateText}
+              note={single && chosenDate && !chosenDate.time && m.new_no_time()}
+              fixing={fixing === 'date'}
+              onFix={() => toggleFix('date')}
+            >
+              {fixing === 'date' && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    <Field>
+                      <FieldLabel htmlFor="job-date">
+                        {m.new_date_label()}
+                      </FieldLabel>
+                      <Input
+                        id="job-date"
+                        name="date"
+                        type="date"
+                        value={chosenDate?.date ?? ''}
+                        onChange={(event) =>
                           setDate(
                             event.target.value
                               ? {
-                                  date: chosenDate.date,
-                                  time: { hour, minute },
+                                  date: event.target.value,
+                                  ...(chosenDate?.time
+                                    ? { time: chosenDate.time }
+                                    : {}),
                                 }
-                              : { date: chosenDate.date },
+                              : null,
                           )
-                        }}
+                        }
                       />
                     </Field>
-                  )}
+                    {single && (
+                      <Field>
+                        <FieldLabel htmlFor="job-time">
+                          {m.new_time_label()}
+                        </FieldLabel>
+                        <Input
+                          id="job-time"
+                          name="time"
+                          type="time"
+                          disabled={!chosenDate}
+                          value={
+                            chosenDate?.time
+                              ? formatTime(chosenDate.time).padStart(5, '0')
+                              : ''
+                          }
+                          onChange={(event) => {
+                            if (!chosenDate) return
+                            const [hour, minute] = event.target.value
+                              .split(':')
+                              .map(Number)
+                            setDate(
+                              event.target.value
+                                ? {
+                                    date: chosenDate.date,
+                                    time: { hour, minute },
+                                  }
+                                : { date: chosenDate.date },
+                            )
+                          }}
+                        />
+                      </Field>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {done}
+                    {chosenDate && (
+                      <Button
+                        variant="ghost"
+                        className="h-11 rounded-xl"
+                        onClick={() => setDate(null)}
+                      >
+                        {m.new_clear()}
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  {done}
-                  {chosenDate && (
-                    <Button
-                      variant="ghost"
-                      className="h-11 rounded-xl"
-                      onClick={() => setDate(null)}
-                    >
-                      {m.new_clear()}
-                    </Button>
-                  )}
-                </div>
+              )}
+            </Slot>
+
+            {/* New jobs start in the first stage; the job page moves them on. */}
+            {firstStage && (
+              <Slot
+                label={m.preview_stage()}
+                show={firstStage.name}
+                quiet
+                value={
+                  <StageBadge
+                    name={firstStage.name}
+                    group={firstStage.group}
+                    className="h-auto text-base font-normal"
+                  />
+                }
+              />
+            )}
+
+            {business.repeatDefault && (
+              <div className="flex min-h-14 items-center gap-3 px-4 py-2">
+                <label
+                  htmlFor="new-repeat"
+                  className="flex min-w-0 flex-1 items-baseline gap-3"
+                >
+                  <span className="w-24 shrink-0 text-sm text-muted-foreground">
+                    {m.repeat_read_back()}
+                  </span>
+                  <span
+                    className={
+                      repeat
+                        ? 'text-base font-medium'
+                        : 'text-base text-muted-foreground'
+                    }
+                  >
+                    {repeat
+                      ? repeatLabel(business.repeatDefault)
+                      : m.repeat_off()}
+                  </span>
+                </label>
+                <Switch
+                  id="new-repeat"
+                  checked={repeat}
+                  onCheckedChange={setRepeat}
+                />
               </div>
             )}
-          </ReadRow>
-          {business.repeatDefault && (
-            <div className="flex min-h-14 items-center gap-3 py-2">
-              <label
-                htmlFor="new-repeat"
-                className="flex min-w-0 flex-1 items-center gap-3"
-              >
-                <span className="flex w-24 shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
-                  <RepeatIcon
-                    aria-hidden
-                    className={cn('size-4 shrink-0', repeat && 'text-primary')}
-                  />
-                  {m.repeat_read_back()}
-                </span>
-                <span className="text-base">
-                  {repeat
-                    ? repeatLabel(business.repeatDefault)
-                    : m.repeat_off()}
-                </span>
-              </label>
-              <Switch
-                id="new-repeat"
-                checked={repeat}
-                onCheckedChange={setRepeat}
-              />
-            </div>
-          )}
+          </div>
         </section>
-      </div>
 
-      <div className="flex flex-col gap-2 border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        {draft.coversPrice && (
+        {/* On a phone Save stays at the bottom, in thumb reach, as the page
+            scrolls; at a desk it follows the slots. */}
+        <div className="flex-1 lg:hidden" />
+        <div className="sticky bottom-0 z-10 -mx-4 mt-4 flex flex-col gap-2 bg-canvas/95 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm lg:static lg:mx-0 lg:mt-6 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+          {draft.coversPrice && (
+            <Button
+              size="xl"
+              variant="outline"
+              className="w-full"
+              disabled={saving}
+              onClick={() => void submit(true)}
+            >
+              <CheckCircleIcon data-icon="inline-start" />
+              {m.new_save_done()}
+            </Button>
+          )}
           <Button
             size="xl"
-            variant="outline"
             className="w-full"
             disabled={saving}
-            onClick={() => void submit(true)}
+            onClick={() => void submit()}
           >
-            <CheckCircleIcon data-icon="inline-start" />
-            {m.new_save_done()}
+            {saving && <Spinner data-icon="inline-start" />}
+            {m.new_save()}
           </Button>
-        )}
-        <Button
-          size="xl"
-          className="w-full"
-          disabled={saving}
-          onClick={() => void submit()}
-        >
-          {saving && <Spinner data-icon="inline-start" />}
-          {m.new_save()}
-        </Button>
+        </div>
       </div>
       {guard.prompt}
     </main>
