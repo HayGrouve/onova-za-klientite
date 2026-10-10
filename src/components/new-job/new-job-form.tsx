@@ -260,16 +260,10 @@ export function NewJobForm({
   })
 
   const wide = useWide()
-  // Set when a save finds something missing: the first thing wrong gets focus.
-  const [failure, setFailure] = useState<{
-    id: number
-    client: boolean
-  }>()
+  // Set when a save finds the title missing: its input gets focus.
+  const [failure, setFailure] = useState<number>()
   useEffect(() => {
-    if (!failure) return
-    document
-      .getElementById(failure.client ? 'new-error-client' : 'new-title')
-      ?.focus()
+    if (failure) document.getElementById('new-title')?.focus()
   }, [failure])
 
   const submit = async (markDone = false) => {
@@ -283,11 +277,9 @@ export function NewJobForm({
       repeat: repeat ? business.repeatDefault : undefined,
     })
     if (!args) {
-      // A missing title opens its input; a missing client shows its picker.
-      if (draft.missing.title) {
-        fixer.openAfterError()
-      }
-      setFailure({ id: Date.now(), client: draft.missing.client })
+      // A missing title opens its input.
+      fixer.openAfterError()
+      setFailure(Date.now())
       return
     }
     submitting.current = true
@@ -327,7 +319,7 @@ export function NewJobForm({
   }
 
   const sourceLabel =
-    draft.clientSource === null || draft.clientSource === 'none'
+    draft.clientSource === 'none'
       ? null
       : {
           phone: m.new_source_phone,
@@ -336,8 +328,7 @@ export function NewJobForm({
           new: m.new_source_new,
         }[draft.clientSource]()
   const clientName =
-    chosenClient &&
-    (chosenClient.kind === 'none' ? m.no_client() : chosenClient.name)
+    chosenClient.kind === 'none' ? m.no_client() : chosenClient.name
   const { phone } = draft
   const alternatives = draft.alternatives.map((item) => ({
     choice: item.choice,
@@ -458,10 +449,8 @@ export function NewJobForm({
                 </span>
               )
             }
-            missing={tried && !chosenClient && m.new_missing_client()}
-            errorId="new-error-client"
           >
-            {fixing === 'client' || (tried && !chosenClient) ? (
+            {fixing === 'client' ? (
               <ClientPicker
                 // Only a tap on "Fix" raises the keyboard, never a failed save.
                 autoFocus={wide && fixing === 'client'}
