@@ -1,3 +1,4 @@
+import { isOverdue } from './dates'
 import { isJobLate, isOpenGroup } from './stages'
 import type { StageGroup } from './stages'
 
@@ -102,4 +103,93 @@ export function lateJobCount(
   today: string,
 ): number {
   return lateJobs(arranged, today).length
+}
+
+/** A visit as the queue reads it. */
+type QueueVisit = {
+  start: number
+  end?: number
+  allDay: boolean
+  doneAt?: number
+  job?: TodayJob
+}
+
+/** A reminder as the queue reads it. */
+type QueueReminder = { date: string }
+
+/** One thing on Today's queue, with why it is there. */
+export type TodayEntry<
+  TVisit extends QueueVisit,
+  TJob extends TodayJob,
+  TReminder extends QueueReminder,
+> =
+  | { kind: 'visit'; visit: TVisit }
+  | { kind: 'job'; job: TJob; reason: 'late' | 'soon' | 'unpaid' }
+  | { kind: 'reminder'; reminder: TReminder; late: boolean }
+
+// A visit with no end counts as current for an hour after it starts.
+const VISIT_HOUR = 60 * 60 * 1000
+
+function visitIsOver(visit: QueueVisit, now: number): boolean {
+  if (visit.doneAt !== undefined) return true
+  if (visit.allDay) return false
+  return (visit.end ?? visit.start + VISIT_HOUR) < now
+}
+
+/**
+ * Today as one queue, one thing at a time (D119): `first` is what to do now,
+ * `rest` what comes after, each entry once. `lists` is already arranged
+ * (`arrangeToday`), so a job is under one reason only.
+ *
+ * The order is today's visits by time, late reminders, overdue jobs, jobs due
+ * soon, the other reminders, then done but unpaid. `first` is the next visit
+ * today that isn't over; without one, the first entry that isn't a visit; and
+ * when only past visits are left, the earliest of them. A visit with no job
+ * (blocked time) has nothing to open, so it stays off the queue.
+ */
+export function todayQueue<
+  TVisit extends QueueVisit,
+  TJob extends TodayJob,
+  TReminder extends QueueReminder,
+>(
+  lists: {
+    appointments: TVisit[]
+    overdue: TJob[]
+    dueSoon: TJob[]
+    doneUnpaid: TJob[]
+    reminders: TReminder[]
+  },
+  today: string,
+  now: number,
+): {
+  first?: TodayEntry<TVisit, TJob, TReminder>
+  rest: Array<TodayEntry<TVisit, TJob, TReminder>>
+} {
+  type Entry = TodayEntry<TVisit, TJob, TReminder>
+  const visits: Entry[] = lists.appointments
+    .filter((visit) => visit.job !== undefined)
+    .map((visit) => ({ kind: 'visit', visit }))
+  const reminder = (item: TReminder): Entry => ({
+    kind: 'reminder',
+    reminder: item,
+    late: isOverdue(item.date, today),
+  })
+  const reminders = lists.reminders.map(reminder)
+  const jobs = (items: TJob[], reason: 'late' | 'soon' | 'unpaid'): Entry[] =>
+    items.map((job) => ({ kind: 'job', job, reason }))
+  const all: Entry[] = [
+    ...visits,
+    ...reminders.filter((entry) => entry.kind === 'reminder' && entry.late),
+    ...jobs(lists.overdue, 'late'),
+    ...jobs(lists.dueSoon, 'soon'),
+    ...reminders.filter((entry) => entry.kind === 'reminder' && !entry.late),
+    ...jobs(lists.doneUnpaid, 'unpaid'),
+  ]
+  const first =
+    all.find(
+      (entry) => entry.kind === 'visit' && !visitIsOver(entry.visit, now),
+    ) ??
+    all.find((entry) => entry.kind !== 'visit') ??
+    all.at(0)
+  return { first, rest: all.filter((entry) => entry !== first) }
 }
