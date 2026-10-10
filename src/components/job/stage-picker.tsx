@@ -1,30 +1,18 @@
-import {
-  ArrowRightIcon,
-  CaretDownIcon,
-  CheckIcon,
-  FlowArrowIcon,
-} from '@phosphor-icons/react'
+import { CaretDownIcon, CheckIcon, FlowArrowIcon } from '@phosphor-icons/react'
 import { cn } from 'cn'
 import { useState } from 'react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ConfirmQuestion } from '#/components/confirm-action'
 import { Hint } from '#/components/hint'
+import { StageTrack } from '#/components/job/stage-track'
 import { Panel, PanelBody } from '#/components/panel'
+import { StageBadge } from '#/components/stage-badge'
 import { Button } from '#/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { m } from '#/paraglide/messages.js'
 import type { StageGroup } from '../../../shared/stages'
 
 export type StageRef = { _id: Id<'stages'>; name: string; group: StageGroup }
-
-// The current stage reads as a soft badge, so the filled button beside it is
-// the one thing to press; colour follows its group (D53).
-const CURRENT_STAGE: Record<StageGroup, string> = {
-  new: 'bg-primary/10 text-primary',
-  in_progress: 'bg-primary/10 text-primary',
-  done: 'bg-green-600/12 text-green-700 dark:text-green-400',
-  cancelled: 'bg-destructive/10 text-destructive',
-}
 
 /** The current chip in the full list is filled in its group colour. */
 const CURRENT_CHIP: Record<StageGroup, string> = {
@@ -47,10 +35,11 @@ export function nextStage(stages: StageRef[], currentId: Id<'stages'>) {
 }
 
 /**
- * Where the job is, and the one usual step forward. Every other stage waits
- * behind "Other stage", and a Cancelled-group stage asks before it moves,
- * since the rest of the money stops counting as owed. Read-only, it shows
- * only where the job is: moving a job is for managers.
+ * Where the job is, as a track of the business's stages (D116). The usual
+ * step forward is the page's main action, "Next: <stage>" (`nextStage`).
+ * Every other stage waits behind "Other stage", and a Cancelled-group stage
+ * asks before it moves, since the rest of the money stops counting as owed.
+ * Read-only, it shows only where the job is: moving a job is for managers.
  */
 export function StagePicker({
   stages,
@@ -76,8 +65,10 @@ export function StagePicker({
     from: Id<'stages'>
   } | null>(null)
   const asking = question?.from === currentId ? question.stage : null
-  const current = stages.find((stage) => stage._id === currentId)
-  const next = nextStage(stages, currentId)
+  // A cancelled job is off the track, which greys out: its stage says so.
+  const offTrack = stages.find(
+    (stage) => stage._id === currentId && stage.group === 'cancelled',
+  )
 
   const pick = (stage: StageRef) => {
     if (stage.group === 'cancelled') {
@@ -117,35 +108,13 @@ export function StagePicker({
       action={!readOnly && toggle}
     >
       <PanelBody className="flex flex-col gap-3">
-        {/* The full list marks the current stage itself. */}
-        {!choosing && (
-          <div className="flex flex-wrap items-center gap-2">
-            {current && (
-              <span
-                className={cn(
-                  'inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full px-3.5 py-1 text-sm font-semibold break-words',
-                  CURRENT_STAGE[current.group],
-                )}
-              >
-                <CheckIcon
-                  aria-hidden
-                  className="size-4 shrink-0"
-                  weight="bold"
-                />
-                {current.name}
-              </span>
-            )}
-            {next && !readOnly && (
-              <Button
-                size="xl"
-                className="ml-auto max-w-full whitespace-normal"
-                onClick={() => pick(next)}
-              >
-                {m.stage_next({ stage: next.name })}
-                <ArrowRightIcon data-icon="inline-end" />
-              </Button>
-            )}
-          </div>
+        <StageTrack stages={stages} currentId={currentId} />
+        {offTrack && (
+          <StageBadge
+            name={offTrack.name}
+            group={offTrack.group}
+            className="h-auto text-sm text-foreground"
+          />
         )}
         {choosing && (
           <ToggleGroup

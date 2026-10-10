@@ -38,6 +38,7 @@ export function ReviewSubmit({
   tone = 'default',
   disabled = false,
   aside,
+  showBack = true,
 }: {
   review: ReturnType<typeof useReview>
   /** The first step's button: it reviews, it doesn't record. */
@@ -53,6 +54,11 @@ export function ReviewSubmit({
   disabled?: boolean
   /** Next to the first button before the review, like a Cancel. "Back" takes its place after. */
   aside?: React.ReactNode
+  /**
+   * The "Back" beside the confirm. A stepped sheet has its own back control
+   * and moves focus to the step's heading instead (D117).
+   */
+  showBack?: boolean
 }) {
   const summaryId = useId()
   const back = useRef<HTMLButtonElement>(null)
@@ -107,7 +113,7 @@ export function ReviewSubmit({
           {reviewing ? confirmLabel : label}
         </Button>
         {!reviewing && aside}
-        {reviewing && (
+        {reviewing && showBack && (
           <Button
             ref={back}
             type="button"

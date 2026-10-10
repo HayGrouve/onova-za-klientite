@@ -33,10 +33,13 @@ export function useDetailSheet<TPanel extends { kind: string }>(
 export function DetailSheet({
   sheet,
   title,
+  hideTitle,
   children,
 }: {
   sheet: { panel: unknown; dismiss: () => void; prompt: React.ReactNode }
   title: React.ReactNode
+  /** For a form that asks its own question, step by step. */
+  hideTitle?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -45,6 +48,7 @@ export function DetailSheet({
         open={sheet.panel !== null}
         onClose={sheet.dismiss}
         title={title}
+        hideTitle={hideTitle}
       >
         <div className="px-4 pb-6">{children}</div>
       </BottomSheet>

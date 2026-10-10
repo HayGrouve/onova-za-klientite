@@ -65,10 +65,13 @@ test('the job shows its money, and a payment moves the balance', async ({
   await expect(figure(page, 'Остатък')).toContainText('650')
 
   await page.getByRole('button', { name: 'Плащане', exact: true }).click()
-  await page.getByLabel('Сума', { exact: true }).fill('200')
-  await page.getByRole('button', { name: 'Прегледай' }).click()
-  // The review step shows what is recorded and asks once more.
-  await page.getByRole('button', { name: /^Запиши 200/ }).click()
+  // One question at a time: how much, how, then the review (D117).
+  const sheet = page.getByRole('dialog')
+  await sheet.getByLabel('Сума', { exact: true }).fill('200')
+  await sheet.getByRole('button', { name: 'Напред', exact: true }).click()
+  await sheet.getByRole('button', { name: 'В брой', exact: true }).click()
+  // The review shows what is recorded and asks once more.
+  await sheet.getByRole('button', { name: /^Запиши 200/ }).click()
 
   await expect(figure(page, 'Платено')).toContainText('500')
   await expect(figure(page, 'Остатък')).toContainText('450')

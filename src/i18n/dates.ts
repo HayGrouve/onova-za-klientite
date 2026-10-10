@@ -66,6 +66,41 @@ export function formatLongDay(date: string) {
   return LONG_DAY.format(new Date(`${date}T12:00:00Z`))
 }
 
+const DAY_OF_MONTH = new Intl.DateTimeFormat('bg-BG', {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'UTC',
+})
+const WEEKDAY = new Intl.DateTimeFormat('bg-BG', {
+  weekday: 'long',
+  timeZone: 'UTC',
+})
+
+/**
+ * A day as a value of its own, like a form's default: today, tomorrow or
+ * yesterday by name, otherwise the weekday, always followed by the date
+ * ("Today, 10 October"), with the year when it isn't this year's.
+ */
+export function formatDayWithDate(date: string, today: string) {
+  const noon = new Date(`${date}T12:00:00Z`)
+  const named =
+    date === today
+      ? m.day_today()
+      : date === addDays(today, 1)
+        ? m.day_tomorrow()
+        : date === addDays(today, -1)
+          ? m.day_yesterday()
+          : WEEKDAY.format(noon)
+  const day = named.charAt(0).toLocaleUpperCase('bg-BG') + named.slice(1)
+  return m.day_with_date({
+    day,
+    date:
+      date.slice(0, 4) === today.slice(0, 4)
+        ? DAY_OF_MONTH.format(noon)
+        : formatLongDay(date),
+  })
+}
+
 export function formatTime(time: { hour: number; minute: number }) {
   return `${time.hour}:${String(time.minute).padStart(2, '0')}`
 }
