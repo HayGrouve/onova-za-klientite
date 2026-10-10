@@ -325,12 +325,14 @@ function ClientPage() {
                 icon={WalletIcon}
                 footer={
                   <>
+                    {/* Calling is the page's one solid action; paying is beside it. */}
                     <Button
                       size="xl"
+                      variant="outline"
                       className="flex-1 lg:max-w-60"
                       onClick={() => sheet.open({ kind: 'payment' })}
                     >
-                      <PlusIcon data-icon="inline-start" />
+                      <WalletIcon data-icon="inline-start" />
                       {m.pay_add()}
                     </Button>
                     {/* A refund is rare: it sits in a menu, as on the job. */}
