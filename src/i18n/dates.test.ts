@@ -4,6 +4,7 @@ import {
   formatActivityMoment,
   formatDay,
   formatDayShort,
+  formatDayWithDate,
   formatLongDay,
   formatTime,
 } from './dates'
@@ -116,5 +117,31 @@ describe('formatActivityMoment', () => {
   it('leaves text that is not a date as it is', () => {
     expect(formatActivityMoment('', '2026-10-08')).toBe('')
     expect(formatActivityMoment('Монтаж', '2026-10-08')).toBe('Монтаж')
+  })
+})
+
+describe('formatDayWithDate', () => {
+  it('names today, tomorrow and yesterday, and still gives the date', () => {
+    expect(formatDayWithDate('2026-10-10', '2026-10-10')).toBe(
+      'Днес, 10 октомври',
+    )
+    expect(formatDayWithDate('2026-10-11', '2026-10-10')).toBe(
+      'Утре, 11 октомври',
+    )
+    expect(formatDayWithDate('2026-10-09', '2026-10-10')).toBe(
+      'Вчера, 9 октомври',
+    )
+  })
+
+  it('names the weekday of any other day', () => {
+    expect(formatDayWithDate('2026-10-06', '2026-10-10')).toBe(
+      'Вторник, 6 октомври',
+    )
+  })
+
+  it('adds the year to a date in another year', () => {
+    expect(formatDayWithDate('2025-12-30', '2026-10-10')).toBe(
+      'Вторник, 30 декември 2025 г.',
+    )
   })
 })
