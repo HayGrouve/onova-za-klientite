@@ -1,24 +1,14 @@
-import {
-  BellIcon,
-  CalendarCheckIcon,
-  CalendarDotsIcon,
-  CheckCircleIcon,
-  HandCoinsIcon,
-  HourglassMediumIcon,
-  WalletIcon,
-  WarningCircleIcon,
-} from '@phosphor-icons/react'
+import { CalendarDotsIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { cn } from 'cn'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
-import { JobRow } from '#/components/job-row'
-import { ListNote, ListSection } from '#/components/list-section'
+import type { JobRowData } from '#/components/job-row'
+import { ListNote } from '#/components/list-section'
 import { Panel, PanelList } from '#/components/panel'
-import { ReminderRow } from '#/components/reminders/reminder-row'
 import { StageBadge } from '#/components/stage-badge'
-import { StatTile } from '#/components/stat-tile'
+import { AfterList, NowBlock, TodayLede } from '#/components/today/today-queue'
 import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
@@ -26,11 +16,14 @@ import { dateInSofia, monthOf } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 import { jobOwedCents } from '../../../shared/allocation'
 import { isJobLate } from '../../../shared/stages'
-import { lateJobs } from '../../../shared/today'
+import type { todayQueue } from '../../../shared/today'
 import { hasRole } from '../../../shared/roles'
 
 type TodayData = FunctionReturnType<typeof api.today.list>
 type AppointmentRow = TodayData['appointments'][number]
+type Queue = ReturnType<
+  typeof todayQueue<AppointmentRow, JobRowData, TodayData['reminders'][number]>
+>
 
 const TIME = new Intl.DateTimeFormat('bg-BG', {
   hour: 'numeric',
@@ -39,224 +32,73 @@ const TIME = new Intl.DateTimeFormat('bg-BG', {
 })
 
 /**
- * Today on a wide screen: the headline figures in a row, then the schedule
- * (today hour by hour, the next days by day) beside what needs acting on.
- * Lists to act on, never charts (design doc, "Simple first").
+ * Today on a wide screen: the same queue as the phone (D119), with the
+ * schedule beside it when the business keeps appointments. Visits live in the
+ * schedule, so the queue's "After" leaves them out; the first thing to do may
+ * still be one. Lists to act on, never charts (design doc, "Simple first").
  */
-export function TodayWide({ data, today }: { data: TodayData; today: string }) {
+export function TodayWide({
+  data,
+  today,
+  queue,
+}: {
+  data: TodayData
+  today: string
+  queue: Queue
+}) {
+  const { modules } = useViewer().business
+  const waiting = (queue.first ? 1 : 0) + queue.rest.length
+  const after = modules.appointments
+    ? queue.rest.filter((entry) => entry.kind !== 'visit')
+    : queue.rest
+
+  const focus = (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col">
+        <TodayLede count={waiting} />
+        <MoneyLine today={today} />
+        {queue.first && <NowBlock entry={queue.first} today={today} />}
+      </div>
+      <AfterList entries={after} today={today} />
+    </div>
+  )
+
+  if (!modules.appointments) return <div className="max-w-2xl">{focus}</div>
+  return (
+    <div className="grid grid-cols-2 items-start gap-y-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      {focus}
+      <Schedule data={data} today={today} />
+    </div>
+  )
+}
+
+/**
+ * For managers, the month's money as one quiet line under the count: what
+ * came in and what is still owed, each opening Money. A Worker sees no totals.
+ */
+function MoneyLine({ today }: { today: string }) {
   const { business } = useViewer()
-  const { words, modules } = business
-  // Level 2: a Worker sees no totals, so the money tiles stay out.
   const seesMoney = hasRole(business.role, 'manager')
   const money = useQuery(
     api.money.headline,
     seesMoney ? { businessId: business._id, month: monthOf(today) } : 'skip',
   )
-
-  // The figure is every unpaid balance, so say how many jobs it covers and how
-  // many of them are done, not only the done ones.
-  const owedDetail =
-    money && money.owingJobs > 0
-      ? [
-          m.money_jobs_count({
-            jobs: words.job.plural,
-            count: money.owingJobs,
-          }),
-          money.doneOwingJobs > 0 &&
-            m.today_owed_done({ count: money.doneOwingJobs }),
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : undefined
-
-  // Every late job, also one with a visit in the schedule beside it, as the
-  // morning push counts: the tile, this section and its count agree (D110).
-  const late = lateJobs(data, today)
-  const attention =
-    late.length +
-    data.dueSoon.length +
-    data.reminders.length +
-    data.doneUnpaid.length
-  const attentionLists = (
-    <>
-      {late.length > 0 && (
-        <ListSection
-          title={m.today_overdue()}
-          icon={WarningCircleIcon}
-          tone="danger"
-          count={late.length}
-        >
-          {late.map((job) => (
-            <JobRow
-              key={job._id}
-              job={job}
-              today={today}
-              lead={{ kind: 'due' }}
-            />
-          ))}
-        </ListSection>
-      )}
-      {data.dueSoon.length > 0 && (
-        <ListSection
-          title={m.today_due_soon()}
-          icon={HourglassMediumIcon}
-          count={data.dueSoon.length}
-        >
-          {data.dueSoon.map((job) => (
-            <JobRow
-              key={job._id}
-              job={job}
-              today={today}
-              lead={{ kind: 'due' }}
-            />
-          ))}
-        </ListSection>
-      )}
-      {data.reminders.length > 0 && (
-        <ListSection
-          title={m.today_reminders()}
-          icon={BellIcon}
-          count={data.reminders.length}
-        >
-          {data.reminders.map((reminder) => (
-            <ReminderRow
-              key={reminder._id}
-              reminderId={reminder._id}
-              note={reminder.note}
-              detail={[reminder.clientName, formatDay(reminder.date, today)]
-                .filter(Boolean)
-                .join(' · ')}
-              date={reminder.date}
-              clientId={reminder.clientId}
-              jobId={reminder.jobId}
-              itemId={reminder.itemId}
-            />
-          ))}
-        </ListSection>
-      )}
-      {data.doneUnpaid.length > 0 && (
-        <ListSection
-          title={m.today_done_unpaid()}
-          icon={HandCoinsIcon}
-          count={data.doneUnpaid.length}
-        >
-          {data.doneUnpaid.map((job) => (
-            <JobRow
-              key={job._id}
-              job={job}
-              today={today}
-              lead={{ kind: 'none' }}
-            />
-          ))}
-        </ListSection>
-      )}
-      {attention === 0 && (
-        <div className="mx-4 flex items-center gap-3 surface p-4 text-sm text-muted-foreground">
-          <CheckCircleIcon
-            aria-hidden
-            className="size-6 shrink-0 text-green-700 dark:text-green-400"
-            weight="duotone"
-          />
-          {m.today_attention_clear()}
-        </div>
-      )}
-    </>
+  if (!seesMoney || !money) return null
+  const figure = (label: string, cents: number) => (
+    <Link
+      to="/money"
+      className="flex items-baseline gap-2 rounded-md underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground tabular-nums">
+        {formatMoney(cents)}
+      </span>
+    </Link>
   )
-
   return (
-    <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-4 gap-3 px-4 xl:gap-4">
-        {modules.appointments && (
-          <StatTile
-            to="/"
-            hash="schedule"
-            icon={CalendarCheckIcon}
-            label={m.today_appointments({
-              appointments: words.appointment.plural,
-            })}
-            value={String(data.appointments.length)}
-            detail={m.count({
-              label: m.today_upcoming(),
-              count: data.upcoming.length,
-            })}
-          />
-        )}
-        <StatTile
-          to="/"
-          hash="attention"
-          icon={WarningCircleIcon}
-          tone={late.length > 0 ? 'danger' : 'muted'}
-          label={m.today_overdue()}
-          value={String(late.length)}
-          detail={m.count({
-            label: m.today_due_soon(),
-            count: data.dueSoon.length,
-          })}
-        />
-        {seesMoney ? (
-          <>
-            <StatTile
-              to="/money"
-              icon={HandCoinsIcon}
-              tone="primary"
-              label={m.money_still_owed()}
-              value={money ? formatMoney(money.stillOwedCents) : '…'}
-              detail={owedDetail}
-            />
-            <StatTile
-              to="/money"
-              icon={WalletIcon}
-              label={m.today_received_month()}
-              value={money ? formatMoney(money.receivedCents) : '…'}
-              detail={
-                money && modules.costs
-                  ? m.money_profit_value({
-                      amount: formatMoney(money.profitCents),
-                    })
-                  : undefined
-              }
-            />
-          </>
-        ) : (
-          <StatTile
-            to="/"
-            hash="attention"
-            icon={HandCoinsIcon}
-            label={m.today_done_unpaid()}
-            value={String(data.doneUnpaid.length)}
-          />
-        )}
-        {!modules.appointments && (
-          <StatTile
-            to="/"
-            hash="attention"
-            icon={BellIcon}
-            label={m.today_reminders()}
-            value={String(data.reminders.length)}
-          />
-        )}
-      </div>
-
-      {modules.appointments ? (
-        <div className="grid grid-cols-2 items-start xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-          <Schedule data={data} today={today} />
-          <section
-            id="attention"
-            aria-label={m.today_attention()}
-            className="flex scroll-mt-6 flex-col gap-5"
-          >
-            {attentionLists}
-          </section>
-        </div>
-      ) : (
-        <section
-          id="attention"
-          aria-label={m.today_attention()}
-          className="grid scroll-mt-6 grid-cols-2 items-start gap-y-5"
-        >
-          {attentionLists}
-        </section>
-      )}
+    <div className="-mt-2 flex flex-wrap gap-x-6 gap-y-1 px-4 pb-4 text-sm">
+      {figure(m.today_received_month(), money.receivedCents)}
+      {figure(m.money_still_owed(), money.stillOwedCents)}
     </div>
   )
 }

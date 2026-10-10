@@ -12,6 +12,7 @@ import type { api } from '../../convex/_generated/api'
 import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import { useViewer } from '#/hooks/use-viewer'
+import { markJobTitle } from '#/lib/morph'
 import { formatDay, formatDayShort } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../shared/dates'
@@ -172,6 +173,8 @@ export function JobRow({
       <Link
         to="/jobs/$jobId"
         params={{ jobId: job._id }}
+        viewTransition
+        onClick={markJobTitle}
         className={cn(
           'relative flex flex-col gap-1 pressable px-4 py-3',
           reason && 'pl-9',
@@ -187,7 +190,10 @@ export function JobRow({
           />
         )}
         <div className="flex items-start justify-between gap-3">
-          <span className="min-w-0 text-[1.0625rem] leading-snug font-medium break-words">
+          <span
+            data-job-title
+            className="min-w-0 text-[1.0625rem] leading-snug font-medium break-words"
+          >
             {job.title}
           </span>
           {owes ? (

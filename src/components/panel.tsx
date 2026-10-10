@@ -39,9 +39,7 @@ export function Panel({
           )}
           <h2 className="truncate text-base font-semibold">{title}</h2>
           {count !== undefined && (
-            <span className="rounded-full bg-foreground/7 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
-              {count}
-            </span>
+            <span className="text-muted-foreground tabular-nums">{count}</span>
           )}
           {hint}
         </div>
