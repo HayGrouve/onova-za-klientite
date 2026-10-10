@@ -50,7 +50,9 @@ export function MoneyFigure({
       <div
         className={cn(
           'tracking-[-0.01em] tabular-nums',
-          small ? 'text-lg font-medium' : 'text-[2rem] leading-tight font-light',
+          small
+            ? 'text-lg font-medium'
+            : 'text-[2rem] leading-tight font-light',
           emphasis && EMPHASIS[emphasis],
         )}
       >

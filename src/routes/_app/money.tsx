@@ -339,7 +339,7 @@ function MoneyPage() {
                                 setPayClient({ _id: row.clientId, name })
                               }
                             >
-                              <PlusIcon data-icon="inline-start" />
+                              <WalletIcon data-icon="inline-start" />
                               {m.pay_add()}
                             </Button>
                           </div>

@@ -69,6 +69,7 @@ import { useViewer } from '#/hooks/use-viewer'
 import { formatDay } from '#/i18n/dates'
 import { METHOD_LABEL } from '#/i18n/money'
 import { runChange } from '#/lib/change'
+import { JOB_TITLE_MORPH } from '#/lib/morph'
 import { jobMainAction, paidShare } from '#/lib/job-actions'
 import { m } from '#/paraglide/messages.js'
 import {
@@ -264,7 +265,11 @@ function JobPage() {
   return (
     <div className="flex flex-col gap-4 pb-6">
       <header className="flex items-start justify-between gap-3 px-4 pt-2">
-        <h1 className="min-w-0 text-2xl leading-tight font-semibold tracking-tight text-balance break-words">
+        {/* The tapped row's title grows into this heading (D120). */}
+        <h1
+          className="min-w-0 text-[1.75rem] leading-tight font-semibold tracking-[-0.012em] text-balance break-words"
+          style={{ viewTransitionName: JOB_TITLE_MORPH }}
+        >
           {job.title}
         </h1>
         <div className="flex shrink-0 items-center gap-1">

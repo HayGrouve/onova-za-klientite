@@ -14,14 +14,18 @@ import type { StageGroup } from '../../../shared/stages'
 
 export type StageRef = { _id: Id<'stages'>; name: string; group: StageGroup }
 
-/** The current chip in the full list is filled in its group colour. */
+/**
+ * The current chip in the full list is the lichen "selected" tint with a
+ * spruce ring, whatever its group: the dot in front of the name already says
+ * the group (D115), so no chip is filled in a loud colour.
+ */
+const CURRENT =
+  'aria-pressed:bg-accent aria-pressed:text-foreground aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:hover:bg-accent'
 const CURRENT_CHIP: Record<StageGroup, string> = {
-  new: 'aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground',
-  in_progress:
-    'aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground',
-  done: 'aria-pressed:bg-green-600 aria-pressed:text-white aria-pressed:hover:bg-green-600 aria-pressed:hover:text-white',
-  cancelled:
-    'aria-pressed:bg-destructive aria-pressed:text-white aria-pressed:hover:bg-destructive aria-pressed:hover:text-white',
+  new: CURRENT,
+  in_progress: CURRENT,
+  done: CURRENT,
+  cancelled: CURRENT,
 }
 
 /**
