@@ -809,6 +809,7 @@ function JobPage() {
 
       <DetailSheet
         sheet={sheet}
+        hideTitle={sheet.panel?.kind === 'payment'}
         title={
           sheet.panel
             ? {
@@ -859,6 +860,7 @@ function JobPage() {
             target={{
               kind: 'job',
               jobId: job._id,
+              title: job.title,
               balanceCents: jobOwedCents(job),
             }}
             today={today}

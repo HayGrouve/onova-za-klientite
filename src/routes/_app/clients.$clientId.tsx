@@ -494,6 +494,7 @@ function ClientPage() {
 
       <DetailSheet
         sheet={sheet}
+        hideTitle={sheet.panel?.kind === 'payment'}
         title={
           sheet.panel?.kind === 'payment'
             ? m.pay_title()
@@ -519,6 +520,7 @@ function ClientPage() {
             target={{
               kind: 'client',
               clientId: client._id,
+              name: client.isNoClient ? m.no_client() : client.name,
               openJobs: data.jobs.filter((job) => job.owes),
             }}
             today={today}

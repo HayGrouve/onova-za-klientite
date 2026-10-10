@@ -1,3 +1,5 @@
+import { cn } from 'cn'
+import { useRef } from 'react'
 import {
   InputGroup,
   InputGroupAddon,
@@ -15,6 +17,8 @@ export function MoneyInput({
   name = 'amount',
   invalid,
   describedBy,
+  size = 'md',
+  selectOnFocus = false,
 }: {
   id?: string
   label: string
@@ -25,10 +29,18 @@ export function MoneyInput({
   name?: string
   invalid?: boolean
   describedBy?: string
+  /** `lg` is the one question of a step: a large, light figure. */
+  size?: 'md' | 'lg'
+  /** Selects a prefilled amount on focus, so typing replaces it. */
+  selectOnFocus?: boolean
 }) {
   const wide = useWide()
+  const large = size === 'lg'
+  // The click that focused the field would otherwise drop the selection on
+  // release and leave a caret instead.
+  const justFocused = useRef(false)
   return (
-    <InputGroup>
+    <InputGroup className={cn(large && 'h-16')}>
       <InputGroupInput
         id={id}
         name={name}
@@ -41,9 +53,27 @@ export function MoneyInput({
         maxLength={14}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onFocus={(event) => {
+          if (!selectOnFocus) return
+          justFocused.current = true
+          event.currentTarget.select()
+        }}
+        onMouseUp={(event) => {
+          if (!justFocused.current) return
+          justFocused.current = false
+          event.preventDefault()
+        }}
+        onKeyDown={() => (justFocused.current = false)}
+        onBlur={() => (justFocused.current = false)}
+        className={cn(
+          large &&
+            'h-16 text-[2.125rem] font-light tracking-tight tabular-nums md:text-[2.125rem]',
+        )}
       />
       <InputGroupAddon align="inline-end">
-        <InputGroupText>€</InputGroupText>
+        <InputGroupText className={cn(large && 'text-2xl font-light')}>
+          €
+        </InputGroupText>
       </InputGroupAddon>
     </InputGroup>
   )
