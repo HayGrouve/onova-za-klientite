@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ConfirmQuestion } from '#/components/confirm-action'
 import { Hint } from '#/components/hint'
+import { CancelReasonField } from '#/components/job/cancel-reason'
 import { StageTrack } from '#/components/job/stage-track'
 import { Panel, PanelBody } from '#/components/panel'
 import { StageBadge } from '#/components/stage-badge'
@@ -42,7 +43,8 @@ export function nextStage(stages: StageRef[], currentId: Id<'stages'>) {
  * Where the job is, as a track of the business's stages (D116). The usual
  * step forward is the page's main action, "Next: <stage>" (`nextStage`).
  * Every other stage waits behind "Other stage", and a Cancelled-group stage
- * asks before it moves, since the rest of the money stops counting as owed.
+ * asks before it moves, since the rest of the money stops counting as owed;
+ * the question also asks why, which can stay empty (D121).
  * Read-only, it shows only where the job is: moving a job is for managers.
  */
 export function StagePicker({
@@ -56,7 +58,8 @@ export function StagePicker({
   stages: StageRef[]
   currentId: Id<'stages'>
   jobTitle: string
-  onMove: (stageId: Id<'stages'>) => void
+  /** `cancelReason` comes with a move into a Cancelled-group stage. */
+  onMove: (stageId: Id<'stages'>, cancelReason?: string) => void
   readOnly?: boolean
   /** More about the stage, under it (why the job was cancelled). */
   children?: React.ReactNode
@@ -69,6 +72,7 @@ export function StagePicker({
     from: Id<'stages'>
   } | null>(null)
   const asking = question?.from === currentId ? question.stage : null
+  const [reason, setReason] = useState('')
   // A cancelled job is off the track, which greys out: its stage says so.
   const offTrack = stages.find(
     (stage) => stage._id === currentId && stage.group === 'cancelled',
@@ -77,6 +81,7 @@ export function StagePicker({
   const pick = (stage: StageRef) => {
     if (stage.group === 'cancelled') {
       setQuestion({ stage, from: currentId })
+      setReason('')
       return
     }
     setChoosing(false)
@@ -169,10 +174,12 @@ export function StagePicker({
             onConfirm={() => {
               setQuestion(null)
               setChoosing(false)
-              onMove(asking._id)
+              onMove(asking._id, reason.trim() || undefined)
             }}
             onCancel={() => setQuestion(null)}
-          />
+          >
+            <CancelReasonField value={reason} onChange={setReason} />
+          </ConfirmQuestion>
         )}
         {children}
       </PanelBody>

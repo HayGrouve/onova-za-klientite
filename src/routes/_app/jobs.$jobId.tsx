@@ -199,7 +199,7 @@ function JobPage() {
   ]
 
   const startPayment = () => sheet.open({ kind: 'payment' })
-  const moveTo = async (stageId: Id<'stages'>) => {
+  const moveTo = async (stageId: Id<'stages'>, cancelReason?: string) => {
     const target = data.stages.find((stage) => stage._id === stageId)
     const previous = data.stages.find((stage) => stage._id === job.stageId)
     if (!target) return
@@ -214,7 +214,7 @@ function JobPage() {
       },
       target,
       previous,
-      startPayment,
+      { onPay: startPayment, cancelReason },
     )
   }
   const actions = (asPinned: boolean) => (
@@ -385,7 +385,9 @@ function JobPage() {
                 stages={data.stages}
                 currentId={job.stageId}
                 jobTitle={job.title}
-                onMove={(stageId) => void moveTo(stageId)}
+                onMove={(stageId, cancelReason) =>
+                  void moveTo(stageId, cancelReason)
+                }
                 readOnly={!canMove}
               >
                 {job.cancelReason && job.stageGroup === 'cancelled' && (

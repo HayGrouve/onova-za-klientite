@@ -118,3 +118,22 @@ test('the job summary is an image, and it is not an invoice', async ({
   const href = (await viber.getAttribute('href')) ?? ''
   expect(decodeURIComponent(href)).toContain('Това не е фактура')
 })
+
+test('cancelling asks why, and the job keeps the reason', async ({ page }) => {
+  await nav(page).getByRole('link', { name: 'Поръчки' }).click()
+  await page.getByRole('link', { name: /Гардероб/ }).click()
+  await page.getByRole('button', { name: 'Друг етап' }).click()
+  // The Cancelled-group stage is the last chip.
+  await page
+    .getByRole('group', { name: 'Етап' })
+    .getByRole('button')
+    .last()
+    .click()
+
+  // One of the usual reasons fills the box; it could also be typed.
+  await page.getByRole('button', { name: 'Скъпо' }).click()
+  await expect(page.getByLabel(/Причина/)).toHaveValue('Скъпо')
+  await page.getByRole('button', { name: 'Премести' }).click()
+
+  await expect(page.getByText('Причина: Скъпо')).toBeVisible()
+})

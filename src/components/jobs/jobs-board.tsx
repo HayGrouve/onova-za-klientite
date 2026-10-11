@@ -14,6 +14,7 @@ import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import { memo, useMemo, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
+import { CancelReasonField } from '#/components/job/cancel-reason'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
 import { ListExtras } from '#/components/list-extras'
@@ -104,6 +105,7 @@ export function JobsBoard({
     target: Target
   } | null>(null)
   const [askOpen, setAskOpen] = useState(false)
+  const [reason, setReason] = useState('')
 
   const stagesByGroup = useMemo(() => {
     const byGroup: Record<StageGroup, Stage[]> = {
@@ -138,11 +140,12 @@ export function JobsBoard({
     }
     return undefined
   }
-  const moveNow = (card: Card, target: Target) =>
+  const moveNow = (card: Card, target: Target, cancelReason?: string) =>
     void moveAndAnnounce(
       card,
       target,
       board?.stages.find((stage) => stage._id === card.stageId),
+      { cancelReason },
     )
   // Steady for the memoized cards and columns; it reads the latest board.
   const moveTo = useStableCallback((pressed: Card, target: Target) => {
@@ -153,6 +156,7 @@ export function JobsBoard({
     // Cancelled jobs stop counting as owed, so ask before a job goes there.
     if (plan === 'ask') {
       setAsking({ jobId: card._id, title: card.title, target })
+      setReason('')
       setAskOpen(true)
       return
     }
@@ -165,7 +169,7 @@ export function JobsBoard({
     if (!asking) return
     const card = currentCard(asking.jobId)
     if (card && planMove(card, asking.target) === 'ask') {
-      moveNow(card, asking.target)
+      moveNow(card, asking.target, reason.trim() || undefined)
     }
   }
   const { drag, floatRef, press, wasDragged } = useCardDrag<Card>(
@@ -245,8 +249,11 @@ export function JobsBoard({
               })}
             </AlertDialogTitle>
           </AlertDialogHeader>
+          {/* Focus lands in the reason box (D121), where Enter does nothing,
+              so a second Enter after the menu can't move the job. */}
+          <CancelReasonField value={reason} onChange={setReason} />
           <AlertDialogFooter>
-            {/* First in the page order, so focus lands on it, as in ConfirmAction. */}
+            {/* Before the move, as ConfirmAction puts its way back first. */}
             <AlertDialogCancel>{m.back()}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={confirmAsked}>
               {m.stage_cancel_confirm()}

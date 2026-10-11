@@ -64,6 +64,7 @@ export function ConfirmQuestion({
   tone = 'destructive',
   onConfirm,
   onCancel,
+  children,
 }: {
   question: React.ReactNode
   confirmLabel: React.ReactNode
@@ -74,6 +75,8 @@ export function ConfirmQuestion({
   tone?: 'destructive' | 'default'
   onConfirm: () => void
   onCancel: () => void
+  /** More to answer with the question (why a job is cancelled), above the buttons. */
+  children?: React.ReactNode
 }) {
   const cancel = useRef<HTMLButtonElement>(null)
   // Focus lands on "Cancel", so a double tap or a second Enter is safe.
@@ -84,6 +87,7 @@ export function ConfirmQuestion({
   return (
     <div role="group" className="flex flex-col gap-3">
       <p className="text-sm text-pretty">{question}</p>
+      {children}
       <div className="flex gap-2">
         <Button
           type="button"

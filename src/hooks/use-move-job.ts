@@ -61,14 +61,23 @@ export function useMoveJob() {
     job: Pick<Moving, '_id' | 'stageGroup' | 'isNoClient'>,
     /** The stage, or Cancelled when the business has no Cancelled stage left. */
     target: Stage | 'cancelled',
+    /** Why, for a move into Cancelled (D121). */
+    cancelReason?: string,
   ) => {
     const result = await runChange(() =>
       target === 'cancelled'
-        ? cancel({ businessId: business._id, jobId: job._id })
+        ? cancel({
+            businessId: business._id,
+            jobId: job._id,
+            ...(cancelReason ? { reason: cancelReason } : {}),
+          })
         : changeStage({
             businessId: business._id,
             jobId: job._id,
             stageId: target._id,
+            ...(cancelReason && target.group === 'cancelled'
+              ? { cancelReason }
+              : {}),
           }),
     )
     return {
@@ -150,16 +159,18 @@ export function useMoveJob() {
    * Moves the job, then offers the reminder rule's reminder if it applies
    * (the toast follows once that is closed), or announces the move at once.
    * `previous` is the stage Undo goes back to; `onPay` adds the payment
-   * button when Done leaves a balance. Offline or on a failure nothing moves.
+   * button when Done leaves a balance, and `cancelReason` goes with a move
+   * into Cancelled. Offline or on a failure nothing moves.
    */
   const moveAndAnnounce = useStableCallback(
     async (
       job: Moving,
       target: Stage | 'cancelled',
       previous: Stage | undefined,
-      onPay?: () => void,
+      options: { onPay?: () => void; cancelReason?: string } = {},
     ) => {
-      const { moved, offerRule } = await move(job, target)
+      const { onPay, cancelReason } = options
+      const { moved, offerRule } = await move(job, target, cancelReason)
       if (!moved) return
       const say = () => announce(job, target, previous, onPay)
       if (offerRule) {
