@@ -142,7 +142,7 @@ describe('readDraft: client', () => {
 
   it('a new name a typo from a client asks whether it is them', () => {
     const draft = read('Иван Птров, шкаф')
-    expect(draft.client?.kind).toBe('new')
+    expect(draft.client.kind).toBe('new')
     expect(draft.alternatives.map((item) => item.as)).toEqual([
       'similar',
       'create',
@@ -153,7 +153,34 @@ describe('readDraft: client', () => {
     const start = { client: { id: 'maria', name: 'Мария Георгиева' } }
     const draft = read('', startFixes(start), { ...ctx, start })
     expect(draft.client).toMatchObject({ kind: 'existing', id: 'maria' })
-    expect(draft.missing).toEqual({ client: false, title: true })
+    expect(draft.clientByDefault).toBe(false)
+    expect(draft.missing).toEqual({ title: true })
+  })
+
+  it('a line that names nobody is for No client, by default', () => {
+    const draft = read('гардероб, 950')
+    expect(draft.client).toEqual({ kind: 'none' })
+    expect(draft.clientByDefault).toBe(true)
+    expect(draft.clientSource).toBe('none')
+    expect(save(draft)?.client).toEqual({ kind: 'none' })
+  })
+
+  it('No client typed in the line is not a default', () => {
+    const draft = read('Без клиент, зареждане с фреон')
+    expect(draft.client).toEqual({ kind: 'none' })
+    expect(draft.clientByDefault).toBe(false)
+  })
+
+  it('a client picked by hand replaces the default', () => {
+    const line = 'гардероб, 950'
+    const fixes = read(line).fix.client({
+      kind: 'existing',
+      id: 'ivan',
+      name: 'Иван Петров',
+    })
+    const draft = read(line, fixes)
+    expect(draft.client).toMatchObject({ kind: 'existing', id: 'ivan' })
+    expect(draft.clientByDefault).toBe(false)
   })
 })
 
@@ -194,7 +221,7 @@ describe('readDraft: items', () => {
 })
 
 describe('saveArgs', () => {
-  it('is null while the client or the title is missing', () => {
+  it('is null while the title is missing', () => {
     expect(save(read(''))).toBeNull()
     expect(save(read('Иван Петров'))).toBeNull()
   })
@@ -226,5 +253,23 @@ describe('saveArgs', () => {
     const draft = read('Без клиент, зареждане с фреон, 40, платено')
     expect(save(draft)?.done).toBeUndefined()
     expect(save(draft, 'single', true)?.done).toBe(true)
+  })
+
+  it('a picked stage is passed on, unless the job is saved as Done', () => {
+    const draft = read('Иван Петров, гардероб, 950')
+    const options = {
+      flow: 'multi' as const,
+      received: { date: TODAY, method: 'cash' as const },
+      depositLabel: 'Капаро',
+    }
+    expect(saveArgs(draft, { ...options, done: false })?.stageId).toBe(
+      undefined,
+    )
+    expect(
+      saveArgs(draft, { ...options, done: false, stageId: 'stage-2' })?.stageId,
+    ).toBe('stage-2')
+    expect(
+      saveArgs(draft, { ...options, done: true, stageId: 'stage-2' })?.stageId,
+    ).toBeUndefined()
   })
 })

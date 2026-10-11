@@ -370,6 +370,7 @@ Each prototype was built in three variants. The founder tried them all and picke
 | --- | --- | --- | --- |
 | 1 | Live preview: the Job form stays on screen and changes with each answer | One question per screen; a chat | Under 2 minutes with the first user, and whether the form matches how he works |
 | 2 | One line: "Иван Петров, гардероб, 950, капаро 300, до 20.10" is read back as client, title, price, deposit and date, each fixable before saving | A short form in a bottom sheet; three taps (who, what, how much) | Under 30 seconds with the first user on his own phone, and how often the read-back gets a real line wrong |
+| Redesign | "One thing at a time": spruce on a calm mineral page, Today as one queue with one thing first, one main action per screen, payments one question per step; with the job's stage drawn as a track, and the "+" line filling its fields while typed | A ruled-notebook look with the line on every screen; a stage track with a yellow next-step button | Whether the calm look holds on the first user's phone in daylight, and the live line on a real keyboard (D115–D120) |
 
 ## Open questions and next steps
 

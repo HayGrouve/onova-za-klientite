@@ -119,6 +119,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* Keyed by the address, so each page fades in when it opens. */}
             <div
               key={pageKey ?? pathname}
+              data-page
               className={cn(
                 'flex w-full flex-1 animate-page flex-col lg:mx-auto',
                 PAGE_WIDTH[layout],
@@ -131,11 +132,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav
           aria-label={m.nav_label()}
           data-bottom-nav
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 shadow-[0_-4px_16px_-6px_rgb(0_0_0/0.08)] backdrop-blur supports-backdrop-filter:bg-background/85 lg:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-canvas/90 backdrop-blur-md lg:hidden"
         >
-          <div className="mx-auto grid max-w-lg grid-cols-5 items-end px-1 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <div className="mx-auto grid max-w-lg grid-cols-5 items-center px-1.5 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
             <NavItem {...today} />
             <NavItem {...jobs} />
+            {/* "+" sits in the row as an equal, not floating over the page. */}
             <div className="flex justify-center">
               <Tip
                 label={m.new_job_label({ job: words.job.singular })}
@@ -144,12 +146,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   to="/new"
                   aria-label={m.new_job_label({ job: words.job.singular })}
-                  className="group/fab -mt-8 flex size-15 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 shadow-primary/30 ring-background transition-[transform,box-shadow] duration-200 outline-none hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/40 focus-visible:ring-ring/50 active:scale-90"
+                  className="flex h-12 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-transform duration-150 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas active:scale-95"
                 >
-                  <PlusIcon
-                    className="size-7 transition-transform duration-300 group-hover/fab:rotate-90"
-                    weight="bold"
-                  />
+                  <PlusIcon className="size-6" weight="bold" />
                 </Link>
               </Tip>
             </div>
@@ -217,24 +216,14 @@ function NavItem({ to, icon: IconComponent, label }: NavEntry) {
     <Link
       to={to}
       activeOptions={{ exact: to === '/' }}
-      className="group flex min-h-12 flex-col items-center justify-end gap-0.5 rounded-xl text-xs text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:font-medium data-[status=active]:text-foreground"
+      className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:font-semibold data-[status=active]:text-primary"
     >
       {({ isActive }) => (
         <>
-          <span className="relative flex h-8 w-14 items-center justify-center">
-            {/* The pill behind the active icon grows in from the middle. */}
-            <span
-              aria-hidden
-              className="absolute inset-0 scale-x-50 rounded-full bg-primary/12 opacity-0 transition-[scale,opacity] duration-300 ease-out group-data-[status=active]:scale-x-100 group-data-[status=active]:opacity-100"
-            />
-            <IconComponent
-              className={cn(
-                'relative size-6 transition-colors',
-                isActive && 'animate-pop text-primary',
-              )}
-              weight={isActive ? 'fill' : 'regular'}
-            />
-          </span>
+          <IconComponent
+            className="size-6 transition-colors"
+            weight={isActive ? 'fill' : 'regular'}
+          />
           <span className="max-w-full truncate px-1">{label}</span>
         </>
       )}
@@ -246,22 +235,17 @@ function NavItem({ to, icon: IconComponent, label }: NavEntry) {
 function Sidebar({ entries }: { entries: NavEntry[] }) {
   const { words } = useViewer().business
   return (
-    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-4 border-r border-border/70 bg-background px-3 py-4 lg:flex xl:w-64">
+    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-4 border-r border-border bg-sidebar px-3 py-4 lg:flex xl:w-60">
       <BusinessSwitcher />
       <Link
         to="/new"
         aria-keyshortcuts={NEW_JOB_SHORTCUT}
         className={buttonVariants({
           size: 'lg',
-          className:
-            'group/new relative h-10 w-full shadow-sm shadow-primary/30',
+          className: 'relative h-11 w-full rounded-xl',
         })}
       >
-        <PlusIcon
-          data-icon="inline-start"
-          weight="bold"
-          className="transition-transform duration-300 group-hover/new:rotate-90"
-        />
+        <PlusIcon data-icon="inline-start" weight="bold" />
         {words.job.singular}
         <kbd
           aria-hidden
@@ -305,7 +289,7 @@ function SidebarLink({
       to={to}
       aria-keyshortcuts={shortcut === SEARCH_SHORTCUT ? 'Control+K' : undefined}
       activeOptions={{ exact: to === '/' }}
-      className="group flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-foreground/80 transition-colors outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:bg-primary/10 data-[status=active]:font-medium data-[status=active]:text-primary"
+      className="group flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-foreground/80 transition-colors outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:bg-accent data-[status=active]:font-semibold data-[status=active]:text-primary"
     >
       {({ isActive }) => (
         <>
@@ -491,7 +475,7 @@ function BusinessMark() {
   return (
     <span
       aria-hidden
-      className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/30"
+      className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"
     >
       <StorefrontIcon className="size-4" weight="fill" />
     </span>

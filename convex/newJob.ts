@@ -6,6 +6,7 @@ import {
   businessMutation,
   businessQuery,
   getLiveClient,
+  getOwned,
   requireRole,
 } from './lib/auth'
 import { createClient } from './lib/clientWrite'
@@ -147,6 +148,9 @@ export const save = businessMutation({
     dueDate: v.optional(v.string()),
     /** Items the job is for, when "+" is started from an item. They must be the client's own. */
     itemIds: v.optional(v.array(v.id('items'))),
+    /** Where the job starts, when not in the first New stage (D122). Never a Cancelled one. */
+    stageId: v.optional(v.id('stages')),
+    /** Saved as done: the first Done stage, whatever `stageId` says. */
     done: v.optional(v.boolean()),
     repeat: v.optional(
       v.object({
@@ -173,15 +177,21 @@ export const save = businessMutation({
       })
     }
 
-    const doneStage = args.done
-      ? firstStageOf(await businessStages(ctx), 'done')
-      : undefined
-    if (args.done && !doneStage) fail('notFound', { table: 'stages' })
+    let stageId
+    if (args.done) {
+      const doneStage = firstStageOf(await businessStages(ctx), 'done')
+      if (!doneStage) fail('notFound', { table: 'stages' })
+      stageId = doneStage._id
+    } else if (args.stageId) {
+      const stage = await getOwned(ctx, 'stages', args.stageId)
+      if (stage.group === 'cancelled') fail('invalid', { field: 'stageId' })
+      stageId = stage._id
+    }
 
     const jobId = await createJob(ctx, {
       clientId,
       title: args.title,
-      stageId: doneStage?._id,
+      stageId,
       typedPriceCents: args.typedPriceCents,
       dueDate: args.dueDate,
       itemIds: args.itemIds,

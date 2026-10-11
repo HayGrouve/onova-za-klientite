@@ -31,14 +31,12 @@ export function SectionHeader({
         {IconComponent && (
           <IconComponent
             aria-hidden
-            className={cn('size-5 shrink-0', TONE[tone])}
+            className={cn('size-4.5 shrink-0', TONE[tone])}
           />
         )}
-        <h2 className="truncate text-sm font-semibold text-muted-foreground">
-          {title}
-        </h2>
+        <h2 className="truncate text-[0.9375rem] font-semibold">{title}</h2>
         {count !== undefined && (
-          <span className="rounded-full bg-foreground/7 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
+          <span className="text-[0.9375rem] text-muted-foreground tabular-nums">
             {count}
           </span>
         )}
@@ -49,12 +47,12 @@ export function SectionHeader({
   )
 }
 
-/** Rows in one white card, divided by lines. Rises in row by row; hidden when empty. */
+/** Rows in one white card, divided by lines. Hidden when empty. */
 export function ListCard({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
       className={cn(
-        'mx-4 flex stagger flex-col divide-y divide-border/70 overflow-hidden surface empty:hidden',
+        'mx-4 flex flex-col divide-y divide-border/70 overflow-hidden surface empty:hidden',
         className,
       )}
       {...props}

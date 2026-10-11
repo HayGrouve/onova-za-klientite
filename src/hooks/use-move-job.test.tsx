@@ -103,6 +103,41 @@ describe('useMoveJob', () => {
     expect(mocks.toastSuccess).toHaveBeenCalledTimes(1)
   })
 
+  it('sends why the job is cancelled, and only into Cancelled', async () => {
+    const declined = { _id: 's4', name: 'Declined', group: 'cancelled' }
+    await act(() =>
+      hook.moveAndAnnounce(job('new'), 'cancelled', fresh, {
+        cancelReason: 'Too dear',
+      }),
+    )
+    expect(mocks.cancel).toHaveBeenCalledWith({
+      businessId: 'business-1',
+      jobId: 'job-1',
+      reason: 'Too dear',
+    })
+    await act(() =>
+      hook.moveAndAnnounce(job('new'), declined as never, fresh, {
+        cancelReason: 'Too dear',
+      }),
+    )
+    expect(mocks.changeStage).toHaveBeenLastCalledWith({
+      businessId: 'business-1',
+      jobId: 'job-1',
+      stageId: 's4',
+      cancelReason: 'Too dear',
+    })
+    await act(() =>
+      hook.moveAndAnnounce(job('new'), doing, fresh, {
+        cancelReason: 'Too dear',
+      }),
+    )
+    expect(mocks.changeStage).toHaveBeenLastCalledWith({
+      businessId: 'business-1',
+      jobId: 'job-1',
+      stageId: 's2',
+    })
+  })
+
   it('holds the toast while the rule offer is open, then shows it', async () => {
     await act(() => hook.moveAndAnnounce(job('in_progress'), done, doing))
     expect(hook.ruleOffer).toEqual({

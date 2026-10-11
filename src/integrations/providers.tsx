@@ -24,7 +24,7 @@ const CLERK_APPEARANCE = {
     colorNeutral: 'var(--foreground)',
     colorRing: 'var(--ring)',
     colorDanger: 'var(--destructive)',
-    fontFamily: "'Sofia Sans Variable', system-ui, sans-serif",
+    fontFamily: "'Onest Variable', system-ui, sans-serif",
     borderRadius: '0.75rem',
   },
 }

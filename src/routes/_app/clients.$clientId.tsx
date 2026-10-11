@@ -204,7 +204,7 @@ function ClientPage() {
                 {(client.phones.length > 0 ||
                   client.email ||
                   client.address) && (
-                  <dl className="flex animate-rise flex-col divide-y divide-border/70 overflow-hidden surface text-sm">
+                  <dl className="flex flex-col divide-y divide-border/70 overflow-hidden surface text-sm">
                     {client.phones.map((item) => (
                       <ContactRow
                         key={item.e164}
@@ -241,7 +241,7 @@ function ClientPage() {
             key: 'money',
             side: true,
             node: (data.owedCents > 0 || client.creditCents > 0) && (
-              <section className="mx-4 grid animate-rise grid-cols-2 divide-x divide-border/70 overflow-hidden surface">
+              <section className="mx-4 grid grid-cols-2 divide-x divide-border/70 overflow-hidden surface">
                 <MoneyFigure
                   label={m.client_owes_total()}
                   cents={data.owedCents}
@@ -325,12 +325,14 @@ function ClientPage() {
                 icon={WalletIcon}
                 footer={
                   <>
+                    {/* Calling is the page's one solid action; paying is beside it. */}
                     <Button
                       size="xl"
+                      variant="outline"
                       className="flex-1 lg:max-w-60"
                       onClick={() => sheet.open({ kind: 'payment' })}
                     >
-                      <PlusIcon data-icon="inline-start" />
+                      <WalletIcon data-icon="inline-start" />
                       {m.pay_add()}
                     </Button>
                     {/* A refund is rare: it sits in a menu, as on the job. */}
@@ -494,6 +496,7 @@ function ClientPage() {
 
       <DetailSheet
         sheet={sheet}
+        hideTitle={sheet.panel?.kind === 'payment'}
         title={
           sheet.panel?.kind === 'payment'
             ? m.pay_title()
@@ -519,6 +522,7 @@ function ClientPage() {
             target={{
               kind: 'client',
               clientId: client._id,
+              name: client.isNoClient ? m.no_client() : client.name,
               openJobs: data.jobs.filter((job) => job.owes),
             }}
             today={today}

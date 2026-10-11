@@ -30,7 +30,7 @@ test('"+" reads one line back and saves a job with its deposit', async ({
 }) => {
   await page.getByRole('link', { name: 'Добави: Поръчка' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Добави поръчка' }),
+    page.getByRole('heading', { name: 'Какво записваме?' }),
   ).toBeVisible()
 
   await page
@@ -65,10 +65,13 @@ test('the job shows its money, and a payment moves the balance', async ({
   await expect(figure(page, 'Остатък')).toContainText('650')
 
   await page.getByRole('button', { name: 'Плащане', exact: true }).click()
-  await page.getByLabel('Сума', { exact: true }).fill('200')
-  await page.getByRole('button', { name: 'Прегледай' }).click()
-  // The review step shows what is recorded and asks once more.
-  await page.getByRole('button', { name: /^Запиши 200/ }).click()
+  // One question at a time: how much, how, then the review (D117).
+  const sheet = page.getByRole('dialog')
+  await sheet.getByLabel('Сума', { exact: true }).fill('200')
+  await sheet.getByRole('button', { name: 'Напред', exact: true }).click()
+  await sheet.getByRole('button', { name: 'В брой', exact: true }).click()
+  // The review shows what is recorded and asks once more.
+  await sheet.getByRole('button', { name: /^Запиши 200/ }).click()
 
   await expect(figure(page, 'Платено')).toContainText('500')
   await expect(figure(page, 'Остатък')).toContainText('450')
@@ -114,4 +117,23 @@ test('the job summary is an image, and it is not an invoice', async ({
   const viber = page.getByRole('link', { name: 'Изпрати текст във Viber' })
   const href = (await viber.getAttribute('href')) ?? ''
   expect(decodeURIComponent(href)).toContain('Това не е фактура')
+})
+
+test('cancelling asks why, and the job keeps the reason', async ({ page }) => {
+  await nav(page).getByRole('link', { name: 'Поръчки' }).click()
+  await page.getByRole('link', { name: /Гардероб/ }).click()
+  await page.getByRole('button', { name: 'Друг етап' }).click()
+  // The Cancelled-group stage is the last chip.
+  await page
+    .getByRole('group', { name: 'Етап' })
+    .getByRole('button')
+    .last()
+    .click()
+
+  // One of the usual reasons fills the box; it could also be typed.
+  await page.getByRole('button', { name: 'Скъпо' }).click()
+  await expect(page.getByLabel(/Причина/)).toHaveValue('Скъпо')
+  await page.getByRole('button', { name: 'Премести' }).click()
+
+  await expect(page.getByText('Причина: Скъпо')).toBeVisible()
 })

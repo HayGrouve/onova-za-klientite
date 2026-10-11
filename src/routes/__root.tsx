@@ -19,10 +19,10 @@ import type { IconProps } from '@phosphor-icons/react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { m } from '#/paraglide/messages.js'
 import appCss from '../styles.css?url'
-// The two Sofia Sans subsets every screen uses. Vite hashes the file by its
+// The two Onest subsets every screen uses. Vite hashes the file by its
 // content, so this URL is the one the stylesheet's @font-face points at.
-import cyrillicFont from '@fontsource-variable/sofia-sans/files/sofia-sans-cyrillic-wght-normal.woff2?url'
-import latinFont from '@fontsource-variable/sofia-sans/files/sofia-sans-latin-wght-normal.woff2?url'
+import cyrillicFont from '@fontsource-variable/onest/files/onest-cyrillic-wght-normal.woff2?url'
+import latinFont from '@fontsource-variable/onest/files/onest-latin-wght-normal.woff2?url'
 
 // Icons are decoration: the text or aria-label next to them says what they
 // mean, so screen readers skip them. An icon can opt back in with its own prop.
@@ -45,7 +45,7 @@ export const Route = createRootRoute({
       },
       { title: m.app_name() },
       { name: 'description', content: m.app_description() },
-      { name: 'theme-color', content: '#2453a4' },
+      { name: 'theme-color', content: '#1e4a3d' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-title', content: m.app_short_name() },
     ],

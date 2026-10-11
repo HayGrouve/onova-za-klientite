@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { arrangeToday, lateJobCount, lateJobs } from './today'
+import { arrangeToday, lateJobCount, lateJobs, todayQueue } from './today'
 import type { TodayAppointment, TodayJob } from './today'
 import type { StageGroup } from './stages'
 
@@ -275,5 +275,183 @@ describe('lateJobCount', () => {
         TODAY,
       ),
     ).toBe(0)
+  })
+})
+
+describe('todayQueue', () => {
+  const HOUR = 60 * 60 * 1000
+  const NOW = Date.UTC(2026, 9, 10, 11, 0) // 14:00 in Sofia
+  const at = (hoursFromNow: number, extra: Partial<QueueVisitInput> = {}) => ({
+    start: NOW + hoursFromNow * HOUR,
+    allDay: false,
+    job: job(`job-at-${hoursFromNow}`),
+    ...extra,
+  })
+  type QueueVisitInput = {
+    start: number
+    end?: number
+    allDay: boolean
+    doneAt?: number
+    job?: TodayJob
+  }
+  type QueueReminderInput = { _id: string; date: string }
+  const lists = {
+    appointments: [] as QueueVisitInput[],
+    overdue: [] as Array<TodayJob>,
+    dueSoon: [] as Array<TodayJob>,
+    doneUnpaid: [] as Array<TodayJob>,
+    reminders: [] as QueueReminderInput[],
+  }
+  const TODAY = '2026-10-10'
+  const keys = (
+    queue: ReturnType<
+      typeof todayQueue<QueueVisitInput, TodayJob, QueueReminderInput>
+    >,
+  ) =>
+    [queue.first, ...queue.rest].map((entry) =>
+      entry === undefined
+        ? 'none'
+        : entry.kind === 'visit'
+          ? `visit:${entry.visit.job?._id}`
+          : entry.kind === 'job'
+            ? `${entry.reason}:${entry.job._id}`
+            : `${entry.late ? 'late-reminder' : 'reminder'}:${entry.reminder._id}`,
+    )
+
+  it('is empty when nothing waits', () => {
+    const queue = todayQueue(lists, TODAY, NOW)
+    expect(queue.first).toBeUndefined()
+    expect(queue.rest).toEqual([])
+  })
+
+  it('leads with the next visit today that is not over', () => {
+    const queue = todayQueue(
+      {
+        ...lists,
+        appointments: [at(-3), at(1)],
+        overdue: [job('late')],
+      },
+      TODAY,
+      NOW,
+    )
+    expect(queue.first).toMatchObject({
+      kind: 'visit',
+      visit: { start: NOW + HOUR },
+    })
+    expect(keys(queue)).toEqual([
+      'visit:job-at-1',
+      'visit:job-at--3',
+      'late:late',
+    ])
+  })
+
+  it('counts a visit as current for an hour after it starts, or until its end', () => {
+    const started = todayQueue(
+      { ...lists, appointments: [at(-0.5)], overdue: [job('late')] },
+      TODAY,
+      NOW,
+    )
+    expect(started.first?.kind).toBe('visit')
+    const ended = todayQueue(
+      {
+        ...lists,
+        appointments: [at(-0.5, { end: NOW - 0.25 * HOUR })],
+        overdue: [job('late')],
+      },
+      TODAY,
+      NOW,
+    )
+    expect(ended.first).toMatchObject({ kind: 'job', reason: 'late' })
+  })
+
+  it('treats a done visit as over, and an all-day visit as current all day', () => {
+    const queue = todayQueue(
+      {
+        ...lists,
+        appointments: [at(1, { doneAt: NOW }), at(-6, { allDay: true })],
+      },
+      TODAY,
+      NOW,
+    )
+    expect(queue.first).toMatchObject({
+      kind: 'visit',
+      visit: { allDay: true },
+    })
+  })
+
+  it('without a current visit, leads with what is late, then due soon, reminders and unpaid', () => {
+    const queue = todayQueue(
+      {
+        ...lists,
+        appointments: [at(-4)],
+        overdue: [job('o1')],
+        dueSoon: [job('s1')],
+        doneUnpaid: [job('u1', 'done')],
+        reminders: [
+          { _id: 'r-due', date: TODAY },
+          { _id: 'r-late', date: '2026-10-01' },
+        ],
+      },
+      TODAY,
+      NOW,
+    )
+    expect(keys(queue)).toEqual([
+      'late-reminder:r-late',
+      'visit:job-at--4',
+      'late:o1',
+      'soon:s1',
+      'reminder:r-due',
+      'unpaid:u1',
+    ])
+  })
+
+  it('leaves out a visit with no job', () => {
+    const queue = todayQueue(
+      { ...lists, appointments: [at(1, { job: undefined })] },
+      TODAY,
+      NOW,
+    )
+    expect(queue.first).toBeUndefined()
+  })
+
+  it('only past visits: the first of them leads', () => {
+    const queue = todayQueue(
+      { ...lists, appointments: [at(-5), at(-3)] },
+      TODAY,
+      NOW,
+    )
+    expect(keys(queue)).toEqual(['visit:job-at--5', 'visit:job-at--3'])
+  })
+
+  it('lists every entry once, whatever the input', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.integer({ min: -12, max: 10 }), { maxLength: 5 }),
+        fc.array(fc.boolean(), { maxLength: 4 }),
+        fc.nat({ max: 3 }),
+        (hours, lateFlags, unpaid) => {
+          const appointments = hours.map((h, index) =>
+            at(h, { job: job(`v${index}`) }),
+          )
+          const reminders = lateFlags.map((late, index) => ({
+            _id: `r${index}`,
+            date: late ? '2026-10-01' : TODAY,
+          }))
+          const doneUnpaid = Array.from({ length: unpaid }, (_, index) =>
+            job(`u${index}`, 'done'),
+          )
+          const queue = todayQueue(
+            { ...lists, appointments, reminders, doneUnpaid },
+            TODAY,
+            NOW,
+          )
+          const all = keys(queue)
+          expect(new Set(all).size).toBe(all.length)
+          expect(all.filter((key) => key !== 'none')).toHaveLength(
+            appointments.length + reminders.length + doneUnpaid.length,
+          )
+        },
+      ),
+    )
   })
 })

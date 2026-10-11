@@ -305,6 +305,71 @@ describe('newJob.save for work already done and paid', () => {
   })
 })
 
+describe('newJob.save in a picked stage (D122)', () => {
+  const line = { client: { kind: 'none' as const }, title: 'Шкаф' }
+
+  it('starts in the stage it is given', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      ...line,
+      stageId: b.stage('in_progress'),
+    })
+    const job = await getDoc(t, 'jobs', jobId)
+    expect(job.stageId).toBe(b.stage('in_progress'))
+    expect(job.stageGroup).toBe('in_progress')
+    expect(job.doneAt).toBeUndefined()
+    await expectCachesFresh(t)
+  })
+
+  it('a picked Done stage is done from the start', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      ...line,
+      stageId: b.stage('done'),
+    })
+    const job = await getDoc(t, 'jobs', jobId)
+    expect(job.stageGroup).toBe('done')
+    expect(job.doneAt).toBeDefined()
+  })
+
+  it('"done" wins over a picked stage', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const { jobId } = await b.owner.mutation(api.newJob.save, {
+      businessId: b.businessId,
+      ...line,
+      stageId: b.stage('in_progress'),
+      done: true,
+    })
+    expect((await getDoc(t, 'jobs', jobId)).stageId).toBe(b.stage('done'))
+  })
+
+  it('refuses a Cancelled stage and another business’s stage', async () => {
+    const t = setupConvex()
+    const b = await setupBusiness(t)
+    const other = await setupBusiness(t, STRANGER)
+    await expect(
+      b.owner.mutation(api.newJob.save, {
+        businessId: b.businessId,
+        ...line,
+        stageId: b.stage('cancelled'),
+      }),
+    ).rejects.toThrow(/invalid/)
+    await expect(
+      b.owner.mutation(api.newJob.save, {
+        businessId: b.businessId,
+        ...line,
+        stageId: other.stage('new'),
+      }),
+    ).rejects.toThrow(/notFound/)
+    expect(await t.run((ctx) => ctx.db.query('jobs').collect())).toHaveLength(0)
+  })
+})
+
 describe('newJob.save with items', () => {
   async function clientWithItem(t: TestConvex, b: TestBusiness) {
     await enableItems(t, b)

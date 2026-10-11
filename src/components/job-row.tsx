@@ -1,9 +1,7 @@
 import {
   CalendarBlankIcon,
   CheckCircleIcon,
-  CoinsIcon,
   FlagIcon,
-  UserIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
@@ -14,6 +12,7 @@ import type { api } from '../../convex/_generated/api'
 import { ListExtras } from '#/components/list-extras'
 import { StageBadge } from '#/components/stage-badge'
 import { useViewer } from '#/hooks/use-viewer'
+import { markJobTitle } from '#/lib/morph'
 import { formatDay, formatDayShort } from '#/i18n/dates'
 import { m } from '#/paraglide/messages.js'
 import { dateInSofia } from '../../shared/dates'
@@ -131,13 +130,28 @@ function timingsOf(
   }
 }
 
-/** One job in a list: title, client, stage, when, and what is still owed. */
+/** Why a row is on Today's queue, shown as a small dot in front of it (D119). */
+export type JobRowReason = 'visit' | 'late' | 'soon' | 'unpaid'
+
+const REASON_DOT: Record<JobRowReason, string> = {
+  visit: 'bg-foreground/55',
+  late: 'bg-destructive',
+  soon: 'bg-soon',
+  unpaid: 'bg-primary',
+}
+
+/**
+ * One job in a list: the title with what is still owed beside it, then when,
+ * the client and the stage. Each fact has its own place, so nothing is joined
+ * into one long line.
+ */
 export function JobRow({
   job,
   today,
   showClient = true,
   lead,
   showDone = false,
+  reason,
 }: {
   job: JobRowData
   today: string
@@ -145,58 +159,79 @@ export function JobRow({
   lead?: JobRowLead
   /** A done job shows when it was done, as a history list needs. */
   showDone?: boolean
+  /** On Today's queue: why the job is there, as a coloured dot. */
+  reason?: JobRowReason
 }) {
   const { words } = useViewer().business
   const timing = timingsOf(job, today, lead, showDone)
   const owes = job.owes && job.priceCents > 0
   const client = showClient && job.clientName
+  const stage = <StageBadge name={job.stageName} group={job.stageGroup} />
 
   return (
     <li className="row-lazy">
       <Link
         to="/jobs/$jobId"
         params={{ jobId: job._id }}
-        className="flex flex-col gap-1.5 pressable px-4 py-3"
+        viewTransition
+        onClick={markJobTitle}
+        className={cn(
+          'relative flex flex-col gap-1 pressable px-4 py-3',
+          reason && 'pl-9',
+        )}
       >
+        {reason && (
+          <span
+            aria-hidden
+            className={cn(
+              'absolute top-[1.3rem] left-4 size-2 rounded-full',
+              REASON_DOT[reason],
+            )}
+          />
+        )}
         <div className="flex items-start justify-between gap-3">
-          <span className="min-w-0 text-base leading-snug font-medium break-words">
+          <span
+            data-job-title
+            className="min-w-0 text-[1.0625rem] leading-snug font-medium break-words"
+          >
             {job.title}
           </span>
-          <StageBadge
-            name={job.stageName}
-            group={job.stageGroup}
-            className="mt-0.5"
-          />
+          {owes ? (
+            <span className="shrink-0 pt-px text-[0.9375rem] tabular-nums">
+              <span className="sr-only">{m.job_balance()}: </span>
+              {formatMoney(job.balanceCents)}
+            </span>
+          ) : (
+            stage
+          )}
         </div>
         {(client || timing.first || timing.rest.length > 0 || owes) && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-            {timing.first && (
-              <Meta
-                icon={timing.first.icon}
-                className="font-medium text-foreground"
-              >
-                {timing.first.text}
-              </Meta>
-            )}
-            {client && (
-              <Meta icon={UserIcon} className="min-w-0">
-                <span className="truncate">{job.clientName}</span>
-              </Meta>
-            )}
-            {timing.rest.map((item) => (
-              <Meta
-                key={item.text}
-                icon={item.icon}
-                className={cn(item.late && 'font-medium text-destructive')}
-              >
-                {item.text}
-              </Meta>
-            ))}
-            {owes && (
-              <Meta icon={CoinsIcon} className="text-foreground/80">
-                {m.balance_short({ amount: formatMoney(job.balanceCents) })}
-              </Meta>
-            )}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              {timing.first && (
+                <Meta
+                  icon={timing.first.icon}
+                  className="font-medium text-foreground"
+                >
+                  {timing.first.text}
+                </Meta>
+              )}
+              {client && (
+                <span className="max-w-full min-w-0 truncate">
+                  {job.clientName}
+                </span>
+              )}
+              {timing.rest.map((item) => (
+                <Meta
+                  key={item.text}
+                  icon={item.icon}
+                  className={cn(item.late && 'font-medium text-destructive')}
+                >
+                  {item.text}
+                </Meta>
+              ))}
+            </div>
+            {owes && stage}
           </div>
         )}
         {timing.visit && (

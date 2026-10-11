@@ -13,7 +13,7 @@ import { usePageTitle } from '#/hooks/use-page-title'
 export function PageTitle({ children }: { children: string }) {
   usePageTitle(children)
   return (
-    <h1 className="px-4 pt-2 pb-3 text-3xl font-semibold tracking-tight text-balance break-words">
+    <h1 className="px-4 pt-1 pb-3 text-[1.75rem] leading-tight font-semibold tracking-[-0.012em] text-balance break-words">
       {children}
     </h1>
   )
@@ -32,9 +32,9 @@ export function EmptyState({
   action?: React.ReactNode
 }) {
   return (
-    <Empty className="animate-rise px-8">
+    <Empty className="px-8">
       <EmptyHeader>
-        <EmptyMedia className="size-16 rounded-3xl bg-primary/10 text-primary">
+        <EmptyMedia className="size-16 rounded-3xl bg-accent text-primary">
           <IconComponent className="size-8" weight="duotone" />
         </EmptyMedia>
         <EmptyTitle className="text-base">{title}</EmptyTitle>

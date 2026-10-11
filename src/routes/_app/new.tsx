@@ -24,7 +24,11 @@ function NewJobPage() {
   const { business } = useViewer()
   const { clientId, itemId } = Route.useSearch()
   const context = useQuery(api.newJob.context, { businessId: business._id })
-  if (!context) {
+  // The stages, for the slot that names where the new job starts (D122).
+  const settings = useQuery(api.businesses.settings, {
+    businessId: business._id,
+  })
+  if (!context || !settings) {
     return (
       <CenteredMessage>
         <Spinner className="size-6 text-muted-foreground" />
@@ -37,12 +41,15 @@ function NewJobPage() {
   const item = context.items.find(
     (entry) => entry.id === itemId && entry.clientId === client?.id,
   )
+  // A new job can start anywhere but Cancelled.
+  const stages = settings.stages.filter((stage) => stage.group !== 'cancelled')
   return (
     <NewJobForm
       key={business._id}
       business={business}
       clients={context.clients}
       services={context.services}
+      stages={stages}
       start={
         client
           ? {

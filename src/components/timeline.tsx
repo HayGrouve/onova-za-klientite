@@ -121,7 +121,7 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
   const { business } = useViewer()
   const today = useToday()
   return (
-    <ol className="mr-4 ml-6 flex stagger flex-col gap-3 border-l-2 border-border/80 pl-4">
+    <ol className="mr-4 ml-6 flex flex-col gap-3 border-l-2 border-border/80 pl-4">
       {items.map((item) => (
         <li
           key={item._id}

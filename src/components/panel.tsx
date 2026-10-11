@@ -27,10 +27,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={cn(
-        'mx-4 flex animate-rise flex-col overflow-hidden surface',
-        className,
-      )}
+      className={cn('mx-4 flex flex-col overflow-hidden surface', className)}
     >
       <div className="flex min-h-12 items-center justify-between gap-2 py-1.5 pr-2 pl-4">
         <div className="flex min-w-0 items-center gap-2">
@@ -42,9 +39,7 @@ export function Panel({
           )}
           <h2 className="truncate text-base font-semibold">{title}</h2>
           {count !== undefined && (
-            <span className="rounded-full bg-foreground/7 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
-              {count}
-            </span>
+            <span className="text-muted-foreground tabular-nums">{count}</span>
           )}
           {hint}
         </div>
@@ -65,7 +60,7 @@ export function PanelList({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
       className={cn(
-        'flex stagger flex-col divide-y divide-border/70 border-t border-border/70 empty:hidden',
+        'flex flex-col divide-y divide-border/70 border-t border-border/70 empty:hidden',
         className,
       )}
       {...props}

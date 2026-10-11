@@ -29,7 +29,7 @@ function Missing({
 }) {
   return (
     <div className="flex min-h-[70dvh] flex-1 items-center justify-center">
-      <Empty className="animate-rise px-8">
+      <Empty className="px-8">
         <EmptyHeader>
           <EmptyMedia className="size-16 rounded-3xl bg-primary/10 text-primary">
             <CompassIcon className="size-8" weight="duotone" />

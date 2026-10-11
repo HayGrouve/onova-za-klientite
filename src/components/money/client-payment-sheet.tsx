@@ -26,6 +26,7 @@ export function ClientPaymentSheet({
       open={client !== null}
       onClose={onClose}
       title={m.money_pay({ name: client?.name ?? '' })}
+      hideTitle
     >
       <div className="px-4 pb-6">
         {client && (
@@ -33,6 +34,7 @@ export function ClientPaymentSheet({
             // Another client starts with a fresh form.
             key={client._id}
             clientId={client._id}
+            name={client.name}
             today={today}
             onClose={onClose}
           />
@@ -44,10 +46,12 @@ export function ClientPaymentSheet({
 
 function ClientPaymentBody({
   clientId,
+  name,
   today,
   onClose,
 }: {
   clientId: Id<'clients'>
+  name: string
   today: string
   onClose: () => void
 }) {
@@ -60,6 +64,7 @@ function ClientPaymentBody({
       target={{
         kind: 'client',
         clientId,
+        name,
         openJobs: data.jobs.filter((job) => job.owes),
       }}
       today={today}

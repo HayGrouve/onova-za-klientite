@@ -33,10 +33,10 @@ function bundleOf(files: BundleFile[]) {
 }
 
 const FONTS = [
-  'sofia-sans-cyrillic-wght-normal-aaa.woff2',
-  'sofia-sans-greek-wght-normal-bbb.woff2',
-  'sofia-sans-latin-ext-wght-normal-ccc.woff2',
-  'sofia-sans-latin-wght-normal-ddd.woff2',
+  'onest-cyrillic-wght-normal-aaa.woff2',
+  'onest-vietnamese-wght-normal-bbb.woff2',
+  'onest-latin-ext-wght-normal-ccc.woff2',
+  'onest-latin-wght-normal-ddd.woff2',
 ]
 
 const OFFLINE_MODULES = [
@@ -66,17 +66,17 @@ describe('planPrecache', () => {
       '/assets/index-1.js',
       '/assets/layout-1.js',
       '/assets/offline-1.js',
+      '/assets/onest-cyrillic-wght-normal-aaa.woff2',
+      '/assets/onest-latin-wght-normal-ddd.woff2',
       '/assets/react-1.js',
       '/assets/shared-1.js',
-      '/assets/sofia-sans-cyrillic-wght-normal-aaa.woff2',
-      '/assets/sofia-sans-latin-wght-normal-ddd.woff2',
       '/assets/styles-1.css',
       '/assets/today-1.js',
     ])
     // The worker still knows every file as valid.
     expect(plan.assets).toContain('/assets/satori-1.js')
     expect(plan.assets).toContain(
-      '/assets/sofia-sans-greek-wght-normal-bbb.woff2',
+      '/assets/onest-vietnamese-wght-normal-bbb.woff2',
     )
     expect(plan.assets).toHaveLength(13)
   })

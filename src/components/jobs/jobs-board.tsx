@@ -14,10 +14,11 @@ import type { FunctionReturnType } from 'convex/server'
 import { cn } from 'cn'
 import { memo, useMemo, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
+import { CancelReasonField } from '#/components/job/cancel-reason'
 import { formatMoment } from '#/components/job-row'
 import { RuleReminderSheet } from '#/components/reminders/rule-reminder-sheet'
 import { ListExtras } from '#/components/list-extras'
-import { StageBadge } from '#/components/stage-badge'
+import { GROUP_DOT, StageBadge } from '#/components/stage-badge'
 import { Tip } from '#/components/tip'
 import {
   AlertDialog,
@@ -67,15 +68,6 @@ type Stage = Board['stages'][number]
 /** Where a dragged job lands: a stage, or Cancelled when it has no stage left. */
 type Target = Stage | 'cancelled'
 
-// The dot by a column's name carries its group's meaning: open work blue,
-// done green, cancelled red, as on the stage badges (D53).
-const GROUP_DOT: Record<StageGroup, string> = {
-  new: 'bg-blue-300',
-  in_progress: 'bg-blue-600',
-  done: 'bg-green-600',
-  cancelled: 'bg-red-500',
-}
-
 /**
  * The jobs board on a wide screen: four columns, one per stage group. A card
  * moves by dragging it onto a column (or onto one stage of a column with
@@ -113,6 +105,7 @@ export function JobsBoard({
     target: Target
   } | null>(null)
   const [askOpen, setAskOpen] = useState(false)
+  const [reason, setReason] = useState('')
 
   const stagesByGroup = useMemo(() => {
     const byGroup: Record<StageGroup, Stage[]> = {
@@ -147,11 +140,12 @@ export function JobsBoard({
     }
     return undefined
   }
-  const moveNow = (card: Card, target: Target) =>
+  const moveNow = (card: Card, target: Target, cancelReason?: string) =>
     void moveAndAnnounce(
       card,
       target,
       board?.stages.find((stage) => stage._id === card.stageId),
+      { cancelReason },
     )
   // Steady for the memoized cards and columns; it reads the latest board.
   const moveTo = useStableCallback((pressed: Card, target: Target) => {
@@ -162,6 +156,7 @@ export function JobsBoard({
     // Cancelled jobs stop counting as owed, so ask before a job goes there.
     if (plan === 'ask') {
       setAsking({ jobId: card._id, title: card.title, target })
+      setReason('')
       setAskOpen(true)
       return
     }
@@ -174,7 +169,7 @@ export function JobsBoard({
     if (!asking) return
     const card = currentCard(asking.jobId)
     if (card && planMove(card, asking.target) === 'ask') {
-      moveNow(card, asking.target)
+      moveNow(card, asking.target, reason.trim() || undefined)
     }
   }
   const { drag, floatRef, press, wasDragged } = useCardDrag<Card>(
@@ -254,8 +249,11 @@ export function JobsBoard({
               })}
             </AlertDialogTitle>
           </AlertDialogHeader>
+          {/* Focus lands in the reason box (D121), where Enter does nothing,
+              so a second Enter after the menu can't move the job. */}
+          <CancelReasonField value={reason} onChange={setReason} />
           <AlertDialogFooter>
-            {/* First in the page order, so focus lands on it, as in ConfirmAction. */}
+            {/* Before the move, as ConfirmAction puts its way back first. */}
             <AlertDialogCancel>{m.back()}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={confirmAsked}>
               {m.stage_cancel_confirm()}
@@ -352,7 +350,7 @@ const Column = memo(function Column({
           <h2 className="truncate text-sm font-semibold">
             {GROUP_LABEL[group]()}
           </h2>
-          <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
+          <span className="text-sm text-muted-foreground tabular-nums">
             {filtering ? `${cards.length}/${total}` : total}
           </span>
           {group === 'new' && (
@@ -378,7 +376,7 @@ const Column = memo(function Column({
           land. The overlay fades in over the cards instead of pushing them
           down, so nothing on the board jumps when a drag starts. */}
       <div className="relative flex min-h-24 flex-col">
-        <ul className="flex stagger flex-col gap-2">
+        <ul className="flex flex-col gap-2">
           {cards.map((card) => (
             <BoardCard
               key={card._id}
@@ -539,8 +537,8 @@ const BoardCard = memo(function BoardCard({
 })
 
 /**
- * What a card shows: the title with its stage joined to the top-right corner
- * (as on the phone's rows), the client, when, and what is still owed.
+ * What a card shows: the title with its stage, the client, when, and what is
+ * still owed.
  */
 function CardFace({ card, today }: { card: Card; today: string }) {
   const late = isJobLate(card, today)
@@ -575,12 +573,10 @@ function CardFace({ card, today }: { card: Card; today: string }) {
         <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium break-words">
           {card.title}
         </span>
-        {/* Pulled over the card's padding onto its top and right edges. */}
         <StageBadge
           name={card.stageName}
           group={card.stageGroup}
-          corner
-          className="-mt-3 -mr-3 h-6 self-end px-2.5 text-[0.6875rem] xl:self-auto"
+          className="h-5 xl:max-w-[45%]"
         />
       </span>
       <span className="flex flex-col gap-1 pr-7 text-xs text-muted-foreground">

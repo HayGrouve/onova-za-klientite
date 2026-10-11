@@ -246,9 +246,7 @@ function StagesPreview({ stages, job }: { stages: Stage[]; job: string }) {
             key={stage._id}
             name={stage.name}
             group={stage.group}
-            className={cn(
-              index === 0 && 'bg-primary text-primary-foreground ring-primary',
-            )}
+            className={cn(index === 0 && 'text-foreground')}
           />
         ))}
       </Flash>
@@ -370,12 +368,12 @@ function StageForm({
                           type="button"
                           aria-pressed={moveTo === other._id}
                           onClick={() => setMoveTo(other._id)}
-                          className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-offset-2"
+                          className="rounded-full border border-border bg-card px-3.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:ring-2 aria-pressed:ring-primary"
                         >
                           <StageBadge
                             name={other.name}
                             group={other.group}
-                            className="h-9 px-3.5 text-sm"
+                            className="h-9 text-sm text-foreground"
                           />
                         </button>
                       ))}
