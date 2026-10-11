@@ -156,7 +156,7 @@ One settings page with short, separate sections. Nothing on it is required to st
 
 | Section | Contains | Level |
 | --- | --- | --- |
-| Business | Name, logo, contact details | 1 |
+| Business | Name, logo, contact details; delete the business (Owner only, by typing its name) | 1 |
 | Names | Renaming Client, Job, Item, Appointment | 1 |
 | Modules | On/off switches for optional building blocks | 1 |
 | Job stages | Stage names, order, stage groups | 1 |

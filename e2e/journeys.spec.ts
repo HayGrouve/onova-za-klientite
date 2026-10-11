@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
-import { nav, runSetup } from './support/app'
+import { addBusiness, nav, runSetup } from './support/app'
 import { expect, test } from './support/fixtures'
 
 // One business, one job, followed from the first sign-in to the summary image.
@@ -136,4 +136,32 @@ test('cancelling asks why, and the job keeps the reason', async ({ page }) => {
   await page.getByRole('button', { name: 'Премести' }).click()
 
   await expect(page.getByText('Причина: Скъпо')).toBeVisible()
+})
+
+test('deleting a business asks for its name, and only that one goes', async ({
+  page,
+}) => {
+  await addBusiness(page)
+  await runSetup(page, { name: 'Временен Е2Е' })
+  await page.goto('/settings/business')
+  await page.getByRole('button', { name: 'Изтрий бизнеса…' }).click()
+
+  const typed = page.getByLabel(/напишете името на бизнеса/)
+  const remove = page.getByRole('button', { name: 'Изтрий завинаги' })
+  await typed.fill('Временен')
+  await expect(remove).toBeDisabled()
+  // Case and spacing don't count.
+  await typed.fill(' временен  е2е ')
+  await remove.click()
+
+  await expect(
+    page.getByText('Бизнесът „Временен Е2Е“ е изтрит.'),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Смени бизнеса' }).click()
+  await expect(
+    page.getByRole('menuitemradio', { name: 'Временен Е2Е' }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('menuitemradio', { name: BUSINESS }),
+  ).toBeVisible()
 })

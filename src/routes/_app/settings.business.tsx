@@ -1,7 +1,8 @@
 import { ImageSquareIcon } from '@phosphor-icons/react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
 import type { FunctionReturnType } from 'convex/server'
@@ -25,7 +26,9 @@ import { useViewer } from '#/hooks/use-viewer'
 import { compressImage } from '#/lib/compress-image'
 import { runChange } from '#/lib/change'
 import { summaryContacts } from '#/lib/job-summary'
+import { wipeSnapshots } from '#/lib/offline-store'
 import { m } from '#/paraglide/messages.js'
+import { namesMatch } from '../../../shared/business'
 import { formatMoney } from '../../../shared/money'
 
 export const Route = createFileRoute('/_app/settings/business')({
@@ -46,7 +49,8 @@ function BusinessSettings() {
       </SettingsPage>
     )
   }
-  return <BusinessForm settings={settings} />
+  // Keyed, so a business switched under the page (deleted, D124) starts clean.
+  return <BusinessForm key={business._id} settings={settings} />
 }
 
 function BusinessForm({ settings }: { settings: Settings }) {
@@ -169,7 +173,125 @@ function BusinessForm({ settings }: { settings: Settings }) {
           </fieldset>
         </form>
       </div>
+      {owner && <DeleteBusiness />}
     </SettingsPage>
+  )
+}
+
+/**
+ * Deleting the business, at the very end of its page and in two steps: a
+ * button opens the question, and only the business's name typed out lets the
+ * last button act (D124). The server checks the name again.
+ */
+function DeleteBusiness() {
+  const viewer = useViewer()
+  const { business } = viewer
+  const remove = useMutation(api.businesses.remove)
+  const navigate = useNavigate()
+  const [asking, setAsking] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const confirmed = namesMatch(typed, business.name)
+  const name = business.name
+
+  const close = () => {
+    setAsking(false)
+    setTyped('')
+  }
+  const confirm = () => {
+    setBusy(true)
+    void runChange(async () => {
+      await remove({ businessId: business._id, confirmName: typed })
+      // The saved offline copy was of this business.
+      await wipeSnapshots()
+    }).then((deleted) => {
+      if (!deleted.done) {
+        setBusy(false)
+        return
+      }
+      toast.success(m.business_deleted({ name }))
+      // A new, empty business opens setup from there.
+      void navigate({ to: '/' })
+    })
+  }
+
+  return (
+    <section
+      aria-labelledby="business-delete"
+      className="mx-4 mt-10 flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-card p-4 shadow-xs"
+    >
+      <h2 id="business-delete" className="font-semibold text-destructive">
+        {m.business_delete()}
+      </h2>
+      <p className="text-sm text-pretty">{m.business_delete_body({ name })}</p>
+      {viewer.businesses.length === 1 && (
+        <p className="text-sm text-pretty text-muted-foreground">
+          {m.business_delete_last()}
+        </p>
+      )}
+      <Link
+        to="/settings/data"
+        className="self-start text-sm font-medium underline underline-offset-4 outline-none focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        {m.business_delete_export()}
+      </Link>
+      {!asking ? (
+        <Button
+          type="button"
+          size="xl"
+          variant="outline"
+          className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => setAsking(true)}
+        >
+          {m.business_delete_start()}
+        </Button>
+      ) : (
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (confirmed && !busy) confirm()
+          }}
+        >
+          <Field>
+            <FieldLabel htmlFor="business-delete-name" className="break-words">
+              {m.business_delete_type({ name })}
+            </FieldLabel>
+            <Input
+              id="business-delete-name"
+              name="business-delete-name"
+              autoFocus
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+            />
+          </Field>
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              size="xl"
+              variant="destructive"
+              className="flex-1"
+              disabled={!confirmed || busy}
+            >
+              {busy && <Spinner data-icon="inline-start" />}
+              {busy ? m.data_deleting() : m.data_delete_confirm()}
+            </Button>
+            <Button
+              type="button"
+              size="xl"
+              variant="outline"
+              disabled={busy}
+              onClick={close}
+            >
+              {m.cancel()}
+            </Button>
+          </div>
+        </form>
+      )}
+    </section>
   )
 }
 
