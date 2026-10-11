@@ -195,7 +195,7 @@ The log of every change as an event (job created, stage changed, payment added).
 _Avoid_: audit log, changelog, feed
 
 **Today** · UI: _Днес_
-The home list of what to act on: today's appointments, overdue and soon-due Jobs, Reminders due and done-but-unpaid Jobs. A wide screen adds a row of headline figures and puts the schedule beside the rest.
+The home list of what to act on: today's appointments, overdue and soon-due Jobs, Reminders due and done-but-unpaid Jobs. A wide screen adds a row of headline figures and puts the schedule beside the rest. It ends with a month calendar (_Календар_) that marks each day's appointments, due dates and Reminders, for planning past the week.
 _Avoid_: dashboard, home, inbox
 
 **Overdue** · UI: _Закъснели_
