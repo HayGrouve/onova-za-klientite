@@ -28,7 +28,8 @@ test('first sign-in opens setup, and a few answers start the business', async ({
 test('"+" reads one line back and saves a job with its deposit', async ({
   page,
 }) => {
-  await page.getByRole('link', { name: 'Добави: Поръчка' }).click()
+  // The "+" in the nav: the calendar's "Добави: Поръчка за …" is a link too.
+  await nav(page).getByRole('link', { name: 'Добави: Поръчка' }).click()
   await expect(
     page.getByRole('heading', { name: 'Какво записваме?' }),
   ).toBeVisible()
