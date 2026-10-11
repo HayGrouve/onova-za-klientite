@@ -161,6 +161,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     date: '2026-10-10',
   }),
   'businesses:remove': () => ({ confirmName: DEFAULT_BUSINESS_NAME }),
+  'calendar:month': () => ({ month: '2026-10' }),
   'businesses:setModules': () => ({
     modules: {
       appointments: true,
@@ -328,6 +329,7 @@ const NO_RECORD_IDS = new Set([
   'dataExport:all',
   'search:all',
   'businesses:remove',
+  'calendar:month',
   'businesses:setModules',
   'businesses:setNewJobOptions',
   'businesses:setReminderRule',

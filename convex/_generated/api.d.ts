@@ -11,6 +11,7 @@
 import type * as account from "../account.js";
 import type * as appointments from "../appointments.js";
 import type * as businesses from "../businesses.js";
+import type * as calendar from "../calendar.js";
 import type * as clients from "../clients.js";
 import type * as clientsAdmin from "../clientsAdmin.js";
 import type * as costs from "../costs.js";
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   account: typeof account;
   appointments: typeof appointments;
   businesses: typeof businesses;
+  calendar: typeof calendar;
   clients: typeof clients;
   clientsAdmin: typeof clientsAdmin;
   costs: typeof costs;

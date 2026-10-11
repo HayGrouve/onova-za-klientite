@@ -210,7 +210,7 @@ Level 1 serves one person on a phone. Level 2 adds what changes when several peo
 | --- | --- | --- |
 | Main screens | Today, Jobs, Clients, Money, plus one "+" button | Adds Calendar and Team |
 | Clients and jobs | All core blocks, stages, extra fields, repeating jobs | Same |
-| Planning | Appointments on jobs; Today and Upcoming lists | Calendar by person and by resource; drag to reschedule; conflict warning |
+| Planning | Appointments on jobs; Today and Upcoming lists, and a month calendar on Today for further ahead | Calendar by person and by resource; drag to reschedule; conflict warning |
 | People | One user | Roles: Owner (everything), Manager (no business settings), Worker (own jobs only; can record payments but sees no totals) |
 | Work | — | Assign jobs and appointments to one or more people; blocked time; time tracking per job; deactivate leavers and reassign their jobs |
 | Client contact | Call and Viber buttons; manual "contacted" log; shareable job summary | Automatic reminders by Viber, SMS or email |

@@ -45,7 +45,7 @@ import { lower } from '#/i18n/words'
 import { runChange } from '#/lib/change'
 import { recordTiming } from '#/lib/timing'
 import { m } from '#/paraglide/messages.js'
-import { clockInSofia, todayInSofia } from '../../../shared/dates'
+import { clockInSofia, monthOf, todayInSofia } from '../../../shared/dates'
 import { formatMoney } from '../../../shared/money'
 import { readDraft, saveArgs, startFixes } from '../../../shared/new-job-draft'
 import type { ClientChoice, DraftFixes } from '../../../shared/new-job-draft'
@@ -93,6 +93,7 @@ export function NewJobForm({
   stages,
   start,
   items,
+  startDate,
 }: {
   business: ActiveBusiness
   clients: ClientCandidate[]
@@ -110,6 +111,8 @@ export function NewJobForm({
     item?: { id: Id<'items'>; name: string }
   }
   items: ItemRef[]
+  /** Opened from a day on Today's calendar: the job's date until the line names one. */
+  startDate?: string
 }) {
   const navigate = useNavigate()
   usePageTitle(m.preview_add({ job: lower(business.words.job.singular) }))
@@ -128,7 +131,9 @@ export function NewJobForm({
   // A save is under way or done: a second Enter or tap must not make a second job.
   const submitting = useRef(false)
   // Fixes made by hand. A fix holds until the line reads that field differently.
-  const [fixes, setFixes] = useState<DraftFixes>(() => startFixes(start))
+  const [fixes, setFixes] = useState<DraftFixes>(() =>
+    startFixes(start, startDate),
+  )
   const [depositMethod, setDepositMethod] = useState<PaymentMethod>('cash')
   // Where the job starts: the first New stage unless another is picked (D122).
   const firstStage = defaultStage(stages)
@@ -235,7 +240,8 @@ export function NewJobForm({
   // nothing left to say: the read-out shows it. A hand fix keeps its box.
   if (titleOpenedByError && parsed.title.trim()) fixer.closeIfOpenedByError()
   // Back where "+" was opened: the item or the client (the new job is in its
-  // list), otherwise Today.
+  // list), otherwise Today; from the calendar, on the job's day (D125).
+  const calendarDay = startDate && (chosenDate?.date ?? startDate)
   const leave = () =>
     start?.item
       ? navigate({ to: '/items/$itemId', params: { itemId: start.item.id } })
@@ -244,7 +250,12 @@ export function NewJobForm({
             to: '/clients/$clientId',
             params: { clientId: start.client.id },
           })
-        : navigate({ to: '/' })
+        : navigate({
+            to: '/',
+            search: calendarDay
+              ? { month: monthOf(calendarDay), day: calendarDay }
+              : {},
+          })
 
   // Leaving with a line typed asks first, whether by the close button or the back button.
   const guard = usePageGuard(text.trim() !== '', {

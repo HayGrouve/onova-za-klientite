@@ -39,6 +39,51 @@ export const vJobRow = v.object({
   listExtra: v.optional(vExtra),
 })
 
+/** An appointment as Today and the calendar list it, with its job's row. */
+export const vAppointmentRow = v.object({
+  _id: v.id('appointments'),
+  start: v.number(),
+  end: v.optional(v.number()),
+  allDay: v.boolean(),
+  label: v.optional(v.string()),
+  doneAt: v.optional(v.number()),
+  job: v.optional(vJobRow),
+})
+
+/** An open reminder as Today and the calendar list it. */
+export const vReminderRow = v.object({
+  _id: v.id('reminders'),
+  date: v.string(),
+  note: v.string(),
+  clientId: v.optional(v.id('clients')),
+  clientName: v.optional(v.string()),
+  jobId: v.optional(v.id('jobs')),
+  itemId: v.optional(v.id('items')),
+})
+
+/** Reminders as `vReminderRow`, each with its client's name. */
+export async function reminderRows(
+  ctx: QueryCtx,
+  reminders: Array<Doc<'reminders'>>,
+) {
+  const rows = []
+  for (const reminder of reminders) {
+    const client = reminder.clientId
+      ? await ctx.db.get('clients', reminder.clientId)
+      : null
+    rows.push({
+      _id: reminder._id,
+      date: reminder.date,
+      note: reminder.note,
+      clientId: reminder.clientId,
+      clientName: client?.name,
+      jobId: reminder.jobId,
+      itemId: reminder.itemId,
+    })
+  }
+  return rows
+}
+
 type Lookups = {
   clients: Map<Id<'clients'>, Doc<'clients'> | null>
   stages: Map<Id<'stages'>, Doc<'stages'> | null>

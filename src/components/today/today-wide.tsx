@@ -33,18 +33,21 @@ const TIME = new Intl.DateTimeFormat('bg-BG', {
 
 /**
  * Today on a wide screen: the same queue as the phone (D119), with the
- * schedule beside it when the business keeps appointments. Visits live in the
- * schedule, so the queue's "After" leaves them out; the first thing to do may
- * still be one. Lists to act on, never charts (design doc, "Simple first").
+ * schedule and the month's calendar (D125) beside it; the schedule when the
+ * business keeps appointments. Visits live in the schedule, so the queue's
+ * "After" leaves them out; the first thing to do may still be one. Lists to
+ * act on, never charts (design doc, "Simple first").
  */
 export function TodayWide({
   data,
   today,
   queue,
+  calendar,
 }: {
   data: TodayData
   today: string
   queue: Queue
+  calendar: React.ReactNode
 }) {
   const { modules } = useViewer().business
   const waiting = (queue.first ? 1 : 0) + queue.rest.length
@@ -63,11 +66,13 @@ export function TodayWide({
     </div>
   )
 
-  if (!modules.appointments) return <div className="max-w-2xl">{focus}</div>
   return (
     <div className="grid grid-cols-2 items-start gap-y-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       {focus}
-      <Schedule data={data} today={today} />
+      <div className="flex flex-col gap-6">
+        {modules.appointments && <Schedule data={data} today={today} />}
+        {calendar}
+      </div>
     </div>
   )
 }

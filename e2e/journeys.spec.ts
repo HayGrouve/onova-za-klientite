@@ -28,7 +28,8 @@ test('first sign-in opens setup, and a few answers start the business', async ({
 test('"+" reads one line back and saves a job with its deposit', async ({
   page,
 }) => {
-  await page.getByRole('link', { name: 'Добави: Поръчка' }).click()
+  // The "+" in the nav: the calendar's "Добави: Поръчка за …" is a link too.
+  await nav(page).getByRole('link', { name: 'Добави: Поръчка' }).click()
   await expect(
     page.getByRole('heading', { name: 'Какво записваме?' }),
   ).toBeVisible()
@@ -136,6 +137,31 @@ test('cancelling asks why, and the job keeps the reason', async ({ page }) => {
   await page.getByRole('button', { name: 'Премести' }).click()
 
   await expect(page.getByText('Причина: Скъпо')).toBeVisible()
+})
+
+test('the calendar plans past the week, and "+" starts on its day', async ({
+  page,
+}) => {
+  await nav(page).getByRole('link', { name: 'Днес' }).click()
+  // Two months on, the 15th: far past the week Today lists.
+  await page.getByRole('button', { name: 'Следващ месец' }).click()
+  await page.getByRole('button', { name: 'Следващ месец' }).click()
+  await page.getByRole('button', { name: /^[а-я]+, 15 [а-я]+/ }).click()
+  await expect(page.getByText('Нищо за този ден.')).toBeVisible()
+  await page.getByRole('link', { name: /^Добави: Поръчка за/ }).click()
+
+  const line = page.getByLabel('Запишете го като в тетрадка')
+  await line.fill('Мария Колева, шкаф, 500')
+  const readBack = page
+    .getByRole('heading', { name: 'Разбрах така' })
+    .locator('..')
+  // The job's due date is the day it was started from.
+  await expect(readBack).toContainText('15.')
+  await line.press('Enter')
+
+  // Back on the same day, which now lists the job.
+  await expect(page).toHaveURL(/day=\d{4}-\d{2}-15/)
+  await expect(page.getByRole('link', { name: /^Шкаф/ })).toBeVisible()
 })
 
 test('deleting a business asks for its name, and only that one goes', async ({
