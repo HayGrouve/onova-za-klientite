@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeFunctionReference } from 'convex/server'
 import { api } from './_generated/api'
+import { DEFAULT_BUSINESS_NAME } from '../shared/setup'
 import type { Id } from './_generated/dataModel'
 import {
   STRANGER,
@@ -159,6 +160,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
     appointmentId: ids.appointmentId,
     date: '2026-10-10',
   }),
+  'businesses:remove': () => ({ confirmName: DEFAULT_BUSINESS_NAME }),
   'businesses:setModules': () => ({
     modules: {
       appointments: true,
@@ -325,6 +327,7 @@ const NO_RECORD_IDS = new Set([
   'clientsAdmin:findByPhones',
   'dataExport:all',
   'search:all',
+  'businesses:remove',
   'businesses:setModules',
   'businesses:setNewJobOptions',
   'businesses:setReminderRule',
@@ -402,6 +405,8 @@ const EVENTS: Record<string, string | null> = {
   'appointments:add': 'appointment.added',
   'appointments:cancel': 'appointment.cancelled',
   'appointments:update': 'appointment.changed',
+  // The whole business goes, its history with it.
+  'businesses:remove': null,
   'businesses:setModules': 'settings.changed',
   'businesses:setNewJobOptions': 'settings.changed',
   'businesses:setReminderRule': 'settings.changed',

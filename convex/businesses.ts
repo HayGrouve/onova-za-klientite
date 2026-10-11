@@ -1,5 +1,9 @@
 import { v } from 'convex/values'
+import { namesMatch } from '../shared/business'
 import { isValidWord } from '../shared/words'
+import { scheduleDeletion } from './account'
+import type { Id } from './_generated/dataModel'
+import type { QueryCtx } from './_generated/server'
 import { logActivity } from './lib/activity'
 import {
   businessMutation,
@@ -203,3 +207,52 @@ export const createAnother = userMutation({
     return businessId
   },
 })
+
+/**
+ * Deletes the business and everything in it, for good (D124). Only its Owner
+ * may, and only by typing its name: the client asks for it before the button
+ * works, and it is checked here too. Every member loses it at once; the data
+ * goes in batches after. The caller moves to their next business, or to a new
+ * one with setup when this was their only one. Returns where they are now.
+ */
+export const remove = businessMutation({
+  args: { confirmName: v.string() },
+  returns: v.id('businesses'),
+  handler: async (ctx, { confirmName }) => {
+    requireRole(ctx.member, 'owner')
+    if (!namesMatch(confirmName, ctx.business.name)) {
+      fail('invalid', { field: 'confirmName' })
+    }
+    const businessId = ctx.business._id
+    // A team is a few people, so its memberships go in this one mutation.
+    const memberships = await ctx.db
+      .query('memberships')
+      .withIndex('by_business_user', (q) => q.eq('businessId', businessId))
+      .collect()
+    for (const membership of memberships) {
+      await ctx.db.delete('memberships', membership._id)
+      const user = await ctx.db.get('users', membership.userId)
+      if (!user) continue
+      const active = user.activeBusinessId
+      if (active !== undefined && active !== businessId) continue
+      // Nobody is left without a business: the last one gives way to a new one.
+      await ctx.db.patch('users', user._id, {
+        activeBusinessId:
+          (await firstBusinessOf(ctx, user._id)) ??
+          (await createBusiness(ctx, user._id)),
+      })
+    }
+    await scheduleDeletion(ctx, [businessId])
+    return (await ctx.db.get('users', ctx.user._id))!.activeBusinessId!
+  },
+})
+
+/** One of the user's businesses they are still an active member of, if any. */
+async function firstBusinessOf(ctx: QueryCtx, userId: Id<'users'>) {
+  const memberships = await ctx.db
+    .query('memberships')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .collect()
+  return memberships.find((item) => item.deactivatedAt === undefined)
+    ?.businessId
+}

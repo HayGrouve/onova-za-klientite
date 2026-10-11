@@ -457,8 +457,9 @@ export default defineSchema({
     .index('by_user', ['userId'])
     .index('by_endpoint', ['endpoint']),
 
+  // Deleting an account, or one business alone (D124): then there is no user.
   deletionJobs: defineTable({
-    userId: v.id('users'),
+    userId: v.optional(v.id('users')),
     businessIds: v.array(v.id('businesses')),
     table: v.string(),
     status: v.union(v.literal('running'), v.literal('done')),
