@@ -6,23 +6,28 @@ import { NewJobForm } from '#/components/new-job/new-job-form'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
+import { isValidDate } from '../../../shared/dates'
 
 export const Route = createFileRoute('/_app/new')({
   // From an item's page: its client is chosen already and the job links to it.
+  // From a day on Today's calendar: the job starts with that date (D125).
   validateSearch: (
     search: Record<string, unknown>,
-  ): { clientId?: string; itemId?: string } => ({
+  ): { clientId?: string; itemId?: string; date?: string } => ({
     ...(typeof search.clientId === 'string'
       ? { clientId: search.clientId }
       : {}),
     ...(typeof search.itemId === 'string' ? { itemId: search.itemId } : {}),
+    ...(typeof search.date === 'string' && isValidDate(search.date)
+      ? { date: search.date }
+      : {}),
   }),
   component: NewJobPage,
 })
 
 function NewJobPage() {
   const { business } = useViewer()
-  const { clientId, itemId } = Route.useSearch()
+  const { clientId, itemId, date } = Route.useSearch()
   const context = useQuery(api.newJob.context, { businessId: business._id })
   // The stages, for the slot that names where the new job starts (D122).
   const settings = useQuery(api.businesses.settings, {
@@ -59,6 +64,7 @@ function NewJobPage() {
           : undefined
       }
       items={context.items}
+      startDate={date}
     />
   )
 }

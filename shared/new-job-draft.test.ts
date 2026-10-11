@@ -157,6 +157,18 @@ describe('readDraft: client', () => {
     expect(draft.missing).toEqual({ title: true })
   })
 
+  it('opened from a calendar day, the line starts with that date', () => {
+    const fixes = startFixes(undefined, '2026-11-20')
+    const draft = read('гардероб', fixes)
+    expect(draft.date).toEqual({ date: '2026-11-20' })
+    expect(save(draft)?.dueDate).toBe('2026-11-20')
+    expect(save(draft, 'single')?.when).toEqual({ date: '2026-11-20' })
+    // A date typed in the line wins over the day it was opened on.
+    expect(read('гардероб, до 25.11', fixes).date).toEqual({
+      date: '2026-11-25',
+    })
+  })
+
   it('a line that names nobody is for No client, by default', () => {
     const draft = read('гардероб, 950')
     expect(draft.client).toEqual({ kind: 'none' })

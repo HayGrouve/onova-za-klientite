@@ -65,16 +65,21 @@ function held<T>(current: Fix<T> | undefined, parsedValue: unknown) {
     : undefined
 }
 
-/** The fixes "+" opens with: the starting client stands in for the empty line's "no client". */
-export function startFixes(start?: DraftStart): DraftFixes {
-  return start
-    ? {
-        client: {
-          value: { kind: 'existing', ...start.client },
-          basis: basis(null),
-        },
-      }
-    : {}
+/**
+ * The fixes "+" opens with: the starting client stands in for the empty
+ * line's "no client", and a day picked on the calendar for its "no date"
+ * (D125). Either gives way once the line names its own.
+ */
+export function startFixes(start?: DraftStart, date?: string): DraftFixes {
+  return {
+    ...(start && {
+      client: {
+        value: { kind: 'existing', ...start.client },
+        basis: basis(null),
+      },
+    }),
+    ...(date && { date: { value: { date }, basis: basis(null) } }),
+  }
 }
 
 const capitalize = (text: string) =>

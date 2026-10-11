@@ -27,6 +27,7 @@ const modules = import.meta.glob<Record<string, unknown>>(
 const WORKER_READS: Record<string, string> = {
   'businesses:settings': 'settings, read-only (D38)',
   'businesses:stageJobCounts': 'forbidden',
+  'calendar:month': 'their jobs and appointments, no reminders (D125)',
   'clients:get': 'only through their jobs, without money',
   'clients:list': 'only the clients of their jobs, without money',
   'clientsAdmin:findByPhones': 'forbidden',
@@ -225,6 +226,21 @@ describe('a Worker sees only their own work (D89)', () => {
     ]
     expect(new Set(jobIds)).toEqual(new Set([mine.jobId]))
     expect(today.reminders).toEqual([])
+  })
+
+  it('sees the calendar only for their jobs, and no reminders', async () => {
+    const t = setupConvex()
+    const { worker, owner, businessId, mine } = await workerBusiness(t)
+    const month = TODAY.slice(0, 7)
+    const seen = await worker.query(api.calendar.month, { businessId, month })
+    expect(seen.visits.map((visit) => visit.job?._id)).toEqual([mine.jobId])
+    expect(seen.due.map((job) => job._id)).toEqual([mine.jobId])
+    expect(seen.reminders).toEqual([])
+    // The owner's month has both jobs and both reminders.
+    const all = await owner.query(api.calendar.month, { businessId, month })
+    expect(all.visits).toHaveLength(2)
+    expect(all.due).toHaveLength(2)
+    expect(all.reminders).toHaveLength(2)
   })
 
   it('sees only the clients of their jobs, without money', async () => {

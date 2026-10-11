@@ -6,27 +6,14 @@ import { queryNow } from './lib/clock'
 import { fail } from './lib/errors'
 import { collectToday } from './lib/todayData'
 import type { TodayVisit } from './lib/todayData'
-import { jobRow, newLookups, vJobRow } from './lib/views'
-
-const vAppointmentRow = v.object({
-  _id: v.id('appointments'),
-  start: v.number(),
-  end: v.optional(v.number()),
-  allDay: v.boolean(),
-  label: v.optional(v.string()),
-  doneAt: v.optional(v.number()),
-  job: v.optional(vJobRow),
-})
-
-const vReminderRow = v.object({
-  _id: v.id('reminders'),
-  date: v.string(),
-  note: v.string(),
-  clientId: v.optional(v.id('clients')),
-  clientName: v.optional(v.string()),
-  jobId: v.optional(v.id('jobs')),
-  itemId: v.optional(v.id('items')),
-})
+import {
+  jobRow,
+  newLookups,
+  reminderRows,
+  vAppointmentRow,
+  vJobRow,
+  vReminderRow,
+} from './lib/views'
 
 /**
  * Today: what to act on (CONTEXT "Today"). `today` is the Sofia calendar date
@@ -73,29 +60,13 @@ export const list = businessQuery({
       return rows
     }
 
-    const reminderRows = []
-    for (const reminder of arranged.reminders) {
-      const client = reminder.clientId
-        ? await ctx.db.get('clients', reminder.clientId)
-        : null
-      reminderRows.push({
-        _id: reminder._id,
-        date: reminder.date,
-        note: reminder.note,
-        clientId: reminder.clientId,
-        clientName: client?.name,
-        jobId: reminder.jobId,
-        itemId: reminder.itemId,
-      })
-    }
-
     return {
       appointments: await appointmentRows(arranged.appointments),
       upcoming: await appointmentRows(arranged.upcoming),
       overdue: await jobRows(arranged.overdue),
       dueSoon: await jobRows(arranged.dueSoon),
       doneUnpaid: await jobRows(arranged.doneUnpaid),
-      reminders: reminderRows,
+      reminders: await reminderRows(ctx, arranged.reminders),
     }
   },
 })
