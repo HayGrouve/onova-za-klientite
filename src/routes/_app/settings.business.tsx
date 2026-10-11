@@ -311,8 +311,7 @@ function SummaryHeaderPreview({
   job: string
 }) {
   return (
-    // The shared image is always white, also in the dark theme.
-    <div className="flex flex-col gap-3 rounded-xl bg-white p-3 text-[#18202f] ring-1 ring-border">
+    <div className="flex flex-col gap-3 rounded-xl bg-background p-3 ring-1 ring-border">
       <Flash
         watch={[name, contacts, logoUrl]}
         className="flex items-center gap-3 py-1"
@@ -329,24 +328,25 @@ function SummaryHeaderPreview({
             {name}
           </p>
           {contacts.map((contact) => (
-            <p key={contact} className="text-xs break-words text-[#5f6b7e]">
+            <p
+              key={contact}
+              className="text-xs break-words text-muted-foreground"
+            >
               {contact}
             </p>
           ))}
         </div>
       </Flash>
-      <div className="h-0.5 bg-[#eef1f7]" />
+      <div className="h-0.5 bg-border" />
       <div className="flex flex-col gap-0.5">
-        <p className="text-xs text-[#2f4fa8]">
-          {m.names_preview_client_name()}
-        </p>
+        <p className="text-xs text-primary">{m.names_preview_client_name()}</p>
         <p className="text-base font-bold">{job}</p>
       </div>
-      <div className="flex items-baseline justify-between text-sm font-bold text-[#2f4fa8]">
+      <div className="flex items-baseline justify-between text-sm font-bold text-primary">
         <span>{m.job_balance()}</span>
         <span className="tabular-nums">{formatMoney(48000)}</span>
       </div>
-      <p className="text-xs text-[#5f6b7e]">{m.summary_not_invoice()}</p>
+      <p className="text-xs text-muted-foreground">{m.summary_not_invoice()}</p>
     </div>
   )
 }
