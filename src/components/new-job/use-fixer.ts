@@ -1,6 +1,7 @@
 import { useCallback, useReducer } from 'react'
 
-export type Fixable = 'client' | 'title' | 'price' | 'deposit' | 'date'
+export type Fixable =
+  'client' | 'title' | 'price' | 'deposit' | 'date' | 'stage'
 
 type State = { fixing: Fixable | null; byError: boolean }
 

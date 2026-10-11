@@ -254,4 +254,22 @@ describe('saveArgs', () => {
     expect(save(draft)?.done).toBeUndefined()
     expect(save(draft, 'single', true)?.done).toBe(true)
   })
+
+  it('a picked stage is passed on, unless the job is saved as Done', () => {
+    const draft = read('Иван Петров, гардероб, 950')
+    const options = {
+      flow: 'multi' as const,
+      received: { date: TODAY, method: 'cash' as const },
+      depositLabel: 'Капаро',
+    }
+    expect(saveArgs(draft, { ...options, done: false })?.stageId).toBe(
+      undefined,
+    )
+    expect(
+      saveArgs(draft, { ...options, done: false, stageId: 'stage-2' })?.stageId,
+    ).toBe('stage-2')
+    expect(
+      saveArgs(draft, { ...options, done: true, stageId: 'stage-2' })?.stageId,
+    ).toBeUndefined()
+  })
 })

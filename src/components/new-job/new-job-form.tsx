@@ -9,6 +9,7 @@ import {
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
 import type { FunctionArgs } from 'convex/server'
+import { cn } from 'cn'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
@@ -18,7 +19,7 @@ import { Slot } from '#/components/new-job/slot'
 import { useFixer } from '#/components/new-job/use-fixer'
 import type { Fixable } from '#/components/new-job/use-fixer'
 import type { ItemRef, PaymentMethod } from '#/components/new-job/types'
-import { StageBadge } from '#/components/stage-badge'
+import { GROUP_DOT, StageBadge } from '#/components/stage-badge'
 import { Stopwatch } from '#/components/stopwatch'
 import { Button } from '#/components/ui/button'
 import { Field, FieldLabel } from '#/components/ui/field'
@@ -52,6 +53,7 @@ import { exampleLine, parseLine } from '../../../shared/parse-line'
 import type { ServiceRef } from '../../../shared/parse-line'
 import { formatPhone } from '../../../shared/phone-format'
 import type { ClientCandidate } from '../../../shared/search'
+import { defaultStage } from '../../../shared/stages'
 import type { StageGroup } from '../../../shared/stages'
 
 const METHODS = [
@@ -88,15 +90,20 @@ export function NewJobForm({
   business,
   clients,
   services,
-  firstStage,
+  stages,
   start,
   items,
 }: {
   business: ActiveBusiness
   clients: ClientCandidate[]
   services: ServiceRef[]
-  /** Where a new job starts, for the stage slot. */
-  firstStage?: { name: string; group: StageGroup }
+  /** The stages a new job can start in, in order: every one but Cancelled. */
+  stages: Array<{
+    _id: Id<'stages'>
+    name: string
+    group: StageGroup
+    order: number
+  }>
   /** Started from an item: its client is chosen already, and the job is linked to the item. */
   start?: {
     client: { id: string; name: string }
@@ -123,6 +130,13 @@ export function NewJobForm({
   // Fixes made by hand. A fix holds until the line reads that field differently.
   const [fixes, setFixes] = useState<DraftFixes>(() => startFixes(start))
   const [depositMethod, setDepositMethod] = useState<PaymentMethod>('cash')
+  // Where the job starts: the first New stage unless another is picked (D122).
+  const firstStage = defaultStage(stages)
+  const [stageId, setStageId] = useState(firstStage?._id)
+  const chosenStage =
+    stages.find((stage) => stage._id === stageId) ?? firstStage
+  const stagePicked =
+    chosenStage !== undefined && chosenStage._id !== firstStage?._id
   const [depositDate, setDepositDate] = useState(today)
 
   const single = business.jobFlow === 'single'
@@ -274,6 +288,7 @@ export function NewJobForm({
       received: { date: depositDate, method: depositMethod },
       depositLabel: m.deposit_label(),
       done: markDone,
+      stageId: stagePicked ? chosenStage._id : undefined,
       repeat: repeat ? business.repeatDefault : undefined,
     })
     if (!args) {
@@ -765,20 +780,63 @@ export function NewJobForm({
               )}
             </Slot>
 
-            {/* New jobs start in the first stage; the job page moves them on. */}
-            {firstStage && (
+            {/* New jobs start in the first New stage, or in the one picked
+                here (D122); the job page moves them on. */}
+            {chosenStage && (
               <Slot
                 label={m.preview_stage()}
-                show={firstStage.name}
-                quiet
+                show={chosenStage.name}
+                quiet={!stagePicked}
                 value={
                   <StageBadge
-                    name={firstStage.name}
-                    group={firstStage.group}
-                    className="h-auto text-base font-normal"
+                    name={chosenStage.name}
+                    group={chosenStage.group}
+                    className={cn(
+                      'h-auto text-base',
+                      stagePicked
+                        ? 'font-medium text-foreground'
+                        : 'font-normal',
+                    )}
                   />
                 }
-              />
+                fixId={fixId('stage')}
+                fixing={fixing === 'stage'}
+                onFix={() => toggleFix('stage')}
+              >
+                {fixing === 'stage' && (
+                  // A tap picks the stage and closes the chips, as the
+                  // payment's method rows do.
+                  <ToggleGroup
+                    aria-label={m.preview_stage()}
+                    value={[chosenStage._id]}
+                    onValueChange={(next: string[]) => {
+                      const picked = stages.find(
+                        (stage) => stage._id === next[0],
+                      )
+                      if (picked) setStageId(picked._id)
+                      closeFixer()
+                    }}
+                    className="w-full flex-wrap"
+                  >
+                    {stages.map((stage) => (
+                      <ToggleGroupItem
+                        key={stage._id}
+                        value={stage._id}
+                        className="h-9 max-w-full rounded-full bg-card px-3.5 whitespace-normal text-foreground/80 ring-1 ring-border ring-inset hover:bg-muted aria-pressed:bg-accent aria-pressed:text-foreground aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:hover:bg-accent"
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            'size-2 shrink-0 rounded-full',
+                            GROUP_DOT[stage.group],
+                          )}
+                        />
+                        {stage.name}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                )}
+              </Slot>
             )}
 
             {business.repeatDefault && (
@@ -816,7 +874,8 @@ export function NewJobForm({
             scrolls; at a desk it follows the slots. */}
         <div className="flex-1 lg:hidden" />
         <div className="sticky bottom-0 z-10 -mx-4 mt-4 flex flex-col gap-2 bg-canvas/95 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm lg:static lg:mx-0 lg:mt-6 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-          {draft.coversPrice && (
+          {/* A job already picked into a Done stage is saved as done anyway. */}
+          {draft.coversPrice && chosenStage?.group !== 'done' && (
             <Button
               size="xl"
               variant="outline"

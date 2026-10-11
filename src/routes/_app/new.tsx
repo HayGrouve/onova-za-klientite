@@ -6,7 +6,6 @@ import { NewJobForm } from '#/components/new-job/new-job-form'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { m } from '#/paraglide/messages.js'
-import { defaultStage } from '../../../shared/stages'
 
 export const Route = createFileRoute('/_app/new')({
   // From an item's page: its client is chosen already and the job links to it.
@@ -25,7 +24,7 @@ function NewJobPage() {
   const { business } = useViewer()
   const { clientId, itemId } = Route.useSearch()
   const context = useQuery(api.newJob.context, { businessId: business._id })
-  // The stages, for the slot that names where the new job starts.
+  // The stages, for the slot that names where the new job starts (D122).
   const settings = useQuery(api.businesses.settings, {
     businessId: business._id,
   })
@@ -42,16 +41,15 @@ function NewJobPage() {
   const item = context.items.find(
     (entry) => entry.id === itemId && entry.clientId === client?.id,
   )
-  const firstStage = defaultStage(settings.stages)
+  // A new job can start anywhere but Cancelled.
+  const stages = settings.stages.filter((stage) => stage.group !== 'cancelled')
   return (
     <NewJobForm
       key={business._id}
       business={business}
       clients={context.clients}
       services={context.services}
-      firstStage={
-        firstStage && { name: firstStage.name, group: firstStage.group }
-      }
+      stages={stages}
       start={
         client
           ? {

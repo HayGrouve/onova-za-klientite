@@ -291,6 +291,8 @@ export function saveArgs(
     received: { date: string; method: 'cash' | 'bank' | 'card' | 'other' }
     depositLabel: string
     done: boolean
+    /** A stage picked by hand (D122). Saving as Done takes the first Done stage instead. */
+    stageId?: string
     repeat?: { every: number; unit: 'week' | 'month' }
   },
 ) {
@@ -317,6 +319,7 @@ export function saveArgs(
     when: single && date ? date : undefined,
     dueDate: !single && date ? date.date : undefined,
     itemIds: draft.itemIds.length ? draft.itemIds : undefined,
+    stageId: options.done ? undefined : options.stageId,
     done: options.done || undefined,
     repeat: options.repeat,
   }
