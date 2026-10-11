@@ -19,7 +19,7 @@ Each term below gives the English name used in code and docs, then the Bulgarian
 ### Who
 
 **Business** · UI: _Бизнес_
-The workspace that owns every other record. A person can belong to several businesses and switch between them.
+The workspace that owns every other record. A person can belong to several businesses and switch between them. Only its Owner can delete it, by typing its name; everything in it goes too.
 _Avoid_: company, account, organisation, workspace, tenant
 
 **User** · UI: _Профил_
