@@ -27,7 +27,6 @@ import { compressImage } from '#/lib/compress-image'
 import { runChange } from '#/lib/change'
 import { summaryContacts } from '#/lib/job-summary'
 import { wipeSnapshots } from '#/lib/offline-store'
-import { lower } from '#/i18n/words'
 import { m } from '#/paraglide/messages.js'
 import { namesMatch } from '../../../shared/business'
 import { formatMoney } from '../../../shared/money'
@@ -224,13 +223,7 @@ function DeleteBusiness() {
       <h2 id="business-delete" className="font-semibold text-destructive">
         {m.business_delete()}
       </h2>
-      <p className="text-sm text-pretty">
-        {m.business_delete_body({
-          name,
-          clients: lower(business.words.client.plural),
-          jobs: lower(business.words.job.plural),
-        })}
-      </p>
+      <p className="text-sm text-pretty">{m.business_delete_body({ name })}</p>
       {viewer.businesses.length === 1 && (
         <p className="text-sm text-pretty text-muted-foreground">
           {m.business_delete_last()}
