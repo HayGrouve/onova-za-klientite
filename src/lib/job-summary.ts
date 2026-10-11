@@ -83,10 +83,12 @@ export function viberTextHref(text: string): string {
   return `viber://forward?text=${encodeURIComponent(text)}`
 }
 
-const INK = '#18202f'
-const MUTED = '#5f6b7e'
-const ACCENT = '#2f4fa8'
-const SOFT = '#eef1f7'
+// The app's own colours (D115), as hex: ink, slate, spruce, mist, a hairline.
+const INK = '#1c2622'
+const MUTED = '#5b6a64'
+const ACCENT = '#1e4a3d'
+const SOFT = '#edf1ef'
+const RULE = '#d1dad5'
 const LOGO_BOX = 150
 
 type Style = CSSProperties
@@ -113,8 +115,8 @@ function moneyRow(name: string, value: string, strong: boolean) {
       gap: 24,
       color: strong ? ACCENT : INK,
     },
-    label(name, { fontSize: strong ? 44 : 36, fontWeight: strong ? 700 : 400 }),
-    label(value, { fontSize: strong ? 52 : 38, fontWeight: 700 }),
+    label(name, { fontSize: strong ? 44 : 36, fontWeight: strong ? 600 : 400 }),
+    label(value, { fontSize: strong ? 52 : 38, fontWeight: 600 }),
   )
 }
 
@@ -160,7 +162,7 @@ export function summaryTree(
         { flexDirection: 'column', gap: 8, flexGrow: 1, flexShrink: 1 },
         label(input.business.name, {
           fontSize: 60,
-          fontWeight: 700,
+          fontWeight: 600,
           lineHeight: 1.1,
         }),
         ...contacts.map((contact) =>
@@ -174,7 +176,7 @@ export function summaryTree(
       input.clientName
         ? label(input.clientName, { fontSize: 38, color: ACCENT })
         : undefined,
-      label(input.title, { fontSize: 64, fontWeight: 700, lineHeight: 1.1 }),
+      label(input.title, { fontSize: 64, fontWeight: 600, lineHeight: 1.1 }),
       box(
         { gap: 28 },
         ...dates.map((date) => label(date, { fontSize: 32, color: MUTED })),
@@ -195,7 +197,7 @@ export function summaryTree(
               label(row.description, { fontSize: 38 }),
               label(row.detail, { fontSize: 30, color: MUTED }),
             ),
-            label(row.total, { fontSize: 38, fontWeight: 700, flexShrink: 0 }),
+            label(row.total, { fontSize: 38, fontWeight: 600, flexShrink: 0 }),
           ),
         ),
       ),
@@ -209,7 +211,7 @@ export function summaryTree(
       },
       moneyRow(m.job_price(), formatMoney(input.priceCents), false),
       moneyRow(m.job_paid(), formatMoney(input.paidCents), false),
-      box({ height: 2, backgroundColor: '#cfd6e4' }),
+      box({ height: 2, backgroundColor: RULE }),
       moneyRow(m.job_balance(), formatMoney(input.balanceCents), true),
     ),
     // A footnote, not a frame: a bordered box reads as a button on a phone.
@@ -223,34 +225,27 @@ export function summaryTree(
 type Font = {
   name: string
   data: ArrayBuffer
-  weight: 400 | 700
+  weight: 400 | 600
   style: 'normal'
 }
 
-// Satori reads TTF, OTF and WOFF, not WOFF2. Each weight comes as a Latin and a
-// Cyrillic file. They are two families, which satori tries one after the other
-// for every character (the font-family below lists both).
-const FONT_FAMILY = 'Sofia Sans Latin, Sofia Sans Cyrillic'
+// Onest, the app's font (D115). Satori reads TTF, OTF and WOFF, not WOFF2 or a
+// variable font, so the image has its own static files. Each weight comes as a
+// Latin and a Cyrillic file. They are two families, which satori tries one
+// after the other for every character (the font-family below lists both).
+const FONT_FAMILY = 'Onest Latin, Onest Cyrillic'
 const FONT_FILES = [
+  { file: 'onest-latin-400-normal.woff', name: 'Onest Latin', weight: 400 },
   {
-    file: 'sofia-sans-latin-400-normal.woff',
-    name: 'Sofia Sans Latin',
+    file: 'onest-cyrillic-400-normal.woff',
+    name: 'Onest Cyrillic',
     weight: 400,
   },
+  { file: 'onest-latin-600-normal.woff', name: 'Onest Latin', weight: 600 },
   {
-    file: 'sofia-sans-cyrillic-400-normal.woff',
-    name: 'Sofia Sans Cyrillic',
-    weight: 400,
-  },
-  {
-    file: 'sofia-sans-latin-700-normal.woff',
-    name: 'Sofia Sans Latin',
-    weight: 700,
-  },
-  {
-    file: 'sofia-sans-cyrillic-700-normal.woff',
-    name: 'Sofia Sans Cyrillic',
-    weight: 700,
+    file: 'onest-cyrillic-600-normal.woff',
+    name: 'Onest Cyrillic',
+    weight: 600,
   },
 ] as const
 
