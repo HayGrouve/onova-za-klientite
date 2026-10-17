@@ -6,7 +6,7 @@ How to run, test and verify this repo. The product rules are in `docs/product-de
 
 ## Before you change code
 
-1. **`CONTEXT.md`** is the domain glossary. Use its words in code, copy and PRs, and keep it in step with the code.
+1. **`GLOSSARY.md`** is the domain glossary. Use its words in code, copy and PRs, and keep it in step with the code.
 2. **`docs/product-design.md`** is the product design. If it and the code disagree, the doc wins: stop and say so.
 3. **`docs/implementation-plan.md`** has the schema, the milestones, the open questions and the decisions made during the build.
 4. **`docs/adr/`** has one ADR per stack or architecture choice. Read the ones for the area you touch.

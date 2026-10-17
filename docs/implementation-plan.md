@@ -1,6 +1,6 @@
 # Implementation plan: v1 (Level 1, Level-2-ready data)
 
-How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`CONTEXT.md`](../CONTEXT.md). Stack choices are recorded in [`docs/adr/`](./adr/).
+How Онова за клиентите goes from an empty repo to a version the first user (a solo furniture maker) uses every day. The product rules come from [`docs/product-design.md`](./product-design.md), and the doc wins over this plan. Domain words are defined in [`GLOSSARY.md`](../GLOSSARY.md). Stack choices are recorded in [`docs/adr/`](./adr/).
 
 **Status:** milestone 0 (this plan) merged in #13 on 6 Oct 2026. Milestones 1 to 10 are built and in review as stacked PRs. Nothing is deployed to production. Vercel is linked after milestone 1 merges.
 
@@ -305,7 +305,7 @@ One PR each, in this order. Each has a GitHub issue. Every milestone follows the
 
 ### 0. Plan (#12)
 
-- [x] `CONTEXT.md`, ADRs, this plan, `AGENTS.md` and `CLAUDE.md`
+- [x] `GLOSSARY.md`, ADRs, this plan, `AGENTS.md` and `CLAUDE.md`
 - [x] One GitHub issue per milestone
 - [x] Questions for the owner (below)
 
@@ -587,7 +587,7 @@ Details the doc doesn't cover, settled here so they can be copied into the livin
 | D2 | Time zone | One fixed zone, Europe/Sofia, for "today", months and push times | Bulgaria only. A business time zone field can come later |
 | D3 | Job address | Copied from the client when the job is created, then editable | A client moving house must not rewrite where past work was done |
 | D4 | Job lines | Stored inside the job document, not as their own table | A job has a handful of lines, and price must change in the same write |
-| D5 | Default words | Item: "Обект". Appointment: "Среща". Job line: "Позиция". Client credit: "Предплатено" | The doc names the concepts but not every Bulgarian word. See `CONTEXT.md` |
+| D5 | Default words | Item: "Обект". Appointment: "Среща". Job line: "Позиция". Client credit: "Предплатено" | The doc names the concepts but not every Bulgarian word. See `GLOSSARY.md` |
 | D6 | New job price | A price matched from a service fills the typed price. No lines are created from the one-line entry | It keeps the new-job save to two required fields. Lines are added on the job page |
 | D7 | Write-off | Stored on the job (`writeOff`), and part of the balance: price − paid − written off | The doc gives the rule but no formula |
 | D8 | Search keys | Precomputed `searchText` per record, folded three ways (see Search) | Convex can only search stored text |

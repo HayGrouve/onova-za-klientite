@@ -10,7 +10,7 @@ export type Words = {
   appointment: Word
 }
 
-/** The words a new business starts with (CONTEXT.md, D5). */
+/** The words a new business starts with (GLOSSARY.md, D5). */
 export const DEFAULT_WORDS: Words = {
   client: { singular: 'Клиент', plural: 'Клиенти', gender: 'm' },
   job: { singular: 'Поръчка', plural: 'Поръчки', gender: 'f' },
