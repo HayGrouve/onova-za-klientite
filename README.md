@@ -10,6 +10,6 @@ The product design is final. All v1 milestones (1–10) are merged and deployed 
 
 - [Product design](docs/product-design.md): a snapshot of the [living design doc](https://claude.ai/code/artifact/c79d23dc-33e3-4bdc-baf2-424f77aac969). It wins over everything else
 - [Implementation plan](docs/implementation-plan.md): schema draft, milestones, open questions, build decisions
-- [Glossary](CONTEXT.md): domain terms and their Bulgarian UI words
+- [Glossary](GLOSSARY.md): domain terms and their Bulgarian UI words
 - [ADRs](docs/adr/): stack and architecture decisions
 - [Agent workflow](AGENTS.md): how to run, test and verify
