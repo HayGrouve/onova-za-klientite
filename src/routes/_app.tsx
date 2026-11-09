@@ -5,7 +5,7 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { AppShell } from '#/components/app-shell'
 import { SnapshotKeeper } from '#/components/offline/snapshot-keeper'
@@ -51,9 +51,14 @@ function SignedInLayout() {
   return <EnsureUser />
 }
 
+/** A user row that vanishes again this soon after being made means something is wrong. */
+const FRESH_START_GAP_MS = 10_000
+
 function EnsureUser() {
   const ensureCurrent = useMutation(api.users.ensureCurrent)
   const [state, setState] = useState<'pending' | 'ready' | 'failed'>('pending')
+  const [round, setRound] = useState(0)
+  const lastFreshStart = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -63,27 +68,45 @@ function EnsureUser() {
     return () => {
       cancelled = true
     }
-  }, [ensureCurrent])
+  }, [ensureCurrent, round])
+
+  // Still signed in but the user row is gone (Remove project data): make a fresh
+  // one, which lands on setup like a first sign-in.
+  const startFresh = useCallback(() => {
+    const now = Date.now()
+    if (now - lastFreshStart.current < FRESH_START_GAP_MS) {
+      setState('failed')
+      return
+    }
+    lastFreshStart.current = now
+    setState('pending')
+    setRound((count) => count + 1)
+  }, [])
 
   if (state === 'failed') return <ProfileError />
   if (state === 'pending') return <StartingUp />
-  return <WithViewer />
+  return <WithViewer onUserGone={startFresh} />
 }
 
-function WithViewer() {
+function WithViewer({ onUserGone }: { onUserGone: () => void }) {
   const viewer = useQuery(api.users.viewer)
   const navigate = useNavigate()
   const pathname = useLocation({ select: (location) => location.pathname })
   const needsSetup =
     viewer?.business?.setupDone === false && pathname !== '/setup'
+  const userGone = viewer === null
 
   // First run: sign in → Setup → Today.
   useEffect(() => {
     if (needsSetup) void navigate({ to: '/setup', replace: true })
   }, [needsSetup, navigate])
 
-  if (viewer === undefined || needsSetup) return <StartingUp />
-  if (!viewer?.business) return <ProfileError />
+  useEffect(() => {
+    if (userGone) onUserGone()
+  }, [userGone, onUserGone])
+
+  if (viewer === undefined || needsSetup || userGone) return <StartingUp />
+  if (!viewer.business) return <ProfileError />
   return (
     <ViewerProvider value={viewer}>
       <StartedUp />

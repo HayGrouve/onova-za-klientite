@@ -273,13 +273,17 @@ describe('export', () => {
   })
 })
 
-describe('delete the account', () => {
-  it('nothing remains after deletion; a shared business keeps going', async () => {
+describe('Изтрий данните', () => {
+  it('detaches the user at once, erases sole businesses, keeps shared ones', async () => {
     vi.stubEnv('ALLOW_SEED', 'true')
     const { t, owner, businessId } = await twoIvans()
     // A second business both users belong to stays, minus the leaver.
     await t.mutation(internal.seed.dev, {})
     await t.withIdentity(STRANGER).mutation(api.users.ensureCurrent, {})
+    await owner.mutation(api.push.subscribe, {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/1',
+      keys: { p256dh: 'p256dh-1', auth: 'auth' },
+    })
     const storageId = await storeBlob(t, 500, 'image/png')
     const { jobId } = await t.run(async (ctx) => ({
       jobId: (await ctx.db
@@ -294,8 +298,41 @@ describe('delete the account', () => {
       storageId,
       target: { kind: 'job', jobId },
     })
+    const ownerId = (await t.run(async (ctx) =>
+      ctx.db
+        .query('users')
+        .withIndex('by_clerk_user', (q) => q.eq('clerkUserId', OWNER.subject))
+        .unique(),
+    ))!._id
 
-    await owner.mutation(api.account.deleteAccount, {})
+    await owner.mutation(api.account.deleteMyData, {})
+
+    // Right away, before any batch runs: no user row, no push, no
+    // memberships, so the person is cut off everywhere.
+    const right = await t.run(async (ctx) => ({
+      owner: await ctx.db.get('users', ownerId),
+      push: await ctx.db.query('pushSubscriptions').collect(),
+      memberships: (await ctx.db.query('memberships').collect()).filter(
+        (membership) => membership.userId === ownerId,
+      ),
+      scheduled: (await ctx.db.system.query('_scheduled_functions').collect())
+        .filter((job) => job.state.kind === 'pending')
+        .map((job) => job.name),
+    }))
+    expect(right.owner).toBeNull()
+    expect(right.push).toEqual([])
+    expect(right.memberships).toEqual([])
+    // Only the batched erase is queued: nothing calls Clerk.
+    expect(new Set(right.scheduled)).toEqual(new Set(['account:deleteStep']))
+    expect(await owner.query(api.users.viewer, {})).toBeNull()
+
+    // Still signed in: the next load starts over with a fresh business.
+    await owner.mutation(api.users.ensureCurrent, {})
+    const fresh = await owner.query(api.users.viewer, {})
+    expect(fresh?.business?._id).toBeDefined()
+    expect(fresh?.business?._id).not.toBe(businessId)
+    expect(fresh?.business?.setupDone).toBe(false)
+
     // One step per table: the test scheduler gives up after about twenty
     // steps in a row, so it is asked again for each business.
     for (let round = 0; round < 4; round++) {
@@ -309,23 +346,55 @@ describe('delete the account', () => {
           (row) => (row as { businessId: string }).businessId === businessId,
         ).length
       }
+      const seeds = (await ctx.db.query('businesses').collect()).filter(
+        (business) => business.seedKey,
+      )
+      const seedMembers = (await ctx.db.query('memberships').collect()).filter(
+        (membership) =>
+          seeds.some((business) => business._id === membership.businessId),
+      )
       return {
         rows: result,
         business: await ctx.db.get('businesses', businessId),
-        owner: (await ctx.db.query('users').collect()).filter(
-          (user) => user.clerkUserId === OWNER.subject,
-        ),
-        seeds: (await ctx.db.query('businesses').collect()).filter(
-          (business) => business.seedKey,
-        ),
         storage: await ctx.db.system.query('_storage').collect(),
+        seeds,
+        seedMembers,
+        fresh: await ctx.db.get('businesses', fresh!.business!._id),
       }
     })
     expect(Object.values(left.rows).every((count) => count === 0)).toBe(true)
     expect(left.business).toBeNull()
-    expect(left.owner).toEqual([])
     expect(left.storage).toEqual([])
-    // The seed businesses have another member, so they stay.
+    // The seed businesses have another member, so they stay, with them.
     expect(left.seeds).toHaveLength(2)
+    expect(left.seedMembers.length).toBeGreaterThan(0)
+    expect(left.seedMembers.every((member) => member.userId !== ownerId)).toBe(
+      true,
+    )
+    // The eraser never touches the fresh start.
+    expect(left.fresh).not.toBeNull()
+  })
+
+  it('erases by Clerk subject, and an unknown subject is a no-op', async () => {
+    const t = setupConvex()
+    const { businessId } = await setupBusiness(t)
+    await t.mutation(internal.account.eraseByClerkUserId, {
+      clerkUserId: 'user_never_signed_in',
+    })
+    expect(await t.run((ctx) => ctx.db.query('users').collect())).toHaveLength(
+      1,
+    )
+
+    await t.mutation(internal.account.eraseByClerkUserId, {
+      clerkUserId: OWNER.subject,
+    })
+    await t.finishAllScheduledFunctions(() => {})
+    await t.finishAllScheduledFunctions(() => {})
+    const left = await t.run(async (ctx) => ({
+      users: await ctx.db.query('users').collect(),
+      business: await ctx.db.get('businesses', businessId),
+    }))
+    expect(left.users).toEqual([])
+    expect(left.business).toBeNull()
   })
 })

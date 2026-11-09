@@ -277,7 +277,7 @@ function DeleteBusiness() {
               disabled={!confirmed || busy}
             >
               {busy && <Spinner data-icon="inline-start" />}
-              {busy ? m.data_deleting() : m.data_delete_confirm()}
+              {busy ? m.data_deleting() : m.business_delete_confirm()}
             </Button>
             <Button
               type="button"

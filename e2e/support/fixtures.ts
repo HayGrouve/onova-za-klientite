@@ -1,7 +1,7 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright'
 import { expect, test as base } from '@playwright/test'
 import type { Browser, BrowserContextOptions, Page } from '@playwright/test'
-import { clerkUserExists, createTestUser, deleteClerkUser } from './clerk-api'
+import { createTestUser, deleteClerkUser } from './clerk-api'
 import type { TestUser } from './clerk-api'
 import { runSetup } from './app'
 import { MOBILE } from './device'
@@ -18,37 +18,41 @@ export async function signIn(page: Page, email: string) {
 }
 
 /**
- * Deletes the account the way a person would (Settings → Data, type ИЗТРИЙ),
- * which removes the user's businesses from Convex and then the Clerk user.
- * Whatever happens, the Clerk user is removed through the Backend API too.
+ * Wipes the user's data the way a person would (Settings, Data, type ИЗТРИЙ),
+ * which erases their businesses in Convex and keeps them signed in. The Clerk
+ * user is never deleted by the app (ADR 0012), so it goes through the Backend
+ * API, whatever happened before.
  */
-async function deleteAccount(
-  browser: Browser,
-  user: TestUser,
-  baseURL: string,
-) {
+export async function deleteMyData(page: Page) {
+  await page.goto('/settings/data')
+  // A business whose setup never finished sends every page to setup first.
+  const setupName = page.getByLabel('Име на бизнеса')
+  const confirm = page.getByLabel('Напиши ИЗТРИЙ, за да потвърдиш')
+  // Worker teardown gets Playwright's 5 s default, not the config's: a cold
+  // dev server needs more for a full load.
+  await expect(setupName.or(confirm)).toBeVisible({ timeout: 30_000 })
+  if (await setupName.isVisible()) {
+    await runSetup(page, {})
+    await page.goto('/settings/data')
+  }
+  await confirm.fill('ИЗТРИЙ')
+  await page.getByRole('button', { name: 'Изтрий данните' }).click()
+  await expect(page.getByText('Данните ти са изтрити.')).toBeVisible({
+    timeout: 15_000,
+  })
+  // Still signed in: the shell starts over on setup with a fresh business.
+  await page.waitForURL(/\/setup$/)
+}
+
+async function cleanUp(browser: Browser, user: TestUser, baseURL: string) {
   const context = await browser.newContext({ ...MOBILE, baseURL })
   try {
     const page = await context.newPage()
     await signIn(page, user.email)
-    await page.goto('/settings/data')
-    // A business whose setup never finished sends every page to setup first.
-    const setupName = page.getByLabel('Име на бизнеса')
-    const confirm = page.getByLabel('Напиши ИЗТРИЙ, за да потвърдиш')
-    await expect(setupName.or(confirm)).toBeVisible()
-    if (await setupName.isVisible()) {
-      await runSetup(page, {})
-      await page.goto('/settings/data')
-    }
-    await confirm.fill('ИЗТРИЙ')
-    await page.getByRole('button', { name: 'Изтрий завинаги' }).click()
-    // Convex deletes in batches and removes the Clerk user as its last step.
-    await expect
-      .poll(() => clerkUserExists(user.id), { timeout: 45_000 })
-      .toBe(false)
+    await deleteMyData(page)
   } catch (error) {
     console.warn(
-      `E2E cleanup: could not delete ${user.email} through the app.`,
+      `E2E cleanup: could not wipe the data of ${user.email} through the app.`,
       error instanceof Error ? error.message : error,
     )
   } finally {
@@ -108,7 +112,7 @@ export const test = base.extend<object, Worker>({
       } finally {
         for (const account of byFile.values()) {
           const created = await account.catch(() => null)
-          if (created) await deleteAccount(browser, created.user, baseURL)
+          if (created) await cleanUp(browser, created.user, baseURL)
         }
       }
     },

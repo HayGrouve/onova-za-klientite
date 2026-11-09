@@ -15,8 +15,11 @@ const app = defineApp({
     CLERK_AUTHORIZED_PARTIES: v.optional(v.string()),
     /** "true" on dev and preview deployments only. Never set on production. */
     ALLOW_SEED: v.optional(v.literal('true')),
-    /** Clerk Backend API key, to delete the Clerk user with the account. */
-    CLERK_SECRET_KEY: v.optional(v.string()),
+    /**
+     * The `whsec_` secret of Clerk's webhook endpoint for `/clerk/webhook`
+     * (`user.deleted`). Unset, the endpoint answers 503 (ADR 0012).
+     */
+    CLERK_WEBHOOK_SIGNING_SECRET: v.optional(v.string()),
     /** Web Push (ADR 0011). Optional, so a deployment without keys still runs. */
     VAPID_PUBLIC_KEY: v.optional(v.string()),
     VAPID_PRIVATE_KEY: v.optional(v.string()),
