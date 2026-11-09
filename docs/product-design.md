@@ -164,7 +164,7 @@ One settings page with short, separate sections. Nothing on it is required to st
 | Services & prices | The service list | 1 |
 | Reminders | The reminder rule and its interval | 1 |
 | Team | Members, roles, resources | 2 |
-| Data | Import, export, delete account and data | 1 |
+| Data | Import, export and **Изтрий данните**: wipes your data in this app and keeps you signed in. The Акаунт itself is deleted only on the hub, at `onovaza.com/akaunt` | 1 |
 | Run setup again | Re-opens the wizard with current answers filled in | 1 |
 
 ## Money
