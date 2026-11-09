@@ -172,7 +172,7 @@ test('deleting a business asks for its name, and only that one goes', async ({
   await page.goto('/settings/business')
   await page.getByRole('button', { name: 'Изтрий бизнеса…' }).click()
 
-  const typed = page.getByLabel(/напишете името на бизнеса/)
+  const typed = page.getByLabel(/напиши името на бизнеса/)
   const remove = page.getByRole('button', { name: 'Изтрий завинаги' })
   await typed.fill('Временен')
   await expect(remove).toBeDisabled()
