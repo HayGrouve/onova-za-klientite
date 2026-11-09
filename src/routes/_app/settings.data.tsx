@@ -7,6 +7,7 @@ import {
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvex, useMutation } from 'convex/react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
 import { ListCard } from '#/components/list-section'
@@ -18,9 +19,15 @@ import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
 import { canPickContact } from '#/lib/contacts'
 import { runChange } from '#/lib/change'
+import { akauntUrl } from '#/lib/env'
 import { errorMessage } from '#/lib/errors'
 import { buildExportZip } from '#/lib/export-zip'
 import { wipeSnapshots } from '#/lib/offline-store'
+import {
+  dropPushOnSignOut,
+  pushSwitchedOff,
+  rememberPushSwitch,
+} from '#/lib/push'
 import { m } from '#/paraglide/messages.js'
 import { todayInSofia } from '../../../shared/dates'
 
@@ -60,7 +67,7 @@ function DataSettings() {
         </li>
         {owner && <ExportRow />}
       </ListCard>
-      <DeleteAccount />
+      <DeleteMyData />
     </SettingsPage>
   )
 }
@@ -124,9 +131,14 @@ function ExportRow() {
   )
 }
 
-function DeleteAccount() {
-  const deleteAccount = useMutation(api.account.deleteAccount)
-  const { signOut } = useClerk()
+/**
+ * Remove project data (ADR 0012): wipes this app's data and keeps you signed in.
+ * The user row goes at once, so the shell starts over with a fresh business
+ * and setup (`_app.tsx`). The Akaunt itself is deleted only on the hub.
+ */
+function DeleteMyData() {
+  const deleteMyData = useMutation(api.account.deleteMyData)
+  const clerk = useClerk()
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const confirmed =
@@ -134,12 +146,13 @@ function DeleteAccount() {
   return (
     <section className="mx-4 mt-6 flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-card p-4 shadow-xs">
       <h2 className="font-semibold text-destructive">{m.data_delete()}</h2>
-      <p className="text-sm">{m.data_delete_body()}</p>
+      <p className="text-sm text-pretty">{m.data_delete_body()}</p>
       <Field>
         <FieldLabel htmlFor="delete-confirm">{m.data_delete_type()}</FieldLabel>
         <Input
           id="delete-confirm"
           name="delete-confirm"
+          autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
           value={typed}
@@ -152,18 +165,43 @@ function DeleteAccount() {
         disabled={!confirmed || busy}
         onClick={() => {
           setBusy(true)
+          // A fresh start has push off on this device: the server's
+          // subscriptions go with the data, and the shell must not subscribe
+          // again on its own while it starts over.
+          const pushWasOff = pushSwitchedOff()
+          rememberPushSwitch(false)
           void runChange(async () => {
-            await deleteAccount({})
+            try {
+              await deleteMyData({})
+            } catch (error) {
+              if (!pushWasOff) rememberPushSwitch(true)
+              throw error
+            }
             await wipeSnapshots()
-            await signOut()
+            // The rows are gone already, so only the browser unsubscribes.
+            await dropPushOnSignOut(async () => {})
           }).then((deleted) => {
-            if (!deleted.done) setBusy(false)
+            if (!deleted.done) {
+              setBusy(false)
+              return
+            }
+            toast.success(m.data_deleted())
           })
         }}
       >
         {busy && <Spinner data-icon="inline-start" />}
         {busy ? m.data_deleting() : m.data_delete_confirm()}
       </Button>
+      <p className="text-sm text-pretty text-muted-foreground">
+        {m.data_akaunt_before()}
+        <a
+          href={akauntUrl(clerk)}
+          className="font-medium text-foreground underline underline-offset-4 outline-none focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {m.data_akaunt_link()}
+        </a>
+        {m.data_akaunt_after()}
+      </p>
     </section>
   )
 }

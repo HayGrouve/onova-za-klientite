@@ -39,11 +39,6 @@ export async function createTestUser(): Promise<TestUser> {
   return { id: user.id, email }
 }
 
-export async function clerkUserExists(id: string): Promise<boolean> {
-  const response = await call(`/users/${id}`)
-  return response.status !== 404
-}
-
 /** Deletes the Clerk user. Already gone (404) counts as done. */
 export async function deleteClerkUser(id: string): Promise<void> {
   const response = await call(`/users/${id}`, { method: 'DELETE' })

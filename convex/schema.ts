@@ -459,11 +459,22 @@ export default defineSchema({
     .index('by_user', ['userId'])
     .index('by_endpoint', ['endpoint']),
 
-  // Deleting an account, or one business alone (D124): then there is no user.
+  // Erasing businesses in batches: Изтрий данните, `user.deleted` or one
+  // business alone (D124).
   deletionJobs: defineTable({
+    /** Left over from the old account deletion; nothing writes it (ADR 0012). */
     userId: v.optional(v.id('users')),
     businessIds: v.array(v.id('businesses')),
     table: v.string(),
     status: v.union(v.literal('running'), v.literal('done')),
   }),
+
+  // Clerk webhook deliveries already acted on, one row per `svix-id`, so a
+  // replay is ignored. Pruned after 30 days.
+  webhookEvents: defineTable({
+    eventId: v.string(),
+    processedAt: v.number(),
+  })
+    .index('by_event', ['eventId'])
+    .index('by_processed_at', ['processedAt']),
 })

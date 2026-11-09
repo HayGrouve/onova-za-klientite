@@ -25,4 +25,11 @@ crons.daily(
   {},
 )
 
+crons.daily(
+  'forget old webhook deliveries',
+  { hourUTC: 3, minuteUTC: 45 },
+  internal.account.pruneWebhookEvents,
+  {},
+)
+
 export default crons

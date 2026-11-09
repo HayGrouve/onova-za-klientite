@@ -314,7 +314,7 @@ const FIXTURES: Record<string, (ids: Ids) => Record<string, unknown>> = {
 /** Functions outside any business: they act only on the caller's own user. */
 const USER_SCOPED = [
   'businesses:createAnother',
-  'account:deleteAccount',
+  'account:deleteMyData',
   'push:subscribe',
   'push:unsubscribe',
   'users:ensureCurrent',

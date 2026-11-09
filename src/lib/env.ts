@@ -15,3 +15,17 @@ export const clerkPublishableKey = clean(
 export const vapidPublicKey = clean(
   import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined,
 )
+
+const akauntUrlFromEnv = clean(
+  import.meta.env.VITE_AKAUNT_URL as string | undefined,
+)
+
+/**
+ * Where the person manages their Akaunt (the shared sign-in): the hub's
+ * `https://onovaza.com/akaunt` in production (`VITE_AKAUNT_URL`). Unset (dev,
+ * previews), Clerk's Account Portal for the instance the app signs in with
+ * (ADR 0012).
+ */
+export function akauntUrl(clerk: { buildUserProfileUrl: () => string }) {
+  return akauntUrlFromEnv ?? clerk.buildUserProfileUrl()
+}
