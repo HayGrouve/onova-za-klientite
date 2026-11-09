@@ -35,7 +35,7 @@ test('"+" reads one line back and saves a job with its deposit', async ({
   ).toBeVisible()
 
   await page
-    .getByLabel('Запишете го като в тетрадка')
+    .getByLabel('Запиши го като в тетрадка')
     .fill('Иван Петров, гардероб, 950, капаро 300, до 20.10')
 
   const readBack = page
@@ -150,7 +150,7 @@ test('the calendar plans past the week, and "+" starts on its day', async ({
   await expect(page.getByText('Нищо за този ден.')).toBeVisible()
   await page.getByRole('link', { name: /^Добави: Поръчка за/ }).click()
 
-  const line = page.getByLabel('Запишете го като в тетрадка')
+  const line = page.getByLabel('Запиши го като в тетрадка')
   await line.fill('Мария Колева, шкаф, 500')
   const readBack = page
     .getByRole('heading', { name: 'Разбрах така' })
@@ -172,7 +172,7 @@ test('deleting a business asks for its name, and only that one goes', async ({
   await page.goto('/settings/business')
   await page.getByRole('button', { name: 'Изтрий бизнеса…' }).click()
 
-  const typed = page.getByLabel(/напишете името на бизнеса/)
+  const typed = page.getByLabel(/напиши името на бизнеса/)
   const remove = page.getByRole('button', { name: 'Изтрий завинаги' })
   await typed.fill('Временен')
   await expect(remove).toBeDisabled()

@@ -74,7 +74,7 @@ export async function runSetup(page: Page, answers: Answers) {
   }
 
   // 2. The word for a job
-  const jobTitle = 'Как наричате работата, която вършите за клиент?'
+  const jobTitle = 'Как наричаш работата, която вършиш за клиент?'
   await expect(page.getByText(jobTitle).first()).toBeVisible()
   if (answers.job === undefined) await skip(page).click()
   else {
@@ -82,14 +82,14 @@ export async function runSetup(page: Page, answers: Answers) {
       await choose(page, jobTitle, answers.job)
     } else {
       await choose(page, jobTitle, 'Друга дума')
-      await page.getByLabel('Вашата дума').fill(answers.job.own)
+      await page.getByLabel('Твоята дума').fill(answers.job.own)
       await page.getByLabel('Когато са няколко').fill(answers.job.plural)
     }
     await next(page).click()
   }
 
   // 3. One go or in stages
-  const flowTitle = 'Как протича работата ви обикновено?'
+  const flowTitle = 'Как протича работата ти обикновено?'
   await expect(page.getByText(flowTitle).first()).toBeVisible()
   if (answers.flow === undefined) await skip(page).click()
   else {
@@ -102,18 +102,18 @@ export async function runSetup(page: Page, answers: Answers) {
   }
 
   // 4. Something the client owns
-  const itemTitle = 'Работите ли върху нещо, което е на клиента?'
+  const itemTitle = 'Работиш ли върху нещо, което е на клиента?'
   await expect(page.getByText(itemTitle).first()).toBeVisible()
   if (answers.item === undefined) await skip(page).click()
   else {
     await choose(page, itemTitle, answers.item === false ? 'Не' : 'Да')
     if (answers.item !== false) {
-      const nameTitle = 'Как го наричате?'
+      const nameTitle = 'Как го наричаш?'
       if ('kind' in answers.item) {
         await choose(page, nameTitle, answers.item.kind)
       } else {
         await choose(page, nameTitle, 'Друго')
-        await page.getByLabel('Вашата дума').fill(answers.item.own)
+        await page.getByLabel('Твоята дума').fill(answers.item.own)
       }
     }
     await next(page).click()
@@ -121,7 +121,7 @@ export async function runSetup(page: Page, answers: Answers) {
 
   // 5. Deposits and costs (two questions on one screen)
   await expect(
-    page.getByText('Взимате ли капаро или аванс?').first(),
+    page.getByText('Взимаш ли капаро или аванс?').first(),
   ).toBeVisible()
   if (answers.deposits === undefined && answers.costs === undefined) {
     await skip(page).click()
@@ -129,14 +129,14 @@ export async function runSetup(page: Page, answers: Answers) {
     if (answers.deposits !== undefined) {
       await choose(
         page,
-        'Взимате ли капаро или аванс?',
+        'Взимаш ли капаро или аванс?',
         answers.deposits ? 'Да' : 'Не',
       )
     }
     if (answers.costs !== undefined) {
       await choose(
         page,
-        'Да следим ли разходите ви?',
+        'Да следим ли разходите ти?',
         answers.costs ? 'Да' : 'Не',
       )
     }
@@ -161,14 +161,14 @@ export async function runSetup(page: Page, answers: Answers) {
   }
 
   // 7. Services and 8. Import: skipped
-  await expect(page.getByText('Най-честите ви услуги и цени')).toBeVisible()
+  await expect(page.getByText('Най-честите ти услуги и цени')).toBeVisible()
   await skip(page).click()
   await expect(page.getByText('Откъде да вземем')).toBeVisible()
   await skip(page).click()
 
   // Review, then start
   await expect(
-    page.getByRole('heading', { name: 'Така ли работите?' }),
+    page.getByRole('heading', { name: 'Така ли работиш?' }),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Да, започвам' }).click()
   await expect(nav(page)).toBeVisible()
