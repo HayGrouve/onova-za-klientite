@@ -1,8 +1,15 @@
+import type { UserIdentity } from 'convex/server'
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
-import { findCurrentUser, findMembership, userMutation } from './lib/auth'
+import {
+  findCurrentUser,
+  findMembership,
+  findUser,
+  requireIdentity,
+  userMutation,
+} from './lib/auth'
 import { createBusiness } from './lib/createBusiness'
 import { fail } from './lib/errors'
 import { joinSeedBusinesses } from './lib/seedAccess'
@@ -10,6 +17,11 @@ import { vJobFlow, vModules, vRole, vWords } from './validators'
 
 function displayName(identity: { name?: string; email?: string }) {
   return identity.name?.trim() || identity.email?.split('@')[0] || ''
+}
+
+/** Under `customJwt` the photo arrives as the raw `picture` claim. */
+function pictureOf(identity: UserIdentity) {
+  return typeof identity.picture === 'string' ? identity.picture : undefined
 }
 
 /**
@@ -20,16 +32,15 @@ export const ensureCurrent = mutation({
   args: {},
   returns: v.id('users'),
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity()
-    if (!identity) fail('auth.signedOut')
+    const identity = await requireIdentity(ctx)
 
     const profile = {
       name: displayName(identity),
       email: identity.email,
-      imageUrl: identity.pictureUrl,
+      imageUrl: pictureOf(identity),
     }
 
-    const existing = await findCurrentUser(ctx)
+    const existing = await findUser(ctx, identity)
     if (existing) {
       if (
         existing.name !== profile.name ||
@@ -42,7 +53,6 @@ export const ensureCurrent = mutation({
     }
 
     const userId = await ctx.db.insert('users', {
-      tokenIdentifier: identity.tokenIdentifier,
       clerkUserId: identity.subject,
       ...profile,
     })

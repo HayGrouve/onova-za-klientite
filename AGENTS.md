@@ -41,13 +41,13 @@ Deploys: `vercel.json` runs `scripts/vercel-build.sh` (`npx convex deploy --cmd 
 
 Env:
 - `.env.local` gets `CONVEX_DEPLOYMENT` and `VITE_CONVEX_URL` from `npx convex deployment select`, and the Clerk keys from `clerk env pull`.
-- Convex env (`npx convex env list`): `CLERK_JWT_ISSUER_DOMAIN`, and `ALLOW_SEED=true` on dev and preview only. Both are also project defaults for new dev and preview deployments (`npx convex env default list --type preview`). Production never gets `ALLOW_SEED`.
+- Convex env (`npx convex env list`): `CLERK_JWT_ISSUER_DOMAIN`, and `ALLOW_SEED=true` on dev and preview only. Both are also project defaults for new dev and preview deployments (`npx convex env default list --type preview`). Production never gets `ALLOW_SEED`. `CLERK_AUTHORIZED_PARTIES` (comma separated origins a token's `azp` must match) is set on production only, last at the cutover; while it is set, "run as user" in the Convex dashboard needs `"azp"` in the identity JSON (ADR 0012).
 - Web Push (ADR 0011): `.env.local` also gets `VITE_VAPID_PUBLIC_KEY`, the public VAPID key (not a secret), which must match the Convex env `VAPID_PUBLIC_KEY`. Convex env also holds `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a `mailto:` address) and `APP_URL` (the app's https origin, for push links). Without them nothing is sent. Push works only in production builds (`pnpm build && pnpm preview`), where the service worker is registered.
 - Never print a secret or commit an `.env*` file.
 
 Sign-in:
 - Clerk app "Onova za Klientite", development instance. Google and email code only; passwords and passkeys are off.
-- Clerk's session token carries `aud: "convex"` (set with `clerk config patch`), which is what Clerk's Convex integration does, so no JWT template is needed.
+- Clerk's session token carries `aud: "convex"` (set with `clerk config patch`), so no JWT template is needed. Convex reads it as a `customJwt` provider (`convex/auth.config.ts`), which passes `azp` and `picture` through, and finds users by the Clerk subject (ADR 0012).
 - Test users: `owner+clerk_test@example.com` and `new+clerk_test@example.com`, code `424242`. New `+clerk_test` users are created with `clerk users create`, because sign-up has a captcha that a headless browser can't pass.
 - On dev and preview deployments, every user who signs in also joins the two seed businesses, so the switcher appears.
 

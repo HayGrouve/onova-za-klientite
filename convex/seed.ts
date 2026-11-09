@@ -165,7 +165,6 @@ async function findOrCreate(
   const owner =
     ownerId ??
     (await ctx.db.insert('users', {
-      tokenIdentifier: `seed|${seed.key}`,
       clerkUserId: `seed_${seed.key}`,
       name: seed.settings.name,
     }))
@@ -461,7 +460,7 @@ async function runSeed(ctx: MutationCtx) {
   if (!seedAllowed()) fail('seed.notAllowed')
   const users = await ctx.db.query('users').collect()
   const realUsers = users.filter(
-    (user) => !user.tokenIdentifier.startsWith('seed|'),
+    (user) => !user.clerkUserId.startsWith('seed_'),
   )
   const businessIds = []
   for (const seed of SEED_BUSINESSES) {

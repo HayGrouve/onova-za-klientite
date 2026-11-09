@@ -28,10 +28,14 @@ export function setupConvex() {
 
 export type TestConvex = ReturnType<typeof setupConvex>
 
+/** The origin the test tokens were asked for (`azp`, ADR 0012). */
+export const APP_ORIGIN = 'https://klientite.test'
+
 export const OWNER = {
   subject: 'user_owner',
   issuer: 'https://clerk.test',
   tokenIdentifier: 'https://clerk.test|user_owner',
+  azp: APP_ORIGIN,
   name: 'Иван Стоянов',
   email: 'ivan@example.com',
 }
@@ -40,6 +44,7 @@ export const STRANGER = {
   subject: 'user_stranger',
   issuer: 'https://clerk.test',
   tokenIdentifier: 'https://clerk.test|user_stranger',
+  azp: APP_ORIGIN,
   name: 'Непознат',
   email: 'stranger@example.com',
 }
@@ -249,9 +254,7 @@ export async function addMember(
   const membershipId = await t.run(async (ctx) => {
     const user = (await ctx.db
       .query('users')
-      .withIndex('by_token', (q) =>
-        q.eq('tokenIdentifier', identity.tokenIdentifier),
-      )
+      .withIndex('by_clerk_user', (q) => q.eq('clerkUserId', identity.subject))
       .unique())!
     return await ctx.db.insert('memberships', {
       businessId: b.businessId,

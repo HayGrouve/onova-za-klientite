@@ -5,8 +5,14 @@ import { v } from 'convex/values'
 
 const app = defineApp({
   env: {
-    /** Clerk's Frontend API URL, e.g. https://….clerk.accounts.dev (ADR 0003). */
+    /** Clerk's Frontend API URL, e.g. https://….clerk.accounts.dev (ADR 0012). */
     CLERK_JWT_ISSUER_DOMAIN: v.string(),
+    /**
+     * Comma separated origins a token's `azp` must match, e.g.
+     * https://klientite.onovaza.com. Production only, set last at the cutover;
+     * unset on dev and previews, where `azp` isn't checked (ADR 0012).
+     */
+    CLERK_AUTHORIZED_PARTIES: v.optional(v.string()),
     /** "true" on dev and preview deployments only. Never set on production. */
     ALLOW_SEED: v.optional(v.literal('true')),
     /** Clerk Backend API key, to delete the Clerk user with the account. */
