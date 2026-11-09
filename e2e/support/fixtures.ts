@@ -34,7 +34,7 @@ async function deleteAccount(
     await page.goto('/settings/data')
     // A business whose setup never finished sends every page to setup first.
     const setupName = page.getByLabel('Име на бизнеса')
-    const confirm = page.getByLabel('Напишете ИЗТРИЙ, за да потвърдите')
+    const confirm = page.getByLabel('Напиши ИЗТРИЙ, за да потвърдиш')
     await expect(setupName.or(confirm)).toBeVisible()
     if (await setupName.isVisible()) {
       await runSetup(page, {})

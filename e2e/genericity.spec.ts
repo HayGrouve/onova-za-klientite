@@ -98,7 +98,7 @@ async function addJobWithOneLine(page: Page, b: Business) {
     page.getByRole('heading', { name: 'Какво записваме?' }),
   ).toBeVisible()
 
-  await page.getByLabel('Запишете го като в тетрадка').fill(b.line)
+  await page.getByLabel('Запиши го като в тетрадка').fill(b.line)
   const readBack = page
     .getByRole('heading', { name: 'Разбрах така' })
     .locator('..')
