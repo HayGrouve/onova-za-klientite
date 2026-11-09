@@ -28,14 +28,18 @@ export async function deleteMyData(page: Page) {
   // A business whose setup never finished sends every page to setup first.
   const setupName = page.getByLabel('Име на бизнеса')
   const confirm = page.getByLabel('Напиши ИЗТРИЙ, за да потвърдиш')
-  await expect(setupName.or(confirm)).toBeVisible()
+  // Worker teardown gets Playwright's 5 s default, not the config's: a cold
+  // dev server needs more for a full load.
+  await expect(setupName.or(confirm)).toBeVisible({ timeout: 30_000 })
   if (await setupName.isVisible()) {
     await runSetup(page, {})
     await page.goto('/settings/data')
   }
   await confirm.fill('ИЗТРИЙ')
   await page.getByRole('button', { name: 'Изтрий данните' }).click()
-  await expect(page.getByText('Данните ти са изтрити.')).toBeVisible()
+  await expect(page.getByText('Данните ти са изтрити.')).toBeVisible({
+    timeout: 15_000,
+  })
   // Still signed in: the shell starts over on setup with a fresh business.
   await page.waitForURL(/\/setup$/)
 }
