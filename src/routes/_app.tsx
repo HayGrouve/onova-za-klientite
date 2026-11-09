@@ -4,6 +4,7 @@ import {
   useLocation,
   useNavigate,
 } from '@tanstack/react-router'
+import { useAuth, useClerk } from '@clerk/tanstack-react-start'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../convex/_generated/api'
@@ -11,9 +12,11 @@ import { AppShell } from '#/components/app-shell'
 import { SnapshotKeeper } from '#/components/offline/snapshot-keeper'
 import { StartedUp, StartingUp } from '#/components/offline/starting-up'
 import { CenteredMessage } from '#/components/centered-message'
+import { StartPage } from '#/components/start-page'
 import { PushKeeper } from '#/components/push-keeper'
 import { Button } from '#/components/ui/button'
 import { ViewerProvider } from '#/hooks/use-viewer'
+import { signInReturnUrl } from '#/lib/safe-redirect'
 import { m } from '#/paraglide/messages.js'
 
 export const Route = createFileRoute('/_app')({ component: SignedInLayout })
@@ -29,24 +32,38 @@ function ProfileError() {
   )
 }
 
-/** Route guards are client-side (ADR 0001). Convex does the real checks (ADR 0006). */
+/**
+ * Route guards are client-side (ADR 0001). Convex does the real checks (ADR
+ * 0006). Signed out, `/` is the start page and any other page goes straight
+ * to sign-in, which brings the person back to it (ADR 0012).
+ */
 function SignedInLayout() {
   const { isLoading, isAuthenticated } = useConvexAuth()
-  const navigate = useNavigate()
+  const { isSignedIn } = useAuth()
+  const clerk = useClerk()
+  const onStart = useLocation({
+    select: (location) => location.pathname === '/',
+  })
+  const signedOut = !isLoading && !isAuthenticated && !isSignedIn
+  // Clerk has a session that Convex turned down: sending the person to
+  // sign-in would only bounce them back here, again and again.
+  const refused = !isLoading && !isAuthenticated && isSignedIn === true
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      // Read the address once: depending on the router's location would
-      // re-run this while the redirect itself is pending.
-      const { pathname, search } = window.location
-      void navigate({
-        to: '/login',
-        search: { redirect: pathname + search },
-        replace: true,
-      })
-    }
-  }, [isLoading, isAuthenticated, navigate])
+    if (!signedOut || onStart) return
+    // Read the address once: depending on the router's location would
+    // re-run this while the redirect itself is pending.
+    const { pathname, search, hash } = window.location
+    void clerk.redirectToSignIn({
+      redirectUrl: signInReturnUrl(
+        pathname + search + hash,
+        window.location.origin,
+      ),
+    })
+  }, [signedOut, onStart, clerk])
 
+  if (refused) return <ProfileError />
+  if (signedOut && onStart) return <StartPage />
   if (isLoading || !isAuthenticated) return <StartingUp />
   return <EnsureUser />
 }

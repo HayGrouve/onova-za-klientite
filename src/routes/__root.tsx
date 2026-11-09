@@ -9,6 +9,7 @@ import { AppProviders } from '#/integrations/providers'
 import { loadLastSnapshot } from '#/lib/offline-store'
 import type { SavedSnapshot } from '#/lib/offline-store'
 import { ErrorView } from '#/components/error-view'
+import { OfflineStartPage } from '#/components/start-page'
 import { ServiceWorkerRegister } from '#/components/service-worker-register'
 import { Toaster } from '#/components/ui/sonner'
 import { TOAST_MOBILE_OFFSET, TOAST_OFFSET } from '#/lib/toast-layout'
@@ -94,7 +95,11 @@ function RootLayout() {
   }, [])
   if (mode === 'pending') return null
   if (mode === 'offline') {
-    return saved === undefined ? null : (
+    if (saved === undefined) return null
+    // Nothing saved on this device: the start page, since Clerk can't load
+    // offline to say who this is.
+    if (saved === null) return <OfflineStartPage />
+    return (
       <Suspense fallback={null}>
         <OfflineApp saved={saved} />
       </Suspense>

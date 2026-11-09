@@ -17,6 +17,7 @@ export function SettingsPage({
   preview,
   previewWideOnly = false,
   previewScrolls = false,
+  footer,
   children,
 }: {
   title: string
@@ -26,6 +27,8 @@ export function SettingsPage({
   previewWideOnly?: boolean
   /** A tall preview that shows in full scrolls away with the page on a phone, not pinned over the controls. */
   previewScrolls?: boolean
+  /** Below the content, such as the legal links on Data. */
+  footer?: React.ReactNode
   children: React.ReactNode
 }) {
   usePageTitle(title)
@@ -92,6 +95,7 @@ export function SettingsPage({
       ) : (
         children
       )}
+      {footer}
     </div>
   )
 }

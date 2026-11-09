@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { toastError } from '#/lib/toast-error'
 import { api } from '../../../convex/_generated/api'
+import { LegalLinks } from '#/components/legal-links'
 import { ListCard } from '#/components/list-section'
 import { SettingsPage } from '#/components/settings/settings-page'
 import { Button } from '#/components/ui/button'
@@ -39,7 +40,10 @@ function DataSettings() {
   const { business } = useViewer()
   const owner = business.role === 'owner'
   return (
-    <SettingsPage title={m.settings_data()}>
+    <SettingsPage
+      title={m.settings_data()}
+      footer={<LegalLinks className="px-4" />}
+    >
       <ListCard>
         <li>
           <Link

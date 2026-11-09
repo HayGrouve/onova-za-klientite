@@ -1,17 +1,14 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-/** Opens Settings (from the account menu, or the back link inside a section). */
+/** Opens Settings from the gear in the phone's header. */
 export async function openSettings(page: Page) {
   const heading = page.getByRole('heading', { name: 'Настройки', level: 1 })
   if (await heading.isVisible()) return
-  const back = page.getByRole('link', { name: 'Настройки', exact: true })
-  if (await back.isVisible()) {
-    await back.click()
-  } else {
-    await page.getByRole('button', { name: 'Профил' }).click()
-    await page.getByRole('menuitem', { name: 'Настройки' }).click()
-  }
+  await page
+    .getByRole('banner')
+    .getByRole('link', { name: 'Настройки' })
+    .click()
   await expect(heading).toBeVisible()
 }
 

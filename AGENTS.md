@@ -48,6 +48,7 @@ Env:
 
 Sign-in:
 - Clerk app "Onova za Klientite", development instance. Google and email code only; passwords and passkeys are off.
+- No Clerk UI renders in the app (ADR 0012). Signed out, `/` is the start page and any other page goes straight to sign-in with itself as an absolute `redirect_url`; `/login` only redirects there, for old bookmarks. Sign-in is `VITE_CLERK_SIGN_IN_URL` / `VITE_CLERK_SIGN_UP_URL` (`https://onovaza.com/vhod` on Vercel Production after the cutover, absolute only) and, unset, the Clerk instance's Account Portal (dev, previews). The avatar menu's Акаунт link is `VITE_AKAUNT_URL` (`https://onovaza.com/akaunt` after the cutover), unset the Account Portal's `/user` page. All three are read in `src/lib/env.ts`; none is set anywhere yet.
 - Clerk's session token carries `aud: "convex"` (set with `clerk config patch`), so no JWT template is needed. Convex reads it as a `customJwt` provider (`convex/auth.config.ts`), which passes `azp` and `picture` through, and finds users by the Clerk subject (ADR 0012).
 - Test users: `owner+clerk_test@example.com` and `new+clerk_test@example.com`, code `424242`. New `+clerk_test` users are created with `clerk users create`, because sign-up has a captcha that a headless browser can't pass.
 - On dev and preview deployments, every user who signs in also joins the two seed businesses, so the switcher appears.

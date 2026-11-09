@@ -9,7 +9,8 @@ import { MOBILE } from './device'
 /** Signs the page in as the Clerk test user (email code 424242, no real mail). */
 export async function signIn(page: Page, email: string) {
   await setupClerkTestingToken({ page })
-  await page.goto('/login')
+  // Any page that loads Clerk: signed out, `/` is the start page.
+  await page.goto('/')
   await clerk.signIn({
     page,
     signInParams: { strategy: 'email_code', identifier: email },

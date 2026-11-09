@@ -9,6 +9,7 @@ import {
   SignOutIcon,
   StorefrontIcon,
   SunIcon,
+  UserCircleIcon,
   UsersIcon,
   WalletIcon,
 } from '@phosphor-icons/react'
@@ -44,6 +45,7 @@ import { Tip } from '#/components/tip'
 import { buttonVariants } from '#/components/ui/button'
 import { TooltipProvider } from '#/components/ui/tooltip'
 import { runChange } from '#/lib/change'
+import { akauntUrl } from '#/lib/env'
 import { initials } from '#/lib/initials'
 import { wipeSnapshots } from '#/lib/offline-store'
 import { dropPushOnSignOut } from '#/lib/push'
@@ -310,6 +312,9 @@ function SidebarLink({
   )
 }
 
+const HEADER_ICON_LINK =
+  'flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:bg-primary/12 data-[status=active]:text-primary'
+
 /** The phone's top bar. A wide screen has all of this in the sidebar. */
 function AppHeader() {
   return (
@@ -320,9 +325,20 @@ function AppHeader() {
           <Link
             to="/search"
             aria-label={m.search_open()}
-            className="flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-[status=active]:bg-primary/12 data-[status=active]:text-primary"
+            className={HEADER_ICON_LINK}
           >
             <MagnifyingGlassIcon className="size-6" />
+          </Link>
+        </Tip>
+        {/* The avatar menu holds only the Akaunt and sign-out, so Settings
+            has its own way in on the phone (the sidebar has its link). */}
+        <Tip label={m.account_settings()}>
+          <Link
+            to="/settings"
+            aria-label={m.account_settings()}
+            className={HEADER_ICON_LINK}
+          >
+            <GearSixIcon className="size-6" />
           </Link>
         </Tip>
         <AccountMenu />
@@ -390,12 +406,13 @@ export function BusinessSwitcher() {
 }
 
 /**
- * The profile menu: settings and sign out. On the phone it is the avatar in
- * the header; in the sidebar (`wide`) it also shows the name and email.
+ * The Akaunt menu: a link to the shared Akaunt and sign out, nothing else
+ * (ADR 0012). On the phone it is the avatar in the header; in the sidebar
+ * (`wide`) it also shows the name and email.
  */
 function AccountMenu({ wide = false }: { wide?: boolean }) {
   const { user } = useViewer()
-  const { signOut } = useClerk()
+  const clerk = useClerk()
   const removePush = useMutation(api.push.unsubscribe)
   const avatar = (
     <Avatar className="ring-2 ring-background">
@@ -450,16 +467,20 @@ function AccountMenu({ wide = false }: { wide?: boolean }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="min-h-11" render={<Link to="/settings" />}>
-          <GearSixIcon />
-          {m.account_settings()}
+        <DropdownMenuItem
+          className="min-h-11"
+          render={<a href={akauntUrl(clerk)} />}
+        >
+          <UserCircleIcon />
+          {m.account_akaunt()}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="min-h-11"
           onClick={() =>
+            // Signing out lands on the start page (`afterSignOutUrl`).
             void dropPushOnSignOut((endpoint) => removePush({ endpoint }))
               .then(() => wipeSnapshots())
-              .then(() => signOut())
+              .then(() => clerk.signOut())
           }
         >
           <SignOutIcon />
