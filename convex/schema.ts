@@ -27,13 +27,15 @@ import {
 export default defineSchema({
   // ── People and access ───────────────────────────────────────────────
   users: defineTable({
-    tokenIdentifier: v.string(),
+    /** Left over from the old lookup; nothing reads it (ADR 0012). */
+    tokenIdentifier: v.optional(v.string()),
+    /** The Clerk subject: how a signed-in user is found (ADR 0012). */
     clerkUserId: v.string(),
     name: v.string(),
     email: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     activeBusinessId: v.optional(v.id('businesses')),
-  }).index('by_token', ['tokenIdentifier']),
+  }).index('by_clerk_user', ['clerkUserId']),
 
   businesses: defineTable({
     name: v.string(),

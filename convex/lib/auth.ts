@@ -5,30 +5,70 @@ import {
   customMutation,
   customQuery,
 } from 'convex-helpers/server/customFunctions'
-import { mutation, query } from '../_generated/server'
+import type { UserIdentity } from 'convex/server'
+import { env, mutation, query } from '../_generated/server'
 import type { Doc, Id, TableNames } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { fail } from './errors'
 
 type Role = Doc<'memberships'>['role']
 
-export async function findCurrentUser(
-  ctx: QueryCtx,
-): Promise<Doc<'users'> | null> {
+/**
+ * The origins a token's `azp` must match, from `CLERK_AUTHORIZED_PARTIES`
+ * (comma separated). Empty when unset or blank, which means no check: dev and
+ * previews never set it (ADR 0012).
+ */
+function authorizedParties(): string[] {
+  return (env.CLERK_AUTHORIZED_PARTIES ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter((origin) => origin !== '')
+}
+
+/**
+ * The caller's identity, or null when signed out. When authorized parties are
+ * set, a token whose `azp` (the page origin that asked for it) is missing or
+ * not listed counts as signed out, so another онова за subdomain's token is
+ * refused here. Every read of the identity goes through this (ADR 0006).
+ */
+export async function getIdentity(ctx: QueryCtx): Promise<UserIdentity | null> {
   const identity = await ctx.auth.getUserIdentity()
   if (!identity) return null
+  const allowed = authorizedParties()
+  if (allowed.length === 0) return identity
+  const azp = identity.azp
+  if (typeof azp !== 'string' || !allowed.includes(azp)) return null
+  return identity
+}
+
+export async function requireIdentity(ctx: QueryCtx): Promise<UserIdentity> {
+  const identity = await getIdentity(ctx)
+  if (!identity) fail('auth.signedOut')
+  return identity
+}
+
+/** The user row for an identity, found by its Clerk subject (ADR 0012). */
+export async function findUser(
+  ctx: QueryCtx,
+  identity: UserIdentity,
+): Promise<Doc<'users'> | null> {
   return await ctx.db
     .query('users')
-    .withIndex('by_token', (q) =>
-      q.eq('tokenIdentifier', identity.tokenIdentifier),
-    )
+    .withIndex('by_clerk_user', (q) => q.eq('clerkUserId', identity.subject))
     .unique()
 }
 
+export async function findCurrentUser(
+  ctx: QueryCtx,
+): Promise<Doc<'users'> | null> {
+  const identity = await getIdentity(ctx)
+  if (!identity) return null
+  return await findUser(ctx, identity)
+}
+
 async function requireUser(ctx: QueryCtx): Promise<Doc<'users'>> {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) fail('auth.signedOut')
-  const user = await findCurrentUser(ctx)
+  const identity = await requireIdentity(ctx)
+  const user = await findUser(ctx, identity)
   if (!user) fail('auth.noUser')
   return user
 }

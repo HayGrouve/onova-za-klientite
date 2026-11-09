@@ -56,11 +56,11 @@ A draft for review. Final validators land in milestone 2. All amounts are intege
 ```ts
 // ── People and access ──────────────────────────────────────────────────
 users: {
-  tokenIdentifier: string            // issuer|subject, from ctx.auth
-  clerkUserId: string                // subject, for Clerk Backend API calls (account deletion)
+  tokenIdentifier?: string           // left over, nothing reads it (ADR 0012)
+  clerkUserId: string                // the Clerk subject: how a user is found (ADR 0012)
   name: string, email?: string, imageUrl?: string
   activeBusinessId?: Id<"businesses">
-}  .index("by_token", ["tokenIdentifier"])
+}  .index("by_clerk_user", ["clerkUserId"])
 
 businesses: {
   name: string, logoFileId?: Id<"files">
