@@ -27,12 +27,12 @@ export function contentSecurityPolicy(publishableKey: string | undefined) {
   const clerk = `https://${clerkFrontendHost(publishableKey) ?? DEVELOPMENT_CLERK_HOST}`
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${clerk} https://challenges.cloudflare.com`,
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${clerk}`,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     `img-src 'self' data: blob: https://img.clerk.com ${clerk} https://*.convex.cloud`,
     `connect-src 'self' data: blob: https://*.convex.cloud wss://*.convex.cloud ${clerk} https://clerk-telemetry.com`,
-    `frame-src https://challenges.cloudflare.com ${clerk}`,
+    `frame-src ${clerk}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",

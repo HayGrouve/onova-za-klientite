@@ -67,6 +67,18 @@ describe('contentSecurityPolicy', () => {
     expect(policy).not.toContain('clerk.accounts.dev')
   })
 
+  it('names the shared production instance for its live key', () => {
+    const policy = contentSecurityPolicy(key('pk_live_', 'clerk.onovaza.com'))
+    for (const name of ['script-src', 'connect-src', 'frame-src', 'img-src']) {
+      expect(directive(policy, name)).toContain('https://clerk.onovaza.com')
+    }
+  })
+
+  it('loads nothing from Cloudflare: no Clerk sign-up widget renders here', () => {
+    const policy = contentSecurityPolicy(key('pk_live_', 'clerk.onovaza.com'))
+    expect(policy).not.toContain('challenges.cloudflare.com')
+  })
+
   it('falls back to the development wildcard when there is no usable key', () => {
     for (const none of [undefined, '', 'garbage']) {
       const policy = contentSecurityPolicy(none)
@@ -86,12 +98,6 @@ describe('contentSecurityPolicy', () => {
   it('keeps the sources that do not depend on the instance', () => {
     const policy = contentSecurityPolicy(key('pk_live_', 'clerk.example.bg'))
     expect(directive(policy, 'img-src')).toContain('https://img.clerk.com')
-    expect(directive(policy, 'script-src')).toContain(
-      'https://challenges.cloudflare.com',
-    )
-    expect(directive(policy, 'frame-src')).toContain(
-      'https://challenges.cloudflare.com',
-    )
     expect(directive(policy, 'connect-src')).toContain(
       'https://clerk-telemetry.com',
     )

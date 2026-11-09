@@ -1,33 +1,17 @@
 import { ClerkProvider, useAuth } from '@clerk/tanstack-react-start'
 import { ConvexReactClient } from 'convex/react'
 import { ConvexProviderWithClerk } from 'convex/react-clerk'
-import { clerkPublishableKey, convexUrl } from '#/lib/env'
-import { clerkLocalization } from '#/integrations/clerk-localization'
+import {
+  clerkPublishableKey,
+  clerkSignInUrl,
+  clerkSignUpUrl,
+  convexUrl,
+} from '#/lib/env'
 import { SnapshotWiper } from '#/components/offline/snapshot-wiper'
 import { CenteredMessage } from '#/components/centered-message'
 import { m } from '#/paraglide/messages.js'
 
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null
-
-// The app's own theme variables, so sign-in follows light and dark with it.
-const CLERK_APPEARANCE = {
-  variables: {
-    colorPrimary: 'var(--primary)',
-    colorPrimaryForeground: 'var(--primary-foreground)',
-    colorBackground: 'var(--card)',
-    colorForeground: 'var(--foreground)',
-    colorMuted: 'var(--muted)',
-    colorMutedForeground: 'var(--muted-foreground)',
-    colorInput: 'var(--background)',
-    colorInputForeground: 'var(--foreground)',
-    colorBorder: 'var(--border)',
-    colorNeutral: 'var(--foreground)',
-    colorRing: 'var(--ring)',
-    colorDanger: 'var(--destructive)',
-    fontFamily: "'Onest Variable', system-ui, sans-serif",
-    borderRadius: '0.75rem',
-  },
-}
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   if (!convex) {
@@ -45,12 +29,14 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     )
   }
   return (
+    // No Clerk UI renders here: sign-in is the hub's page in production and
+    // Clerk's Account Portal elsewhere (ADR 0012). A prop beats the env in
+    // this SDK, so the URLs are passed only when set.
     <ClerkProvider
       publishableKey={clerkPublishableKey}
-      localization={clerkLocalization}
-      appearance={CLERK_APPEARANCE}
-      signInUrl="/login"
-      afterSignOutUrl="/login"
+      {...(clerkSignInUrl ? { signInUrl: clerkSignInUrl } : {})}
+      {...(clerkSignUpUrl ? { signUpUrl: clerkSignUpUrl } : {})}
+      afterSignOutUrl="/"
       allowedRedirectOrigins={
         typeof window === 'undefined' ? [] : [window.location.origin]
       }

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { BusinessSwitcher } from '#/components/app-shell'
+import { LEGAL_URLS } from '#/components/legal-links'
 import { JobFormPreview } from '#/components/setup/job-form-preview'
 import { SetupChanges } from '#/components/setup/setup-changes'
 import { STEP_BODY } from '#/components/setup/steps'
@@ -270,6 +271,20 @@ export function SetupWizard({
                   ? m.setup_review_save()
                   : m.setup_review_start()}
             </Button>
+            {!current.setupDone && (
+              <p className="text-center text-sm text-pretty text-muted-foreground">
+                {m.setup_legal_before()}
+                <a
+                  href={LEGAL_URLS.processing}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-foreground underline underline-offset-4 outline-none focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  {m.setup_legal_link()}
+                </a>
+                {m.setup_legal_after()}
+              </p>
+            )}
           </div>
         )}
       </section>

@@ -18,3 +18,12 @@ export function safeRedirect(value: unknown): string {
     return '/'
   }
 }
+
+/**
+ * The absolute `redirect_url` to hand to sign-in: this app's origin plus a
+ * safe path. Sign-in runs on another host (the hub's Vhod page or Clerk's
+ * Account Portal), where a bare path would point at that host instead.
+ */
+export function signInReturnUrl(value: unknown, origin: string): string {
+  return new URL(safeRedirect(value), origin).href
+}

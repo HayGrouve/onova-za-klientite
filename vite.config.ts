@@ -9,7 +9,6 @@ import {
   clerkFrontendHost,
   contentSecurityPolicy,
 } from './build/content-security-policy.ts'
-import { trimClerkBundle } from './build/clerk-localization.ts'
 import { serviceWorker } from './build/service-worker.ts'
 import { vendorGuard } from './build/vendor-guard.ts'
 
@@ -118,7 +117,6 @@ export default defineConfig(({ mode }) => {
         emitTsDeclarations: true,
       }),
       tailwindcss(),
-      trimClerkBundle(),
       tanstackStart({ spa: { enabled: true } }),
       // Nitro's server runtime is for dev and build only. Under Vitest it loads
       // CJS React in an ESM runner and keeps the process alive.

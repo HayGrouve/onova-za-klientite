@@ -5,6 +5,7 @@ import {
   createFileRoute,
   useLocation,
 } from '@tanstack/react-router'
+import { LegalLinks } from '#/components/legal-links'
 import { settingsGroups, useAddBusiness } from '#/components/settings/sections'
 import { Spinner } from '#/components/ui/spinner'
 import { useViewer } from '#/hooks/use-viewer'
@@ -102,6 +103,7 @@ function SettingsMenu() {
         )}
         <span className="truncate">{m.business_add()}</span>
       </button>
+      <LegalLinks className="mt-4 px-3 [&_a]:min-h-8 [&_ul]:text-xs" />
     </nav>
   )
 }

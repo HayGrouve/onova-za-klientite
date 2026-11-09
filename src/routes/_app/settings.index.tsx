@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { settingsGroups, useAddBusiness } from '#/components/settings/sections'
 import type { SettingsSection } from '#/components/settings/sections'
 import { Spinner } from '#/components/ui/spinner'
+import { LegalLinks } from '#/components/legal-links'
 import { ListCard } from '#/components/list-section'
 import { PageTitle } from '#/components/page'
 import { useViewer } from '#/hooks/use-viewer'
@@ -79,6 +80,7 @@ function SettingsIndex() {
           </section>
         ))}
       </div>
+      <LegalLinks className="mt-4 px-4 pb-6" />
     </>
   )
 }
