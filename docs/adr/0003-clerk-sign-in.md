@@ -1,6 +1,6 @@
 # ADR 0003: Clerk for sign-in
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 0012](./0012-shared-akaunt.md)
 
 ## Context
 

@@ -22,9 +22,21 @@ Each term below gives the English name used in code and docs, then the Bulgarian
 The workspace that owns every other record. A person can belong to several businesses and switch between them. Only its Owner can delete it, by typing its name; everything in it goes too.
 _Avoid_: company, account, organisation, workspace, tenant
 
-**User** · UI: _Профил_
-A person who signs in. A user takes part in a business only through a Membership.
-_Avoid_: member, owner (those are Memberships), customer
+**User** · UI: _Акаунт_
+A person who signs in with their онова за Акаунт, the identity shared by every онова за project (ADR 0012). Here a user takes part in a business only through a Membership.
+_Avoid_: профил, регистрация, member, owner (those are Memberships), customer
+
+**Sign-in** · UI: _Вход_
+Signing in to your Акаунт, on the hub's `onovaza.com/vhod`. A new email creates the Акаунт in the same step, so there is no separate sign-up.
+_Avoid_: регистрация, sign-up, логин
+
+**Sign-out** · UI: _Изход_
+Leaving your Акаунт. It signs you out of every онова за project at once.
+_Avoid_: logout
+
+**Remove project data** · UI: _Изтрий данните_
+Wipes what this app holds about you: the businesses you are alone in, with every record, and your place in shared ones. Your Акаунт stays and you stay signed in. Deleting the Акаунт itself (_Изтрий Акаунта_) happens only on the hub.
+_Avoid_: изтрий профила, изтрий акаунта, delete account
 
 **Membership** · UI: _Член на екипа_
 A user's place in one business, with one Role. Deactivated, never deleted, so history keeps the name.
