@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { addBusiness, nav, openMore, runSetup } from './support/app'
+import { addBusiness, bottomNav, openMore, runSetup } from './support/app'
 import { BUSINESSES } from './support/businesses'
 import type { Business } from './support/businesses'
 import { expect, test } from './support/fixtures'
@@ -52,7 +52,7 @@ async function shapeItem(page: Page, b: Business) {
       .getByLabel('Много')
       .fill(b.itemPlural)
     await page.getByRole('button', { name: 'Запази', exact: true }).click()
-    await expect(nav(page)).toBeVisible()
+    await bottomNav(page)
   }
   await openSection(page, 'Полета')
   await page.getByRole('tab', { name: b.item.plural }).click()
@@ -91,7 +91,9 @@ async function expectReminderRule(page: Page, b: Business) {
 
 /** "+": the header, the rows the form shows, then one line saved. */
 async function addJobWithOneLine(page: Page, b: Business) {
-  await nav(page)
+  await (
+    await bottomNav(page)
+  )
     .getByRole('link', { name: `Добави: ${b.job.singular}` })
     .click()
   await expect(
@@ -124,12 +126,16 @@ async function addJobWithOneLine(page: Page, b: Business) {
   }
 
   await page.getByRole('button', { name: 'Запази', exact: true }).click()
-  await expect(nav(page)).toBeVisible()
+  await bottomNav(page)
 }
 
 /** The job's page: the stages, the repeat line, the reminder offer. */
 async function expectJobPage(page: Page, b: Business) {
-  await nav(page).getByRole('link', { name: b.job.plural }).click()
+  await (
+    await bottomNav(page)
+  )
+    .getByRole('link', { name: b.job.plural })
+    .click()
   await expect(
     page.getByRole('heading', { name: b.job.plural, level: 1 }),
   ).toBeVisible()
@@ -172,7 +178,7 @@ async function expectJobPage(page: Page, b: Business) {
 
 /** The client's page: the item section by its own word, with an item added. */
 async function expectClientPage(page: Page, b: Business) {
-  await nav(page).getByRole('link', { name: 'Клиенти' }).click()
+  await (await bottomNav(page)).getByRole('link', { name: 'Клиенти' }).click()
   await page.getByRole('link', { name: new RegExp(b.client) }).click()
   await expect(
     page.getByRole('heading', { name: b.client, level: 1 }),
@@ -218,11 +224,10 @@ for (const [index, b] of BUSINESSES.entries()) {
     await runSetup(page, b.answers)
 
     // The words: the nav, the "+" label and its header.
+    const nav = await bottomNav(page)
+    await expect(nav.getByRole('link', { name: b.job.plural })).toBeVisible()
     await expect(
-      nav(page).getByRole('link', { name: b.job.plural }),
-    ).toBeVisible()
-    await expect(
-      nav(page).getByRole('link', { name: `Добави: ${b.job.singular}` }),
+      nav.getByRole('link', { name: `Добави: ${b.job.singular}` }),
     ).toBeVisible()
     await expect(page.getByRole('banner')).toContainText(b.answers.name)
 

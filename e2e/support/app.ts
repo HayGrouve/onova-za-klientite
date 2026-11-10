@@ -32,8 +32,24 @@ export type Answers = {
       }
 }
 
-export const nav = (page: Page) =>
-  page.getByRole('navigation', { name: 'Основно меню' })
+/**
+ * The phone's bottom nav, once no toast holds its place. A toast takes the
+ * nav's slot while it shows (styles.css), and Sonner keeps a toast up for as
+ * long as the pointer rests on it. A finger never rests there, but Playwright's
+ * mouse stays where it last clicked, often right where the toast appears, so
+ * it moves off first and the toast leaves on its own time.
+ */
+export async function bottomNav(page: Page): Promise<Locator> {
+  await page.mouse.move(0, 0)
+  await expect(
+    page.locator(
+      '[data-sonner-toaster][data-y-position="bottom"] [data-sonner-toast]',
+    ),
+  ).toHaveCount(0, { timeout: 30_000 })
+  const nav = page.getByRole('navigation', { name: 'Основно меню' })
+  await expect(nav).toBeVisible()
+  return nav
+}
 
 /** The chips of one question: the toggle group named like the question. */
 function question(page: Page, title: string): Locator {
@@ -171,7 +187,7 @@ export async function runSetup(page: Page, answers: Answers) {
     page.getByRole('heading', { name: 'Така ли работиш?' }),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Да, започвам' }).click()
-  await expect(nav(page)).toBeVisible()
+  await bottomNav(page)
 }
 
 /** Settings → Добави бизнес: creates the next business and opens its setup. */

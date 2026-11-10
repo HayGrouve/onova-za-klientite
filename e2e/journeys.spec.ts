@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
-import { addBusiness, nav, runSetup } from './support/app'
+import { addBusiness, bottomNav, runSetup } from './support/app'
 import { expect, test } from './support/fixtures'
 
 // One business, one job, followed from the first sign-in to the summary image.
@@ -22,14 +22,20 @@ test('first sign-in opens setup, and a few answers start the business', async ({
 
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('banner')).toContainText(BUSINESS)
-  await expect(nav(page).getByRole('link', { name: 'Поръчки' })).toBeVisible()
+  await expect(
+    (await bottomNav(page)).getByRole('link', { name: 'Поръчки' }),
+  ).toBeVisible()
 })
 
 test('"+" reads one line back and saves a job with its deposit', async ({
   page,
 }) => {
   // The "+" in the nav: the calendar's "Добави: Поръчка за …" is a link too.
-  await nav(page).getByRole('link', { name: 'Добави: Поръчка' }).click()
+  await (
+    await bottomNav(page)
+  )
+    .getByRole('link', { name: 'Добави: Поръчка' })
+    .click()
   await expect(
     page.getByRole('heading', { name: 'Какво записваме?' }),
   ).toBeVisible()
@@ -49,14 +55,14 @@ test('"+" reads one line back and saves a job with its deposit', async ({
   await expect(readBack).toContainText('20.10')
 
   await page.getByRole('button', { name: 'Запази', exact: true }).click()
-  await expect(nav(page)).toBeVisible()
+  await bottomNav(page)
   await expect(page).toHaveURL(/\/$/)
 })
 
 test('the job shows its money, and a payment moves the balance', async ({
   page,
 }) => {
-  await nav(page).getByRole('link', { name: 'Поръчки' }).click()
+  await (await bottomNav(page)).getByRole('link', { name: 'Поръчки' }).click()
   await page.getByRole('link', { name: /Гардероб/ }).click()
   await expect(page.getByRole('heading', { name: 'Гардероб' })).toBeVisible()
 
@@ -79,7 +85,7 @@ test('the job shows its money, and a payment moves the balance', async ({
 })
 
 test('the Money screen adds the payments up', async ({ page }) => {
-  await nav(page).getByRole('link', { name: 'Пари' }).click()
+  await (await bottomNav(page)).getByRole('link', { name: 'Пари' }).click()
   await expect(page.getByRole('heading', { name: 'Пари' })).toBeVisible()
 
   await expect(figure(page, 'Получени')).toContainText('500')
@@ -94,7 +100,7 @@ test('the Money screen adds the payments up', async ({ page }) => {
 test('the job summary is an image, and it is not an invoice', async ({
   page,
 }) => {
-  await nav(page).getByRole('link', { name: 'Поръчки' }).click()
+  await (await bottomNav(page)).getByRole('link', { name: 'Поръчки' }).click()
   await page.getByRole('link', { name: /Гардероб/ }).click()
   await page.getByRole('button', { name: 'Обобщение' }).click()
 
@@ -121,7 +127,7 @@ test('the job summary is an image, and it is not an invoice', async ({
 })
 
 test('cancelling asks why, and the job keeps the reason', async ({ page }) => {
-  await nav(page).getByRole('link', { name: 'Поръчки' }).click()
+  await (await bottomNav(page)).getByRole('link', { name: 'Поръчки' }).click()
   await page.getByRole('link', { name: /Гардероб/ }).click()
   await page.getByRole('button', { name: 'Друг етап' }).click()
   // The Cancelled-group stage is the last chip.
@@ -142,7 +148,7 @@ test('cancelling asks why, and the job keeps the reason', async ({ page }) => {
 test('the calendar plans past the week, and "+" starts on its day', async ({
   page,
 }) => {
-  await nav(page).getByRole('link', { name: 'Днес' }).click()
+  await (await bottomNav(page)).getByRole('link', { name: 'Днес' }).click()
   // Two months on, the 15th: far past the week Today lists.
   await page.getByRole('button', { name: 'Следващ месец' }).click()
   await page.getByRole('button', { name: 'Следващ месец' }).click()
