@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { workerSource } from './worker-source.ts'
+import { FAREWELL_HOST, workerSource } from './worker-source.ts'
 import type { WorkerManifest } from './worker-source.ts'
 
 const ORIGIN = 'https://app.test'
@@ -12,12 +12,23 @@ class FakeRequest {
   url: string
   mode = 'cors'
   method = 'GET'
-  constructor(input: string | { url: string }) {
-    this.url = new URL(
-      typeof input === 'string' ? input : input.url,
-      ORIGIN,
-    ).href
+  constructor(input: string | { url: string }, base = ORIGIN) {
+    this.url = new URL(typeof input === 'string' ? input : input.url, base).href
   }
+}
+
+type DeleteRequest = {
+  onsuccess?: () => void
+  onerror?: () => void
+  onblocked?: () => void
+}
+
+type WorkerOptions = {
+  origin?: string
+  /** URLs of the open windows. */
+  windows?: string[]
+  /** How the snapshot delete ends: an open page makes it "blocked". */
+  snapshotDelete?: 'success' | 'blocked'
 }
 
 function okResponse() {
@@ -31,8 +42,18 @@ function okResponse() {
 }
 
 /** Just enough of a service worker scope and the Cache API to run the worker. */
-function createWorker(manifest: WorkerManifest, stores: Stores) {
+function createWorker(
+  manifest: WorkerManifest,
+  stores: Stores,
+  {
+    origin = ORIGIN,
+    windows = [],
+    snapshotDelete = 'success',
+  }: WorkerOptions = {},
+) {
   const fetched: string[] = []
+  /** Every farewell side effect, in the order it happened. */
+  const log: string[] = []
   const listeners = new Map<string, Listener>()
   const fetchFn = (request: FakeRequest) => {
     fetched.push(new URL(request.url).pathname)
@@ -43,11 +64,13 @@ function createWorker(manifest: WorkerManifest, stores: Stores) {
     const store = stores.get(name) as Map<string, string>
     return {
       keys: () =>
-        Promise.resolve([...store.keys()].map((url) => new FakeRequest(url))),
+        Promise.resolve(
+          [...store.keys()].map((url) => new FakeRequest(url, origin)),
+        ),
       addAll: async (requests: FakeRequest[] | string[]) => {
         for (const request of requests) {
-          const { url } = new FakeRequest(request)
-          await fetchFn(new FakeRequest(url))
+          const { url } = new FakeRequest(request, origin)
+          await fetchFn(new FakeRequest(url, origin))
           store.set(url, url)
         }
       },
@@ -64,26 +87,71 @@ function createWorker(manifest: WorkerManifest, stores: Stores) {
     }
   }
   const self = {
-    location: { origin: ORIGIN },
-    clients: { claim: () => Promise.resolve() },
+    location: new URL(origin),
+    skipWaiting: () => {
+      log.push('skipWaiting')
+      return Promise.resolve()
+    },
+    registration: {
+      unregister: () => {
+        log.push('unregister')
+        return Promise.resolve(true)
+      },
+    },
+    clients: {
+      claim: () => {
+        log.push('claim')
+        return Promise.resolve()
+      },
+      matchAll: () =>
+        Promise.resolve(
+          windows.map((url) => ({
+            url,
+            navigate: (target: string) => {
+              log.push(`navigate ${url} -> ${target}`)
+              return Promise.resolve(null)
+            },
+          })),
+        ),
+    },
     addEventListener: (type: string, listener: Listener) =>
       listeners.set(type, listener),
+  }
+  const indexedDB = {
+    deleteDatabase: (name: string) => {
+      log.push(`deleteDatabase ${name}`)
+      const request: DeleteRequest = {}
+      setTimeout(() =>
+        snapshotDelete === 'blocked'
+          ? request.onblocked?.()
+          : request.onsuccess?.(),
+      )
+      return request
+    },
   }
   const caches = {
     open: (name: string) => Promise.resolve(open(name)),
     keys: () => Promise.resolve([...stores.keys()]),
-    delete: (name: string) => Promise.resolve(stores.delete(name)),
+    delete: (name: string) => {
+      log.push(`delete cache ${name}`)
+      return Promise.resolve(stores.delete(name))
+    },
     match: (request: FakeRequest | string, options?: { cacheName: string }) => {
       const hit = stores
         .get(options?.cacheName ?? '')
-        ?.get(new FakeRequest(request as string).url)
+        ?.get(new FakeRequest(request as string, origin).url)
       return Promise.resolve(hit ? { cached: hit } : undefined)
     },
   }
   runInNewContext(workerSource(manifest), {
     self,
     caches,
-    Request: FakeRequest,
+    indexedDB,
+    Request: class extends FakeRequest {
+      constructor(input: string | { url: string }) {
+        super(input, origin)
+      }
+    },
     URL,
     Set,
     Promise,
@@ -100,7 +168,7 @@ function createWorker(manifest: WorkerManifest, stores: Stores) {
     await Promise.all(waits)
     return result.response ? await result.response : undefined
   }
-  return { run, fetched }
+  return { run, fetched, log }
 }
 
 const manifest = (version: string, assets: string[]): WorkerManifest => ({
@@ -174,5 +242,89 @@ describe('generated worker', () => {
       request: new FakeRequest('/fonts/x.woff'),
     })
     expect(other).toBeUndefined()
+  })
+})
+
+describe('farewell on the old host', () => {
+  const old = `https://${FAREWELL_HOST}`
+  const app = manifest('v1', ['/assets/a-1.js', '/assets/b-1.js'])
+
+  it('takes over at once, clears everything, sends windows to the new host, then unregisters', async () => {
+    // Today's worker left its caches behind.
+    const stores: Stores = new Map([
+      ['shell-v0', new Map([[`${old}/_shell.html`, 'x']])],
+      ['assets', new Map([[`${old}/assets/a-0.js`, 'x']])],
+    ])
+    const worker = createWorker(app, stores, {
+      origin: old,
+      windows: [`${old}/customers/abc?tab=jobs`, `${old}/`],
+    })
+
+    await worker.run('install')
+    expect(worker.log).toEqual(['skipWaiting'])
+    expect(worker.fetched).toEqual([])
+
+    await worker.run('activate')
+    expect(worker.log).toEqual([
+      'skipWaiting',
+      'delete cache shell-v0',
+      'delete cache assets',
+      'deleteDatabase keyval-store',
+      'claim',
+      `navigate ${old}/customers/abc?tab=jobs -> https://klientite.onovaza.com/customers/abc?tab=jobs`,
+      `navigate ${old}/ -> https://klientite.onovaza.com/`,
+      'unregister',
+    ])
+    expect(stores.size).toBe(0)
+  })
+
+  it('does not wait for the snapshot delete that an open page blocks', async () => {
+    const worker = createWorker(app, new Map(), {
+      origin: old,
+      windows: [`${old}/today`],
+      snapshotDelete: 'blocked',
+    })
+    await worker.run('activate')
+    expect(worker.log.at(-1)).toBe('unregister')
+  })
+
+  it('serves nothing from a cache: every request goes to the network', async () => {
+    const worker = createWorker(app, new Map(), { origin: old })
+    const navigation = Object.assign(new FakeRequest('/customers', old), {
+      mode: 'navigate',
+    })
+    expect(await worker.run('fetch', { request: navigation })).toBeUndefined()
+    expect(
+      await worker.run('fetch', {
+        request: new FakeRequest('/assets/a-1.js', old),
+      }),
+    ).toBeUndefined()
+  })
+
+  it.each([
+    'https://klientite.onovaza.com',
+    'https://onova-za-klientite-git-feat-x-haygrouves-projects.vercel.app',
+    'https://onova-za-klientite-abc123def-haygrouves-projects.vercel.app',
+    'https://www.onova-za-klientite.vercel.app',
+    'https://onova-za-klientite.vercel.app.example.com',
+    'http://localhost:3000',
+  ])('on %s keeps caching and serving the shell', async (origin) => {
+    const stores: Stores = new Map()
+    const worker = createWorker(app, stores, {
+      origin,
+      windows: [`${origin}/today`],
+    })
+    await worker.run('install')
+    await worker.run('activate')
+    expect([...stores.keys()].sort()).toEqual(['assets', 'shell-v1'])
+    // Today's worker claims its pages, and nothing of the farewell runs.
+    expect(worker.log).toEqual(['claim'])
+
+    const navigation = Object.assign(new FakeRequest('/customers', origin), {
+      mode: 'navigate',
+    })
+    expect(await worker.run('fetch', { request: navigation })).toEqual({
+      cached: new URL('/_shell.html', origin).href,
+    })
   })
 })
