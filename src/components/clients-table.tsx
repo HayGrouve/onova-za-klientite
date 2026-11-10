@@ -160,7 +160,7 @@ export function ClientsTable({
                     : 'text-muted-foreground',
                 )}
               >
-                {client.owedCents > 0 ? formatMoney(client.owedCents) : '–'}
+                {client.owedCents > 0 ? formatMoney(client.owedCents) : ''}
               </TableCell>
               <TableCell
                 className={cn(
@@ -168,7 +168,7 @@ export function ClientsTable({
                   'text-right text-muted-foreground tabular-nums',
                 )}
               >
-                {client.creditCents > 0 ? formatMoney(client.creditCents) : '–'}
+                {client.creditCents > 0 ? formatMoney(client.creditCents) : ''}
               </TableCell>
               <TableCell
                 className={cn(WIDE_ONLY, 'px-4 text-right tabular-nums')}

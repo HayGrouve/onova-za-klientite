@@ -559,7 +559,7 @@ export function NewJobForm({
               // Saved with a capital first letter, so it reads that way here.
               value={
                 <span className="block first-letter:uppercase">
-                  {chosenTitle.trim() || '–'}
+                  {chosenTitle.trim() || m.fields_choice_none()}
                 </span>
               }
               fixId={fixId('title')}
@@ -601,7 +601,11 @@ export function NewJobForm({
                   clientItems
                     .filter((item) => pickedItems.includes(item.id))
                     .map((item) => item.name)
-                    .join(', ') || '–'
+                    .join(', ') || (
+                    <span className="block first-letter:uppercase">
+                      {m.fields_choice_none()}
+                    </span>
+                  )
                 }
               >
                 <div className="flex flex-wrap gap-2">
