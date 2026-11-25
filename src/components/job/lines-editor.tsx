@@ -37,13 +37,13 @@ function toRow(line: Line): Row {
   }
 }
 
-/** What a row comes to, or a dash while its numbers aren't readable yet. */
+/** What a row comes to, or nothing while its numbers aren't readable yet. */
 function lineSum(row: Row) {
   const quantity = parseQuantity(row.quantity)
   const unitPriceCents = parseMoney(row.price)
   return quantity !== null && unitPriceCents !== null && unitPriceCents >= 0
     ? formatMoney(lineTotalCents(quantity, unitPriceCents))
-    : '–'
+    : ''
 }
 
 /** Job lines: from the service list or typed. The price becomes their sum. */

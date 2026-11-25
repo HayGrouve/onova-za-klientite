@@ -51,8 +51,8 @@ const SORT: Record<JobSortKey, (a: JobRowData, b: JobRowData) => number> = {
 
 // Narrow screens drop what the books need least, so the money stays in view:
 // the client moves under the title, and the next appointment goes (xl).
-/** An amount, or a dash for none, in price, paid and balance alike. */
-const money = (cents: number) => (cents === 0 ? '–' : formatMoney(cents))
+/** An amount, or a blank cell for none, in price, paid and balance alike. */
+const money = (cents: number) => (cents === 0 ? '' : formatMoney(cents))
 
 const WIDE_ONLY = 'hidden xl:table-cell'
 const CELL = 'px-3 xl:px-4'
