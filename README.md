@@ -4,7 +4,7 @@ Simple client, job and money tracking for any small service business, from one p
 
 ## Status
 
-The product design is final. All v1 milestones (1–10) are merged and deployed to https://onova-za-klientite.vercel.app. Next: real-device checks, then the launch switch to the owner's domain and the Clerk production instance.
+The product design is final. All v1 milestones (1–10) are merged and deployed to https://klientite.onovaza.com, which signs in through the shared онова за Акаунт (onovaza.com, [ADR 0012](docs/adr/0012-shared-akaunt.md)). The old https://onova-za-klientite.vercel.app redirects there. Next: real-device checks.
 
 ## Docs
 
